@@ -1,3 +1,9 @@
+# Lightning
+.lightning_studio/
+.vscode-server
+.windsurf-server
+.cursor-server
+
 # Environment
 .env
 .env.local

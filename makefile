@@ -24,7 +24,7 @@ NC := \033[0m # No Color
 ## help: Show this help message
 help:
 	@echo "$(GREEN)╔══════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(GREEN)║     Arash Messenger Bot v3.0 - Makefile Commands        ║$(NC)"
+	@echo "$(GREEN)║     Arash Messenger Bot v3.0 - Makefile Commands         ║$(NC)"
 	@echo "$(GREEN)╚══════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Setup Commands:$(NC)"
