@@ -99,23 +99,35 @@ class MessageProcessor:
             max_history = platform_manager.get_max_history(session.platform)
             
             # Send to OpenRouter with session's current model
-            response = await openrouter_client.send_chat_request(
-                session_id=session.session_id,
-                query=message.text or "این تصویر را توضیح بده؟",
-                history=session.get_recent_history(max_history),
-                pipeline=session.current_model,
-                files=files
-            )
-            
-            # Update history
-            session.add_message("user", message.text or "[تصویر/پیوست]")
-            session.add_message("assistant", response["Response"])
-            
-            # Trim history if exceeds platform limit
-            if len(session.history) > max_history * 2:
-                session.history = session.history[-max_history * 2:]
-            
-            return response["Response"]
+            try:
+                response = await openrouter_client.send_chat_request(
+                    session_id=session.session_id,
+                    query=message.text or "این تصویر را توضیح بده؟",
+                    history=session.get_recent_history(max_history),
+                    pipeline=session.current_model,
+                    files=files
+                )
+                
+                # Update history
+                session.add_message("user", message.text or "[تصویر/پیوست]")
+                session.add_message("assistant", response["Response"])
+                
+                # Trim history if exceeds platform limit
+                if len(session.history) > max_history * 2:
+                    session.history = session.history[-max_history * 2:]
+                
+                return response["Response"]
+                
+            except Exception as openrouter_error:
+                logger.error(f"OpenRouter service error: {openrouter_error}")
+                
+                # Return fallback message when OpenRouter is unavailable
+                return (
+                    "⚠️ متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست.\n\n"
+                    f"پیام شما: {message.text}\n\n"
+                    "لطفاً چند لحظه دیگر دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.\n\n"
+                    f"جزئیات خطا: سرویس هوش مصنوعی پاسخ نمی‌دهد."
+                )
             
         except Exception as e:
             logger.error(f"Error processing chat: {e}", exc_info=True)
