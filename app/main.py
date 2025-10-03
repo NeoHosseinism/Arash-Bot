@@ -1,0 +1,154 @@
+"""
+FastAPI application entry point
+"""
+import asyncio
+from datetime import datetime
+from contextlib import asynccontextmanager
+import logging
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.core.config import settings
+from app.api.routes import router
+from app.services.session_manager import session_manager
+from app.services.platform_manager import platform_manager
+from app.services.openrouter_client import openrouter_client
+from app.utils.logger import setup_logging
+
+# Setup logging
+setup_logging()
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    # Startup
+    logger.info("=" * 60)
+    logger.info("Starting Arash Messenger Bot Service v3.0")
+    logger.info("=" * 60)
+    
+    app.state.start_time = datetime.utcnow()
+    
+    # Log platform configurations
+    logger.info("📱 Platform Configurations:")
+    
+    # Telegram
+    telegram_config = platform_manager.get_config("telegram")
+    logger.info("  Telegram (Public):")
+    logger.info(f"    - Model: {telegram_config.model}")
+    logger.info(f"    - Rate Limit: {telegram_config.rate_limit}/min")
+    logger.info(f"    - Commands: {', '.join(telegram_config.commands)}")
+    logger.info(f"    - Max History: {telegram_config.max_history}")
+    
+    # Internal
+    internal_config = platform_manager.get_config("internal")
+    logger.info("  Internal (Private):")
+    logger.info(f"    - Default Model: {internal_config.model}")
+    logger.info(f"    - Available Models: {len(internal_config.available_models)}")
+    logger.info(f"    - Rate Limit: {internal_config.rate_limit}/min")
+    logger.info(f"    - Commands: {len(internal_config.commands)}")
+    logger.info(f"    - Max History: {internal_config.max_history}")
+    logger.info(f"    - Authentication: {'✅ Required' if internal_config.requires_auth else '❌ Not required'}")
+    
+    logger.info(f"\n🌐 OpenRouter Service: {settings.OPENROUTER_SERVICE_URL}")
+    logger.info(f"🔧 Environment: {settings.ENVIRONMENT}")
+    logger.info("✅ Service ready to handle requests!")
+    logger.info("=" * 60)
+    
+    # Start periodic cleanup task
+    cleanup_task = asyncio.create_task(periodic_cleanup())
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down Arash Messenger Bot Service...")
+    
+    # Cancel cleanup task
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+    
+    # Close HTTP client
+    await openrouter_client.close()
+    
+    # Log statistics
+    total_sessions = len(session_manager.sessions)
+    telegram_count = session_manager.get_session_count("telegram")
+    internal_count = session_manager.get_session_count("internal")
+    
+    logger.info(f"Sessions processed: {total_sessions}")
+    logger.info(f"  - Telegram: {telegram_count}")
+    logger.info(f"  - Internal: {internal_count}")
+    logger.info("Shutdown complete.")
+
+
+async def periodic_cleanup():
+    """Periodic cleanup of old sessions"""
+    while True:
+        try:
+            await asyncio.sleep(300)  # Every 5 minutes
+            cleared = session_manager.clear_old_sessions()
+            session_manager.clear_rate_limits()
+            if cleared > 0:
+                logger.info(f"Periodic cleanup: removed {cleared} expired sessions")
+        except asyncio.CancelledError:
+            break
+        except Exception as e:
+            logger.error(f"Error in periodic cleanup: {e}")
+
+
+# Create FastAPI app
+app = FastAPI(
+    title="Arash Messenger Bot Service",
+    version="3.0.0",
+    description="Unified bot service supporting Telegram (public) and Internal (private) platforms",
+    docs_url="/docs" if settings.ENABLE_API_DOCS else None,
+    redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Exception handlers
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Global exception handler"""
+    logger.error(f"Unhandled exception: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "success": False,
+            "error": "internal_server_error",
+            "detail": "An internal error occurred" if settings.is_production else str(exc)
+        }
+    )
+
+
+# Include routes
+app.include_router(router)
+
+
+# Development server helper
+if __name__ == "__main__":
+    import uvicorn
+    
+    uvicorn.run(
+        "app.main:app",
+        host=settings.API_HOST,
+        port=settings.API_PORT,
+        reload=not settings.is_production,
+        log_level=settings.LOG_LEVEL.lower()
+    )

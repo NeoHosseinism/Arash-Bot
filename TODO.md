@@ -1,0 +1,2 @@
+- [] change the run_bot.py to telegram_bot
+- [] version 3 -> 1
