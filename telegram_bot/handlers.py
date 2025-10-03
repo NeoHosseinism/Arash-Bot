@@ -3,7 +3,7 @@ Telegram bot handlers
 """
 import base64
 import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import ContextTypes
 import httpx
 
@@ -19,6 +19,16 @@ class TelegramHandlers:
         self.bot_client = bot_client
         self.max_file_size = settings.max_image_size_bytes
     
+    def _get_response_text(self, response: dict, default: str = "پاسخی دریافت نشد") -> str:
+        """Extract response text from API response"""
+        # Try different response formats
+        if "response" in response:
+            return response["response"]
+        elif "data" in response and isinstance(response["data"], dict):
+            if "response" in response["data"]:
+                return response["data"]["response"]
+        return default
+    
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle /start command"""
         user = update.effective_user
@@ -32,8 +42,10 @@ class TelegramHandlers:
                 text="/start"
             )
             
+            response_text = self._get_response_text(response, "🤖 خوش آمدید!")
+            
             await update.message.reply_text(
-                response["data"]["response"],
+                response_text,
                 parse_mode="Markdown"
             )
         except Exception as e:
@@ -55,8 +67,10 @@ class TelegramHandlers:
                 text="/help"
             )
             
+            response_text = self._get_response_text(response, "📚 راهنما")
+            
             await update.message.reply_text(
-                response["data"]["response"],
+                response_text,
                 parse_mode="Markdown"
             )
         except Exception as e:
@@ -82,8 +96,10 @@ class TelegramHandlers:
                 text=message.text
             )
             
+            response_text = self._get_response_text(response, "متوجه نشدم")
+            
             await message.reply_text(
-                response["data"]["response"],
+                response_text,
                 parse_mode="Markdown"
             )
         except httpx.HTTPStatusError as e:
@@ -147,9 +163,10 @@ class TelegramHandlers:
                 mime_type="image/jpeg"
             )
             
-            # Send response
+            response_text = self._get_response_text(response, "تصویر پردازش شد")
+            
             await message.reply_text(
-                response["data"]["response"],
+                response_text,
                 parse_mode="Markdown"
             )
             
@@ -204,8 +221,10 @@ class TelegramHandlers:
                     mime_type=document.mime_type
                 )
                 
+                response_text = self._get_response_text(response, "فایل پردازش شد")
+                
                 await message.reply_text(
-                    response["data"]["response"],
+                    response_text,
                     parse_mode="Markdown"
                 )
             except Exception as e:

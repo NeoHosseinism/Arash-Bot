@@ -9,8 +9,8 @@ from telegram.ext import (
     filters
 )
 
-from telegram.client import BotServiceClient
-from telegram.handlers import TelegramHandlers
+from telegram_bot.client import BotServiceClient
+from telegram_bot.handlers import TelegramHandlers
 from app.core.config import settings
 from app.utils.logger import setup_logging
 
