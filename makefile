@@ -111,19 +111,19 @@ run-service:
 ## run-bot: Run Telegram bot
 run-bot:
 	@echo "$(GREEN)Starting Telegram bot...$(NC)"
-	@$(PYTHON_VENV) run_bot.py
+	@$(PYTHON_VENV) run_telegram_bot.py
 
 ## run-all: Run both service and bot (requires tmux or screen)
 run-all:
 	@if command -v tmux > /dev/null; then \
 		echo "$(GREEN)Starting services with tmux...$(NC)"; \
 		tmux new-session -d -s arash-bot "$(PYTHON_VENV) run_service.py"; \
-		tmux split-window -h -t arash-bot "$(PYTHON_VENV) run_bot.py"; \
+		tmux split-window -h -t arash-bot "$(PYTHON_VENV) run_telegram_bot.py"; \
 		tmux attach -t arash-bot; \
 	elif command -v screen > /dev/null; then \
 		echo "$(GREEN)Starting services with screen...$(NC)"; \
 		screen -dmS arash-service bash -c "$(PYTHON_VENV) run_service.py"; \
-		screen -dmS arash-bot bash -c "$(PYTHON_VENV) run_bot.py"; \
+		screen -dmS arash-bot bash -c "$(PYTHON_VENV) run_telegram_bot.py"; \
 		echo "$(GREEN)Services started!$(NC)"; \
 		echo "$(YELLOW)Attach with: screen -r arash-service$(NC)"; \
 	else \
@@ -136,7 +136,7 @@ run-all:
 stop:
 	@echo "$(YELLOW)Stopping services...$(NC)"
 	@pkill -f "run_service.py" || true
-	@pkill -f "run_bot.py" || true
+	@pkill -f "run_telegram_bot.py" || true
 	@if command -v tmux > /dev/null; then \
 		tmux kill-session -t arash-bot 2>/dev/null || true; \
 	fi

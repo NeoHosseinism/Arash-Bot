@@ -59,7 +59,7 @@ nano .env  # or use any text editor
 python run_service.py
 
 # Terminal 2: Run Telegram bot
-python run_bot.py
+python run_telegram_bot.py
 ```
 
 The FastAPI service will be available at `http://localhost:8001`
@@ -93,7 +93,7 @@ arash-messenger-bot/
 ├── .gitignore
 ├── requirements.txt
 ├── run_service.py              # Service entry point
-├── run_bot.py                  # Bot entry point
+├── run_telegram_bot.py                  # Bot entry point
 └── README.md
 ```
 
@@ -271,7 +271,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Run both services
-CMD ["sh", "-c", "python run_service.py & python run_bot.py"]
+CMD ["sh", "-c", "python run_service.py & python run_telegram_bot.py"]
 ```
 
 ### Systemd Service

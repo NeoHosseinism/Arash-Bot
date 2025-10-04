@@ -120,7 +120,7 @@ source venv/bin/activate
 
 # Run services
 python run_service.py
-python run_bot.py
+python run_telegram_bot.py
 ```
 
 ### Method 3: Systemd (Production)

@@ -1,2 +1,8 @@
-- [] change the run_bot.py to telegram_bot
+- [x] change the run_telegram_bot.py to telegram_bot
 - [] version 3 -> 1
+- [] add api sepration in the or side
+- [] optimize the 
+- [] write a notifier bot in telegram for APIs credit done
+- [] make 2 modes response in Bot service stream(SSE) and batch and simulating gpt response in telegram
+- [] use form ⌛ between messages and if platform was telegram after the response be ready delete that ⌛ and then send response
+- [] make switch models enable in public platform like telgram in this code, but use from a different list of the private (internal) mode

@@ -243,7 +243,7 @@ class CommandProcessor:
         language = args[0]
         text = " ".join(args[1:])
         
-        return f"🌐 در حال ترجمه به {language}: *{text}*\n(این به سرویس OpenRouter ارسال می‌شود)"
+        return f"🌐 در حال ترجمه به {language}: *{text}*\n"
     
     async def handle_settings(self, session: ChatSession, args: List[str]) -> str:
         """Handle /settings command (private only)"""
