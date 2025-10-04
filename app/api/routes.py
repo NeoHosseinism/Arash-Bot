@@ -36,7 +36,7 @@ async def root():
     
     return HealthCheckResponse(
         service="Arash Messenger Bot",
-        version="3.0.0",
+        version="1.0.0",
         status="healthy",
         platforms={
             "telegram": {
@@ -65,7 +65,7 @@ async def health_check():
     return {
         "status": "healthy" if openrouter_healthy else "degraded",
         "service": "Arash Messenger Bot",
-        "version": "3.0.0",
+        "version": "1.0.0",
         "components": {
             "api": "healthy",
             "openrouter": "healthy" if openrouter_healthy else "unhealthy",

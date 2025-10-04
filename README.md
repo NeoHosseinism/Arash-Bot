@@ -1,4 +1,4 @@
-# Arash Messenger Bot v3.0
+# Arash Messenger Bot v1.0
 
 A professional, scalable multi-platform chatbot service supporting Telegram (public) and Internal (private) messaging platforms with AI model integration via OpenRouter.
 

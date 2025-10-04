@@ -1,5 +1,5 @@
 - [x] change the run_telegram_bot.py to telegram_bot
-- [] version 3 -> 1
+- [x] version 3 -> 1
 - [] add api sepration in the or side
 - [] optimize the 
 - [] write a notifier bot in telegram for APIs credit done

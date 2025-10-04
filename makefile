@@ -1,4 +1,4 @@
-# Makefile for Arash Messenger Bot v3.0
+# Makefile for Arash Messenger Bot v1.0
 # Provides convenient commands for development and deployment
 
 .PHONY: help install dev test clean run-service run-bot run-all stop docker-build docker-up docker-down logs format lint security check deploy
@@ -24,7 +24,7 @@ NC := \033[0m # No Color
 ## help: Show this help message
 help:
 	@echo "$(GREEN)╔══════════════════════════════════════════════════════════╗$(NC)"
-	@echo "$(GREEN)║     Arash Messenger Bot v3.0 - Makefile Commands         ║$(NC)"
+	@echo "$(GREEN)║     Arash Messenger Bot v1.0 - Makefile Commands         ║$(NC)"
 	@echo "$(GREEN)╚══════════════════════════════════════════════════════════╝$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Setup Commands:$(NC)"
@@ -334,7 +334,7 @@ upgrade:
 info:
 	@echo "$(GREEN)Project Information:$(NC)"
 	@echo "  Name: Arash Messenger Bot"
-	@echo "  Version: 3.0.0"
+	@echo "  Version: 1.0.0"
 	@echo "  Python: $(shell $(PYTHON) --version)"
 	@echo "  Venv: $(if $(wildcard $(VENV)),$(GREEN)Active$(NC),$(RED)Not found$(NC))"
 	@echo "  Services: $(if $(shell pgrep -f run_service.py),$(GREEN)Running$(NC),$(RED)Stopped$(NC))"
