@@ -18,10 +18,14 @@ class Settings(BaseSettings):
     
     # Telegram Configuration
     TELEGRAM_BOT_TOKEN: str = Field(..., env="TELEGRAM_BOT_TOKEN")
-    TELEGRAM_MODEL: str = Field(default="google/gemini-2.0-flash-001", env="TELEGRAM_MODEL")
+    TELEGRAM_DEFAULT_MODEL: str = Field(default="google/gemini-2.0-flash-001", env="TELEGRAM_DEFAULT_MODEL")
+    TELEGRAM_MODELS: str = Field(
+        default="google/gemini-2.0-flash-001,google/gemini-2.5-flash,deepseek/deepseek-chat-v3-0324,openai/gpt-4o-mini,google/gemma-3-1b-it",
+        env="TELEGRAM_MODELS"
+    )
     TELEGRAM_RATE_LIMIT: int = Field(default=20, env="TELEGRAM_RATE_LIMIT")
     TELEGRAM_MAX_HISTORY: int = Field(default=10, env="TELEGRAM_MAX_HISTORY")
-    TELEGRAM_COMMANDS: str = Field(default="start,help,status,translate", env="TELEGRAM_COMMANDS")
+    TELEGRAM_COMMANDS: str = Field(default="start,help,status,translate,model,models", env="TELEGRAM_COMMANDS")
     TELEGRAM_ADMIN_USERS: str = Field(default="", env="TELEGRAM_ADMIN_USERS")
     TELEGRAM_WEBHOOK_URL: Optional[str] = Field(default=None, env="TELEGRAM_WEBHOOK_URL")
     
@@ -81,6 +85,11 @@ class Settings(BaseSettings):
     def telegram_commands_list(self) -> List[str]:
         """Get Telegram commands as list"""
         return [cmd.strip() for cmd in self.TELEGRAM_COMMANDS.split(",") if cmd.strip()]
+    
+    @property
+    def telegram_models_list(self) -> List[str]:
+        """Get Telegram models as list"""
+        return [model.strip() for model in self.TELEGRAM_MODELS.split(",") if model.strip()]
     
     @property
     def telegram_admin_users_set(self) -> set:

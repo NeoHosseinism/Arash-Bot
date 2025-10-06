@@ -58,19 +58,19 @@ class PlatformManager:
     def _load_configurations(self):
         """Load platform configurations from settings"""
         
-        # Telegram configuration (PUBLIC)
+        # Telegram configuration (PUBLIC with limited models)
         self.configs[Platform.TELEGRAM] = PlatformConfig(
             type=PlatformType.PUBLIC,
-            model=settings.TELEGRAM_MODEL,
-            available_models=[settings.TELEGRAM_MODEL],
+            model=settings.TELEGRAM_DEFAULT_MODEL,
+            available_models=settings.telegram_models_list,
             rate_limit=settings.TELEGRAM_RATE_LIMIT,
             commands=settings.telegram_commands_list,
-            allow_model_switch=False,
+            allow_model_switch=True,  # ✅ NOW ENABLED for Telegram
             requires_auth=False,
             max_history=settings.TELEGRAM_MAX_HISTORY
         )
         
-        # Internal configuration (PRIVATE)
+        # Internal configuration (PRIVATE with all models)
         self.configs[Platform.INTERNAL] = PlatformConfig(
             type=PlatformType.PRIVATE,
             model=settings.INTERNAL_DEFAULT_MODEL,
@@ -85,7 +85,7 @@ class PlatformManager:
         )
         
         logger.info("Platform configurations loaded successfully")
-        logger.info(f"  - Telegram: {self.configs[Platform.TELEGRAM].model}")
+        logger.info(f"  - Telegram: {self.configs[Platform.TELEGRAM].model} + {len(self.configs[Platform.TELEGRAM].available_models)} models")
         logger.info(f"  - Internal: {len(self.configs[Platform.INTERNAL].available_models)} models")
     
     def get_config(self, platform: str) -> PlatformConfig:

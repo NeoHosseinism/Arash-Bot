@@ -112,13 +112,17 @@ class CommandProcessor:
             help_text += f"• پلتفرم: داخلی (خصوصی)\n"
             help_text += f"• تغییر مدل: ✅ فعال\n"
             help_text += f"• مدل فعلی: {session.current_model}\n"
+            help_text += f"• مدل‌های موجود: {len(config.available_models)}\n"
             help_text += f"• محدودیت سرعت: {config.rate_limit} پیام/دقیقه\n"
             help_text += f"• حداکثر تاریخچه: {config.max_history} پیام\n"
         else:
-            help_text += f"• پلتفرم: تلگرام\n"
-            help_text += f"• مدل: {config.model} (ثابت)\n"
+            help_text += f"• پلتفرم: تلگرام (عمومی)\n"
+            help_text += f"• تغییر مدل: ✅ فعال\n"
+            help_text += f"• مدل فعلی: {session.current_model}\n"
+            help_text += f"• مدل‌های موجود: {len(config.available_models)}\n"
             help_text += f"• محدودیت سرعت: {config.rate_limit} پیام/دقیقه\n"
             help_text += f"• حداکثر تاریخچه: {config.max_history} پیام\n"
+            help_text += f"\n💡 از /model برای تغییر مدل استفاده کنید"
         
         return help_text
     
@@ -153,30 +157,51 @@ class CommandProcessor:
         return MESSAGES_FA["session_cleared"]
     
     async def handle_model(self, session: ChatSession, args: List[str]) -> str:
-        """Handle /model command (private only)"""
-        if session.platform != "internal":
-            return MESSAGES_FA["model_switch_not_available"].format(model=session.current_model)
-        
+        """Handle /model command (now works for both platforms)"""
         available_models = platform_manager.get_available_models(session.platform)
         
+        # Determine which aliases to use based on platform
+        if session.platform == "telegram":
+            from app.core.constants import TELEGRAM_MODEL_ALIASES
+            aliases = TELEGRAM_MODEL_ALIASES
+        else:
+            from app.core.constants import MODEL_ALIASES
+            aliases = MODEL_ALIASES
+        
         if not args:
-            return (
-                f"**مدل فعلی:** {session.current_model}\n\n"
-                f"**مدل‌های موجود:**\n" +
-                "\n".join([f"• {m}" for m in available_models]) +
-                f"\n\nبرای تغییر مدل از `/model [نام]` استفاده کنید"
-            )
+            # Show current model and available models
+            models_text = f"**مدل فعلی:** {session.current_model}\n\n"
+            models_text += f"**مدل‌های موجود:**\n"
+            
+            for model in available_models:
+                if model == session.current_model:
+                    models_text += f"• **{model}** ← فعلی\n"
+                else:
+                    models_text += f"• {model}\n"
+            
+            models_text += f"\nبرای تغییر مدل از `/model [نام]` استفاده کنید"
+            
+            # Add aliases hint
+            if session.platform == "telegram":
+                models_text += "\n\n**نام‌های کوتاه:**\n"
+                models_text += "• gemini, flash → Gemini Flash\n"
+                models_text += "• deepseek, deep → DeepSeek\n"
+                models_text += "• mini → GPT-4o Mini\n"
+                models_text += "• gemma → Gemma 3\n"
+            
+            return models_text
         
         model = args[0].lower()
         
-        # Check model aliases
-        if model in MODEL_ALIASES:
-            model = MODEL_ALIASES[model]
+        # Check aliases
+        if model in aliases:
+            model = aliases[model]
         
+        # Validate model is available for this platform
         if not platform_manager.is_model_available(session.platform, model):
             return (
                 MESSAGES_FA["model_invalid"].format(model=model) + "\n\n"
-                f"**مدل‌های موجود:**\n" +
+                f"**مدل‌های موجود برای {session.platform}:**\n" +
                 "\n".join([f"• {m}" for m in available_models])
             )
         
@@ -186,16 +211,12 @@ class CommandProcessor:
     async def handle_models(self, session: ChatSession, args: List[str]) -> str:
         """Handle /models command"""
         config = platform_manager.get_config(session.platform)
-        
-        if session.platform != "internal":
-            return (
-                f"📌 **پلتفرم تلگرام:**\n\n"
-                f"مدل ثابت: **{config.model}**\n\n"
-                f"تغییر مدل فقط برای کاربران داخلی امکان‌پذیر است."
-            )
-        
         available_models = platform_manager.get_available_models(session.platform)
-        models_text = "🤖 **مدل‌های موجود:**\n\n"
+        
+        if session.platform == "telegram":
+            models_text = "🤖 **مدل‌های موجود در تلگرام:**\n\n"
+        else:
+            models_text = "🤖 **مدل‌های موجود (داخلی):**\n\n"
         
         for model in available_models:
             if model == session.current_model:
@@ -205,17 +226,25 @@ class CommandProcessor:
         
         models_text += f"\n💡 از `/model [نام]` برای تغییر استفاده کنید"
         
-        # Add aliases info
-        models_text += "\n\n**نام‌های مستعار (aliases):**\n"
-        models_text += "• claude, sonnet → Claude Sonnet 4\n"
-        models_text += "• gpt, gpt5 → GPT-5\n"
-        models_text += "• gpt4, gpt-4 → GPT-4.1\n"
-        models_text += "• mini → GPT-4o Mini\n"
-        models_text += "• web, search → GPT-4o Search\n"
-        models_text += "• gemini → Gemini 2.5 Flash\n"
-        models_text += "• grok → Grok 4\n"
-        models_text += "• deepseek → DeepSeek v3\n"
-        models_text += "• llama → Llama 4 Maverick\n"
+        # Add aliases based on platform
+        if session.platform == "telegram":
+            models_text += "\n\n**نام‌های مستعار (کوتاه):**\n"
+            models_text += "• gemini, flash → Gemini Flash\n"
+            models_text += "• gemini-2.5, flash-2.5 → Gemini 2.5 Flash\n"
+            models_text += "• deepseek, deep → DeepSeek v3\n"
+            models_text += "• mini, gpt-mini → GPT-4o Mini\n"
+            models_text += "• gemma → Gemma 3 1B\n"
+        else:
+            models_text += "\n\n**نام‌های مستعار (aliases):**\n"
+            models_text += "• claude, sonnet → Claude Sonnet 4\n"
+            models_text += "• gpt, gpt5 → GPT-5\n"
+            models_text += "• gpt4, gpt-4 → GPT-4.1\n"
+            models_text += "• mini → GPT-4o Mini\n"
+            models_text += "• web, search → GPT-4o Search\n"
+            models_text += "• gemini → Gemini 2.5 Flash\n"
+            models_text += "• grok → Grok 4\n"
+            models_text += "• deepseek → DeepSeek v3\n"
+            models_text += "• llama → Llama 4 Maverick\n"
         
         return models_text
     

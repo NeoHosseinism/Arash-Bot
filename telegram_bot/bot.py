@@ -49,6 +49,12 @@ class TelegramBot:
         self.application.add_handler(
             CommandHandler("translate", self.handlers.handle_text_message)
         )
+        self.application.add_handler(
+            CommandHandler("model", self.handlers.handle_text_message)
+        )
+        self.application.add_handler(
+            CommandHandler("models", self.handlers.handle_text_message)
+        )
         
         # Add message handlers
         self.application.add_handler(
@@ -87,7 +93,8 @@ class TelegramBot:
             # Use polling mode
             logger.info("Starting bot in polling mode...")
             logger.info(f"Bot service URL: {self.bot_client.service_url}")
-            logger.info(f"Model: {settings.TELEGRAM_MODEL}")
+            logger.info(f"Default Model: {settings.TELEGRAM_DEFAULT_MODEL}")
+            logger.info(f"Available Models: {len(settings.telegram_models_list)}")
             logger.info(f"Rate limit: {settings.TELEGRAM_RATE_LIMIT}/min")
             logger.info("=" * 60)
             self.application.run_polling(drop_pending_updates=True)

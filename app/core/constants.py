@@ -30,7 +30,7 @@ class PlatformType(str, Enum):
 
 # Model Aliases for easier switching
 MODEL_ALIASES = {
-    # Claude models
+    # Claude models (Internal only)
     "claude": "anthropic/claude-sonnet-4",
     "claude-4": "anthropic/claude-sonnet-4",
     "sonnet": "anthropic/claude-sonnet-4",
@@ -46,17 +46,35 @@ MODEL_ALIASES = {
     "web": "openai/gpt-4o-search-preview",
     "search": "openai/gpt-4o-search-preview",
     
-    # Gemini models
+    # Gemini models (Available on Telegram)
     "gemini": "google/gemini-2.5-flash",
     "gemini-2.5": "google/gemini-2.5-flash",
     "gemini-2": "google/gemini-2.0-flash-001",
     "flash": "google/gemini-2.0-flash-001",
+    "flash-2": "google/gemini-2.0-flash-001",
+    "flash-2.5": "google/gemini-2.5-flash",
     "gemma": "google/gemma-3-1b-it",
     
     # Other models
     "grok": "x-ai/grok-4",
     "deepseek": "deepseek/deepseek-chat-v3-0324",
+    "deep": "deepseek/deepseek-chat-v3-0324",
     "llama": "meta-llama/llama-4-maverick",
+}
+
+# Telegram-specific aliases (for public users)
+TELEGRAM_MODEL_ALIASES = {
+    "gemini": "google/gemini-2.5-flash",
+    "gemini-2.5": "google/gemini-2.5-flash",
+    "gemini-2": "google/gemini-2.0-flash-001",
+    "flash": "google/gemini-2.0-flash-001",
+    "flash-2": "google/gemini-2.0-flash-001",
+    "flash-2.5": "google/gemini-2.5-flash",
+    "gemma": "google/gemma-3-1b-it",
+    "deepseek": "deepseek/deepseek-chat-v3-0324",
+    "deep": "deepseek/deepseek-chat-v3-0324",
+    "mini": "openai/gpt-4o-mini",
+    "gpt-mini": "openai/gpt-4o-mini",
 }
 
 
@@ -66,7 +84,7 @@ MESSAGES_FA = {
     "welcome_internal": """🤖 **خوش آمدید به ربات چت‌بات سازمانی آرش!**
 
 شما به امکانات پیشرفته زیر دسترسی دارید:
-• استفاده از چندین مدل هوش مصنوعی (مثل Claude، GPT-5 و غیره)
+• استفاده از چندین مدل هوش مصنوعی (مثل Claude، GPT-4 و غیره)
 • امکان تغییر مدل با دستور /model
 • تاریخچه گفت‌وگوی گسترده‌تر
 • و غیره.
