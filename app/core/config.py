@@ -1,63 +1,72 @@
 """
-Configuration management using Pydantic Settings
+Configuration management using Pydantic Settings V2
 """
 from typing import List, Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field, validator
-import os
+from pydantic import field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pathlib import Path
+import json
 
 
 class Settings(BaseSettings):
-    """Application settings with validation"""
+    """Application settings with validation - Pydantic V2"""
     
     # Core Configuration
-    ENVIRONMENT: str = Field(default="development", env="ENVIRONMENT")
-    OPENROUTER_SERVICE_URL: str = Field(..., env="OPENROUTER_SERVICE_URL")
-    SESSION_TIMEOUT_MINUTES: int = Field(default=30, env="SESSION_TIMEOUT_MINUTES")
+    ENVIRONMENT: str = "development"
+    OPENROUTER_SERVICE_URL: str
+    SESSION_TIMEOUT_MINUTES: int = 30
     
     # Telegram Configuration
-    TELEGRAM_BOT_TOKEN: str = Field(..., env="TELEGRAM_BOT_TOKEN")
-    TELEGRAM_DEFAULT_MODEL: str = Field(default="google/gemini-2.0-flash-001", env="TELEGRAM_DEFAULT_MODEL")
-    TELEGRAM_MODELS: str = Field(
-        default="google/gemini-2.0-flash-001,google/gemini-2.5-flash,deepseek/deepseek-chat-v3-0324,openai/gpt-4o-mini,google/gemma-3-1b-it",
-        env="TELEGRAM_MODELS"
+    TELEGRAM_BOT_TOKEN: str
+    TELEGRAM_DEFAULT_MODEL: str = "google/gemini-2.0-flash-001"
+    TELEGRAM_MODELS: str = (
+        "google/gemini-2.0-flash-001,google/gemini-2.5-flash,"
+        "deepseek/deepseek-chat-v3-0324,openai/gpt-4o-mini,google/gemma-3-1b-it"
     )
-    TELEGRAM_RATE_LIMIT: int = Field(default=20, env="TELEGRAM_RATE_LIMIT")
-    TELEGRAM_MAX_HISTORY: int = Field(default=10, env="TELEGRAM_MAX_HISTORY")
-    TELEGRAM_COMMANDS: str = Field(default="start,help,status,translate,model,models", env="TELEGRAM_COMMANDS")
-    TELEGRAM_ADMIN_USERS: str = Field(default="", env="TELEGRAM_ADMIN_USERS")
-    TELEGRAM_WEBHOOK_URL: Optional[str] = Field(default=None, env="TELEGRAM_WEBHOOK_URL")
+    TELEGRAM_RATE_LIMIT: int = 20
+    TELEGRAM_MAX_HISTORY: int = 10
+    TELEGRAM_COMMANDS: str = "start,help,status,translate,model,models"
+    TELEGRAM_ADMIN_USERS: str = ""
+    TELEGRAM_WEBHOOK_URL: Optional[str] = None
     
     # Internal Configuration
-    INTERNAL_DEFAULT_MODEL: str = Field(default="openai/gpt-5-chat", env="INTERNAL_DEFAULT_MODEL")
-    INTERNAL_MODELS: str = Field(..., env="INTERNAL_MODELS")
-    INTERNAL_RATE_LIMIT: int = Field(default=60, env="INTERNAL_RATE_LIMIT")
-    INTERNAL_MAX_HISTORY: int = Field(default=30, env="INTERNAL_MAX_HISTORY")
-    INTERNAL_API_KEY: str = Field(..., env="INTERNAL_API_KEY")
-    INTERNAL_WEBHOOK_SECRET: Optional[str] = Field(default=None, env="INTERNAL_WEBHOOK_SECRET")
-    INTERNAL_ADMIN_USERS: str = Field(default="", env="INTERNAL_ADMIN_USERS")
+    INTERNAL_DEFAULT_MODEL: str = "openai/gpt-5-chat"
+    INTERNAL_MODELS: str
+    INTERNAL_RATE_LIMIT: int = 60
+    INTERNAL_MAX_HISTORY: int = 30
+    INTERNAL_API_KEY: str
+    INTERNAL_WEBHOOK_SECRET: Optional[str] = None
+    INTERNAL_ADMIN_USERS: str = ""
     
     # Logging
-    LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
-    LOG_FILE: str = Field(default="logs/bot_service.log", env="LOG_FILE")
+    LOG_LEVEL: str = "INFO"
+    LOG_FILE: str = "logs/arash_bot_service.log"
     
     # Features
-    ENABLE_IMAGE_PROCESSING: bool = Field(default=True, env="ENABLE_IMAGE_PROCESSING")
-    MAX_IMAGE_SIZE_MB: int = Field(default=20, env="MAX_IMAGE_SIZE_MB")
+    ENABLE_IMAGE_PROCESSING: bool = True
+    MAX_IMAGE_SIZE_MB: int = 20
     
     # Database (Optional)
-    REDIS_URL: Optional[str] = Field(default=None, env="REDIS_URL")
-    DATABASE_URL: Optional[str] = Field(default=None, env="DATABASE_URL")
+    REDIS_URL: Optional[str] = None
+    DATABASE_URL: Optional[str] = None
     
     # API Server
-    API_HOST: str = Field(default="0.0.0.0", env="API_HOST")
-    API_PORT: int = Field(default=8001, env="API_PORT")
-    ENABLE_API_DOCS: bool = Field(default=True, env="ENABLE_API_DOCS")
-    CORS_ORIGINS: str = Field(default="*", env="CORS_ORIGINS")
+    API_HOST: str = "0.0.0.0"
+    API_PORT: int = 8001
+    ENABLE_API_DOCS: bool = True
+    CORS_ORIGINS: str = "*"
     
-    @validator("TELEGRAM_BOT_TOKEN")
-    def validate_telegram_token(cls, v):
+    # Pydantic V2 model configuration
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True,
+        extra="ignore"  # Ignore extra fields in .env file
+    )
+    
+    @field_validator("TELEGRAM_BOT_TOKEN")
+    @classmethod
+    def validate_telegram_token(cls, v: str) -> str:
         """Validate Telegram bot token format"""
         if not v or v == "your_telegram_bot_token_here":
             raise ValueError("TELEGRAM_BOT_TOKEN must be set to a valid token")
@@ -65,8 +74,9 @@ class Settings(BaseSettings):
             raise ValueError("Invalid Telegram bot token format")
         return v
     
-    @validator("INTERNAL_API_KEY")
-    def validate_api_key(cls, v):
+    @field_validator("INTERNAL_API_KEY")
+    @classmethod
+    def validate_api_key(cls, v: str) -> str:
         """Validate API key strength"""
         if not v or v == "your_secure_random_api_key_here":
             raise ValueError("INTERNAL_API_KEY must be set to a secure key")
@@ -74,11 +84,37 @@ class Settings(BaseSettings):
             raise ValueError("INTERNAL_API_KEY must be at least 32 characters")
         return v
     
-    @validator("LOG_FILE")
-    def create_log_directory(cls, v):
+    @field_validator("LOG_FILE")
+    @classmethod
+    def create_log_directory(cls, v: str) -> str:
         """Ensure log directory exists"""
         log_path = Path(v)
         log_path.parent.mkdir(parents=True, exist_ok=True)
+        return v
+    
+    @field_validator("INTERNAL_MODELS")
+    @classmethod
+    def validate_internal_models(cls, v: str) -> str:
+        """Validate INTERNAL_MODELS is valid JSON array or comma-separated string"""
+        if not v:
+            raise ValueError("INTERNAL_MODELS cannot be empty")
+        
+        # Try parsing as JSON first
+        if v.strip().startswith('['):
+            try:
+                models = json.loads(v)
+                if not isinstance(models, list):
+                    raise ValueError("INTERNAL_MODELS JSON must be an array")
+                if not models:
+                    raise ValueError("INTERNAL_MODELS array cannot be empty")
+                return v
+            except json.JSONDecodeError as e:
+                raise ValueError(f"INTERNAL_MODELS invalid JSON: {e}")
+        
+        # Otherwise treat as comma-separated
+        if not any(c in v for c in [',', '/']):
+            raise ValueError("INTERNAL_MODELS must be JSON array or comma-separated list")
+        
         return v
     
     @property
@@ -99,6 +135,14 @@ class Settings(BaseSettings):
     @property
     def internal_models_list(self) -> List[str]:
         """Get internal models as list"""
+        # Handle JSON array format
+        if self.INTERNAL_MODELS.strip().startswith('['):
+            try:
+                return json.loads(self.INTERNAL_MODELS)
+            except json.JSONDecodeError:
+                pass
+        
+        # Handle comma-separated format
         return [model.strip() for model in self.INTERNAL_MODELS.split(",") if model.strip()]
     
     @property
@@ -127,15 +171,11 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         """Check if running in development"""
         return self.ENVIRONMENT.lower() == "development"
-    
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
 
 
 # Global settings instance
-settings = Settings()
+# This will raise validation errors if required fields are missing from .env
+settings = Settings()   # type: ignore[call-arg]
 
 
 def get_settings() -> Settings:

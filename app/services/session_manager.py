@@ -105,7 +105,7 @@ class SessionManager:
     def clear_old_sessions(self):
         """Clear expired sessions"""
         timeout_minutes = settings.SESSION_TIMEOUT_MINUTES
-        timeout = datetime.utcnow() - timedelta(minutes=timeout_minutes)
+        timeout = datetime.now() - timedelta(minutes=timeout_minutes)
         
         keys_to_remove = [
             key for key, session in self.sessions.items()
@@ -151,7 +151,7 @@ class SessionManager:
     
     def get_active_session_count(self, minutes: int = 5) -> int:
         """Get count of recently active sessions"""
-        threshold = datetime.utcnow() - timedelta(minutes=minutes)
+        threshold = datetime.now() - timedelta(minutes=minutes)
         return len([
             s for s in self.sessions.values()
             if s.last_activity > threshold

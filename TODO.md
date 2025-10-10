@@ -7,6 +7,8 @@ v1.0.0
 - [] test all possible situations
 
 v2.0.0
+- [] add gaurdrail
+- [] fill the app security.py (dropped)
 - [] make 2 modes response in Bot service stream(SSE) and batch and simulating gpt response in telegram
 - [] use form ⌛ between messages for all platforms and if platform was telegram after the response be ready delete that ⌛ and then send response
 

@@ -225,14 +225,14 @@ python -c "import secrets; print(secrets.token_hex(32))"
 
 ### Logs
 
-Logs are stored in `logs/bot_service.log` with rotation.
+Logs are stored in `logs/arash_bot_service.log` with rotation.
 
 ```bash
 # View logs
-tail -f logs/bot_service.log
+tail -f logs/arash_bot_service.log
 
 # Search for errors
-grep ERROR logs/bot_service.log
+grep ERROR logs/arash_bot_service.log
 ```
 
 ### Statistics API
@@ -342,7 +342,7 @@ If you're migrating from the previous version:
 ## 📞 Support
 
 For issues or questions:
-1. Check the logs: `logs/bot_service.log`
+1. Check the logs: `logs/arash_bot_service.log`
 2. Review API docs: `http://localhost:8001/docs`
 3. Check configuration: `GET /platforms`
 

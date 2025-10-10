@@ -122,7 +122,7 @@ MESSAGES_FA = {
     "command_unknown": "❓ دستور ناشناخته: /{command}\nبرای دیدن دستورات موجود /help را تایپ کنید.",
     
     # Model switching
-    "model_switch_not_available": "❌ تغییر مدل در تلگرام امکان‌پذیر نیست.\nشما از **{model}** استفاده می‌کنید",
+    "model_switch_not_available": "❌ تغییر مدل امکان‌پذیر نیست.\nشما از **{model}** استفاده می‌کنید",
     "model_current": "**مدل فعلی:** {model}",
     "model_switched": "✅ به **{model}** تغییر یافت",
     "model_invalid": "❌ مدل نامعتبر: `{model}`",
@@ -176,7 +176,7 @@ Type /help to see available commands.""",
     "command_not_available_platform": "❌ Command `/{command}` is not available on {platform}.\n\n**Available commands:**\n{commands}",
     "command_unknown": "❓ Unknown command: /{command}\nType /help to see available commands.",
     
-    "model_switch_not_available": "❌ Model switching not available on Telegram.\nYou're using: **{model}**",
+    "model_switch_not_available": "❌ Model switching not available.\nYou're using: **{model}**",
     "model_current": "**Current model:** {model}",
     "model_switched": "✅ Switched to **{model}**",
     "model_invalid": "❌ Invalid model: `{model}`",

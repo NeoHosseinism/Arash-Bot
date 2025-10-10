@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Arash Messenger Bot Service v1.0")
     logger.info("=" * 60)
     
-    app.state.start_time = datetime.utcnow()
+    app.state.start_time = datetime.now()
     
     # Log platform configurations
     logger.info("📱 Platform Configurations:")
