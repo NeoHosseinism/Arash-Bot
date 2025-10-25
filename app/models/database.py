@@ -1,10 +1,14 @@
 """
 Database models for API key management and usage tracking.
+Note: Chat history is NOT stored here - it's handled by the AI service.
+This database only stores API keys, teams, and usage statistics.
 """
 
+import os
 from datetime import datetime
 from enum import Enum
 from typing import Optional
+import logging
 
 from sqlalchemy import (
     Boolean,
@@ -16,9 +20,13 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    inspect,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.exc import OperationalError, ProgrammingError
+
+logger = logging.getLogger(__name__)
 
 Base = declarative_base()
 
@@ -133,27 +141,121 @@ class UsageLog(Base):
 
 # Database session management
 class Database:
-    """Database connection and session management"""
+    """Database connection and session management with PostgreSQL support"""
 
-    def __init__(self, database_url: str = "sqlite:///./arash_bot.db"):
+    def __init__(self, database_url: Optional[str] = None):
         """
         Initialize database connection.
 
         Args:
-            database_url: Database connection string
+            database_url: Database connection string. If None, reads from environment.
         """
-        self.engine = create_engine(
-            database_url,
-            connect_args={"check_same_thread": False} if database_url.startswith("sqlite") else {},
-        )
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+        if database_url is None:
+            database_url = os.getenv("DATABASE_URL", "sqlite:///./arash_bot.db")
 
-    def create_tables(self):
-        """Create all database tables"""
-        Base.metadata.create_all(bind=self.engine)
+        logger.info(f"Initializing database connection: {database_url.split('@')[-1] if '@' in database_url else database_url}")
+
+        # Configure engine based on database type
+        engine_args = {}
+        if database_url.startswith("sqlite"):
+            engine_args["connect_args"] = {"check_same_thread": False}
+        elif database_url.startswith("postgresql"):
+            # PostgreSQL-specific settings for better performance
+            engine_args["pool_size"] = 10
+            engine_args["max_overflow"] = 20
+            engine_args["pool_pre_ping"] = True  # Verify connections before using them
+            engine_args["pool_recycle"] = 3600  # Recycle connections after 1 hour
+
+        try:
+            self.engine = create_engine(database_url, **engine_args)
+            self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+            self.database_url = database_url
+            logger.info("Database engine created successfully")
+        except Exception as e:
+            logger.error(f"Failed to create database engine: {e}")
+            raise
+
+    def table_exists(self, table_name: str) -> bool:
+        """
+        Check if a table exists in the database.
+
+        Args:
+            table_name: Name of the table to check
+
+        Returns:
+            True if table exists, False otherwise
+        """
+        try:
+            inspector = inspect(self.engine)
+            return table_name in inspector.get_table_names()
+        except Exception as e:
+            logger.error(f"Error checking if table {table_name} exists: {e}")
+            return False
+
+    def create_tables(self, force: bool = False):
+        """
+        Create all database tables if they don't exist.
+        Handles scenarios where tables may already exist.
+
+        Args:
+            force: If True, drop and recreate all tables (use with caution!)
+        """
+        try:
+            if force:
+                logger.warning("Dropping all existing tables (force=True)")
+                Base.metadata.drop_all(bind=self.engine)
+
+            # Check which tables already exist
+            inspector = inspect(self.engine)
+            existing_tables = inspector.get_table_names()
+
+            if existing_tables:
+                logger.info(f"Found existing tables: {', '.join(existing_tables)}")
+            else:
+                logger.info("No existing tables found, creating new schema")
+
+            # Create all tables (will skip existing ones)
+            Base.metadata.create_all(bind=self.engine)
+
+            # Verify tables were created
+            new_tables = inspect(self.engine).get_table_names()
+            created_tables = set(new_tables) - set(existing_tables)
+
+            if created_tables:
+                logger.info(f"Created new tables: {', '.join(created_tables)}")
+            else:
+                logger.info("All tables already exist")
+
+            logger.info("Database schema ready")
+
+        except OperationalError as e:
+            logger.error(f"Operational error creating tables: {e}")
+            raise
+        except ProgrammingError as e:
+            logger.error(f"Programming error creating tables: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error creating tables: {e}")
+            raise
+
+    def test_connection(self) -> bool:
+        """
+        Test if database connection is working.
+
+        Returns:
+            True if connection works, False otherwise
+        """
+        try:
+            with self.engine.connect() as conn:
+                conn.execute("SELECT 1")
+            logger.info("Database connection test successful")
+            return True
+        except Exception as e:
+            logger.error(f"Database connection test failed: {e}")
+            return False
 
     def get_session(self):
-        """Get a database session"""
+        """Get a database session (generator for dependency injection)"""
         db = self.SessionLocal()
         try:
             yield db
@@ -165,12 +267,12 @@ class Database:
 _db_instance: Optional[Database] = None
 
 
-def get_database(database_url: str = "sqlite:///./arash_bot.db") -> Database:
+def get_database(database_url: Optional[str] = None) -> Database:
     """
     Get or create the global database instance.
 
     Args:
-        database_url: Database connection string
+        database_url: Database connection string. If None, reads from environment.
 
     Returns:
         Database instance
@@ -178,7 +280,12 @@ def get_database(database_url: str = "sqlite:///./arash_bot.db") -> Database:
     global _db_instance
     if _db_instance is None:
         _db_instance = Database(database_url)
-        _db_instance.create_tables()
+        # Test connection
+        if _db_instance.test_connection():
+            # Create tables if they don't exist
+            _db_instance.create_tables()
+        else:
+            logger.error("Database connection failed - API key management will not be available")
     return _db_instance
 
 
@@ -186,3 +293,17 @@ def get_db_session():
     """Dependency for getting database sessions in FastAPI"""
     db = get_database()
     return next(db.get_session())
+
+
+# Future: Chat history models would go here
+# Currently NOT implemented as chat history is handled by AI service
+# When implementing end-to-end chat history, add models here:
+#
+# class ChatHistory(Base):
+#     __tablename__ = "chat_history"
+#     id = Column(Integer, primary_key=True)
+#     session_id = Column(String(64), index=True)
+#     role = Column(String(20))  # "user" or "assistant"
+#     content = Column(Text)
+#     timestamp = Column(DateTime, default=datetime.utcnow)
+#     ...additional fields...

@@ -35,8 +35,8 @@ async def lifespan(app: FastAPI):
     app.state.start_time = datetime.now()
     
     # Log platform configurations
-    logger.info("📱 Platform Configurations:")
-    
+    logger.info("Platform Configurations:")
+
     # Telegram
     telegram_config = platform_manager.get_config("telegram")
     logger.info("  Telegram (Public):")
@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"    - Rate Limit: {telegram_config.rate_limit}/min")
     logger.info(f"    - Commands: {', '.join(telegram_config.commands)}")
     logger.info(f"    - Max History: {telegram_config.max_history}")
-    
+
     # Internal
     internal_config = platform_manager.get_config("internal")
     logger.info("  Internal (Private):")
@@ -53,19 +53,19 @@ async def lifespan(app: FastAPI):
     logger.info(f"    - Rate Limit: {internal_config.rate_limit}/min")
     logger.info(f"    - Commands: {len(internal_config.commands)}")
     logger.info(f"    - Max History: {internal_config.max_history}")
-    logger.info(f"    - Authentication: {'✅ Required' if internal_config.requires_auth else '❌ Not required'}")
+    logger.info(f"    - Authentication: {'Required' if internal_config.requires_auth else 'Not required'}")
 
     # Initialize database for API key management
     try:
         db = get_database()
         db.create_tables()
-        logger.info("✅ Database initialized successfully")
+        logger.info("[OK] Database initialized successfully")
     except Exception as e:
-        logger.warning(f"⚠️ Database initialization failed (API key management disabled): {e}")
+        logger.warning(f"[WARNING] Database initialization failed (API key management disabled): {e}")
 
-    logger.info(f"\n🌐 AI Service: {settings.AI_SERVICE_URL}")
-    logger.info(f"🔧 Environment: {settings.ENVIRONMENT}")
-    logger.info("✅ Service ready to handle requests!")
+    logger.info(f"\nAI Service: {settings.AI_SERVICE_URL}")
+    logger.info(f"Environment: {settings.ENVIRONMENT}")
+    logger.info("[OK] Service ready to handle requests!")
     logger.info("=" * 60)
     
     # Start periodic cleanup task

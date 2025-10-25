@@ -23,7 +23,7 @@ def init_database():
     print("Initializing database...")
     db_instance = get_database()
     db_instance.create_tables()
-    print("✓ Database initialized successfully")
+    print("[OK] Database initialized successfully")
 
 
 def create_team(name: str, description: str = None, daily_quota: int = None, monthly_quota: int = None):
@@ -39,13 +39,13 @@ def create_team(name: str, description: str = None, daily_quota: int = None, mon
             daily_quota=daily_quota,
             monthly_quota=monthly_quota,
         )
-        print(f"✓ Team created successfully!")
+        print(f"[OK] Team created successfully!")
         print(f"  ID: {team.id}")
         print(f"  Name: {team.name}")
         print(f"  Daily Quota: {team.daily_quota or 'Unlimited'}")
         print(f"  Monthly Quota: {team.monthly_quota or 'Unlimited'}")
     except Exception as e:
-        print(f"✗ Error creating team: {e}")
+        print(f"[ERROR] Error creating team: {e}")
         sys.exit(1)
 
 
@@ -66,9 +66,9 @@ def list_teams():
             team.id,
             team.name,
             team.description or "-",
-            team.daily_quota or "∞",
-            team.monthly_quota or "∞",
-            "✓" if team.is_active else "✗",
+            team.daily_quota or "unlimited",
+            team.monthly_quota or "unlimited",
+            "active" if team.is_active else "inactive",
             team.created_at.strftime("%Y-%m-%d"),
         ])
 
@@ -94,7 +94,7 @@ def create_api_key(
         # Verify team exists
         team = APIKeyManager.get_team_by_id(session, team_id)
         if not team:
-            print(f"✗ Team with ID {team_id} not found")
+            print(f"[ERROR] Team with ID {team_id} not found")
             sys.exit(1)
 
         api_key_string, api_key_obj = APIKeyManager.create_api_key(
@@ -107,7 +107,7 @@ def create_api_key(
             created_by="cli-admin",
         )
 
-        print("✓ API Key created successfully!")
+        print("[OK] API Key created successfully!")
         print()
         print("=" * 60)
         print("IMPORTANT: Save this API key securely!")
@@ -125,11 +125,11 @@ def create_api_key(
         print(f"  Expires: {api_key_obj.expires_at or 'Never'}")
 
     except ValueError as e:
-        print(f"✗ Invalid access level: {access_level}")
+        print(f"[ERROR] Invalid access level: {access_level}")
         print(f"  Valid values: user, team_lead, admin")
         sys.exit(1)
     except Exception as e:
-        print(f"✗ Error creating API key: {e}")
+        print(f"[ERROR] Error creating API key: {e}")
         sys.exit(1)
 
 
@@ -159,7 +159,7 @@ def list_api_keys(team_id: int = None):
             key.name,
             key.team.name,
             key.access_level,
-            "✓" if key.is_active else "✗",
+            "active" if key.is_active else "inactive",
             key.last_used_at.strftime("%Y-%m-%d %H:%M") if key.last_used_at else "Never",
             key.expires_at.strftime("%Y-%m-%d") if key.expires_at else "Never",
         ])
@@ -182,13 +182,13 @@ def revoke_api_key(key_id: int, permanent: bool = False):
             action = "revoked"
 
         if success:
-            print(f"✓ API key {action} successfully (ID: {key_id})")
+            print(f"[OK] API key {action} successfully (ID: {key_id})")
         else:
-            print(f"✗ API key not found (ID: {key_id})")
+            print(f"[ERROR] API key not found (ID: {key_id})")
             sys.exit(1)
 
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f"[ERROR] Error: {e}")
         sys.exit(1)
 
 
