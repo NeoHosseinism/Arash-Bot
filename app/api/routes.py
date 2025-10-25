@@ -20,7 +20,7 @@ from app.models.schemas import (
 from app.services.message_processor import message_processor
 from app.services.session_manager import session_manager
 from app.services.platform_manager import platform_manager
-from app.services.openrouter_client import openrouter_client
+from app.services.ai_client import ai_client
 from app.api.dependencies import (
     get_auth,
     verify_internal_api_key,
@@ -67,15 +67,15 @@ async def root():
 @router.get("/health")
 async def health_check():
     """Detailed health check"""
-    openrouter_healthy = await openrouter_client.health_check()
+    ai_service_healthy = await ai_client.health_check()
 
     return {
-        "status": "healthy" if openrouter_healthy else "degraded",
+        "status": "healthy" if ai_service_healthy else "degraded",
         "service": "Arash Messenger Bot",
         "version": "1.0.0",
         "components": {
             "api": "healthy",
-            "openrouter": "healthy" if openrouter_healthy else "unhealthy",
+            "ai_service": "healthy" if ai_service_healthy else "unhealthy",
             "sessions": "healthy",
         },
         "timestamp": datetime.now().isoformat(),

@@ -9,7 +9,7 @@ from app.models.session import ChatSession
 from app.services.session_manager import session_manager
 from app.services.platform_manager import platform_manager
 from app.services.command_processor import command_processor
-from app.services.openrouter_client import openrouter_client
+from app.services.ai_client import ai_client
 from app.core.constants import MESSAGES_FA, MessageType
 
 logger = logging.getLogger(__name__)
@@ -98,30 +98,30 @@ class MessageProcessor:
             # Get max history for platform
             max_history = platform_manager.get_max_history(session.platform)
             
-            # Send to OpenRouter with session's current model
+            # Send to AI service with session's current model
             try:
-                response = await openrouter_client.send_chat_request(
+                response = await ai_client.send_chat_request(
                     session_id=session.session_id,
                     query=message.text or "این تصویر را توضیح بده؟",
                     history=session.get_recent_history(max_history),
                     pipeline=session.current_model,
                     files=files
                 )
-                
+
                 # Update history
                 session.add_message("user", message.text or "[تصویر/پیوست]")
                 session.add_message("assistant", response["Response"])
-                
+
                 # Trim history if exceeds platform limit
                 if len(session.history) > max_history * 2:
                     session.history = session.history[-max_history * 2:]
-                
+
                 return response["Response"]
-                
-            except Exception as openrouter_error:
-                logger.error(f"OpenRouter service error: {openrouter_error}")
-                
-                # Return fallback message when OpenRouter is unavailable
+
+            except Exception as ai_service_error:
+                logger.error(f"AI service error: {ai_service_error}")
+
+                # Return fallback message when AI service is unavailable
                 return (
                     "⚠️ متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست.\n\n"
                     f"پیام شما: {message.text}\n\n"

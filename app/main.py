@@ -12,9 +12,11 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.api.routes import router
+from app.api.admin_routes import router as admin_router
 from app.services.session_manager import session_manager
 from app.services.platform_manager import platform_manager
-from app.services.openrouter_client import openrouter_client
+from app.services.ai_client import ai_client
+from app.models.database import get_database
 from app.utils.logger import setup_logging
 
 # Setup logging
@@ -52,8 +54,16 @@ async def lifespan(app: FastAPI):
     logger.info(f"    - Commands: {len(internal_config.commands)}")
     logger.info(f"    - Max History: {internal_config.max_history}")
     logger.info(f"    - Authentication: {'✅ Required' if internal_config.requires_auth else '❌ Not required'}")
-    
-    logger.info(f"\n🌐 OpenRouter Service: {settings.OPENROUTER_SERVICE_URL}")
+
+    # Initialize database for API key management
+    try:
+        db = get_database()
+        db.create_tables()
+        logger.info("✅ Database initialized successfully")
+    except Exception as e:
+        logger.warning(f"⚠️ Database initialization failed (API key management disabled): {e}")
+
+    logger.info(f"\n🌐 AI Service: {settings.AI_SERVICE_URL}")
     logger.info(f"🔧 Environment: {settings.ENVIRONMENT}")
     logger.info("✅ Service ready to handle requests!")
     logger.info("=" * 60)
@@ -74,7 +84,7 @@ async def lifespan(app: FastAPI):
         pass
     
     # Close HTTP client
-    await openrouter_client.close()
+    await ai_client.close()
     
     # Log statistics
     total_sessions = len(session_manager.sessions)
@@ -139,6 +149,7 @@ async def global_exception_handler(request, exc):
 
 # Include routes
 app.include_router(router)
+app.include_router(admin_router)
 
 
 # Development server helper

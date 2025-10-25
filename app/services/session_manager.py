@@ -11,6 +11,7 @@ import logging
 from app.models.session import ChatSession
 from app.services.platform_manager import platform_manager
 from app.core.config import settings
+from app.core.name_mapping import get_friendly_platform_name, mask_session_id
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,9 @@ class SessionManager:
                 is_admin=platform_manager.is_admin(platform, user_id)
             )
             
-            logger.info(f"Created new session for {platform}:{chat_id}")
+            friendly_platform = get_friendly_platform_name(platform)
+            masked_id = mask_session_id(self.sessions[key].session_id)
+            logger.info(f"Created new session for {friendly_platform} (session: {masked_id})")
         else:
             # Update last activity
             self.sessions[key].update_activity()

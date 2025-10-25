@@ -1,0 +1,305 @@
+#!/usr/bin/env python3
+"""
+CLI tool for managing teams and API keys
+"""
+
+import sys
+import os
+
+# Add parent directory to path to import app modules
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import argparse
+from datetime import datetime
+from tabulate import tabulate
+
+from app.models.database import get_database, AccessLevel
+from app.services.api_key_manager import APIKeyManager
+from app.services.usage_tracker import UsageTracker
+
+
+def init_database():
+    """Initialize the database"""
+    print("Initializing database...")
+    db_instance = get_database()
+    db_instance.create_tables()
+    print("✓ Database initialized successfully")
+
+
+def create_team(name: str, description: str = None, daily_quota: int = None, monthly_quota: int = None):
+    """Create a new team"""
+    db = get_database()
+    session = next(db.get_session())
+
+    try:
+        team = APIKeyManager.create_team(
+            db=session,
+            name=name,
+            description=description,
+            daily_quota=daily_quota,
+            monthly_quota=monthly_quota,
+        )
+        print(f"✓ Team created successfully!")
+        print(f"  ID: {team.id}")
+        print(f"  Name: {team.name}")
+        print(f"  Daily Quota: {team.daily_quota or 'Unlimited'}")
+        print(f"  Monthly Quota: {team.monthly_quota or 'Unlimited'}")
+    except Exception as e:
+        print(f"✗ Error creating team: {e}")
+        sys.exit(1)
+
+
+def list_teams():
+    """List all teams"""
+    db = get_database()
+    session = next(db.get_session())
+
+    teams = APIKeyManager.list_all_teams(session, active_only=False)
+
+    if not teams:
+        print("No teams found")
+        return
+
+    table_data = []
+    for team in teams:
+        table_data.append([
+            team.id,
+            team.name,
+            team.description or "-",
+            team.daily_quota or "∞",
+            team.monthly_quota or "∞",
+            "✓" if team.is_active else "✗",
+            team.created_at.strftime("%Y-%m-%d"),
+        ])
+
+    headers = ["ID", "Name", "Description", "Daily Quota", "Monthly Quota", "Active", "Created"]
+    print(tabulate(table_data, headers=headers, tablefmt="grid"))
+
+
+def create_api_key(
+    team_id: int,
+    name: str,
+    access_level: str = "user",
+    description: str = None,
+    expires_in_days: int = None,
+):
+    """Create a new API key"""
+    db = get_database()
+    session = next(db.get_session())
+
+    try:
+        # Validate access level
+        access_level_enum = AccessLevel(access_level)
+
+        # Verify team exists
+        team = APIKeyManager.get_team_by_id(session, team_id)
+        if not team:
+            print(f"✗ Team with ID {team_id} not found")
+            sys.exit(1)
+
+        api_key_string, api_key_obj = APIKeyManager.create_api_key(
+            db=session,
+            team_id=team_id,
+            name=name,
+            access_level=access_level_enum,
+            description=description,
+            expires_in_days=expires_in_days,
+            created_by="cli-admin",
+        )
+
+        print("✓ API Key created successfully!")
+        print()
+        print("=" * 60)
+        print("IMPORTANT: Save this API key securely!")
+        print("It will not be shown again.")
+        print("=" * 60)
+        print()
+        print(f"API Key: {api_key_string}")
+        print()
+        print("=" * 60)
+        print()
+        print(f"  Key Prefix: {api_key_obj.key_prefix}")
+        print(f"  Name: {api_key_obj.name}")
+        print(f"  Team: {team.name} (ID: {team_id})")
+        print(f"  Access Level: {api_key_obj.access_level}")
+        print(f"  Expires: {api_key_obj.expires_at or 'Never'}")
+
+    except ValueError as e:
+        print(f"✗ Invalid access level: {access_level}")
+        print(f"  Valid values: user, team_lead, admin")
+        sys.exit(1)
+    except Exception as e:
+        print(f"✗ Error creating API key: {e}")
+        sys.exit(1)
+
+
+def list_api_keys(team_id: int = None):
+    """List API keys"""
+    db = get_database()
+    session = next(db.get_session())
+
+    if team_id:
+        keys = APIKeyManager.list_team_api_keys(session, team_id)
+    else:
+        # List all teams and their keys
+        teams = APIKeyManager.list_all_teams(session)
+        keys = []
+        for team in teams:
+            keys.extend(APIKeyManager.list_team_api_keys(session, team.id))
+
+    if not keys:
+        print("No API keys found")
+        return
+
+    table_data = []
+    for key in keys:
+        table_data.append([
+            key.id,
+            key.key_prefix,
+            key.name,
+            key.team.name,
+            key.access_level,
+            "✓" if key.is_active else "✗",
+            key.last_used_at.strftime("%Y-%m-%d %H:%M") if key.last_used_at else "Never",
+            key.expires_at.strftime("%Y-%m-%d") if key.expires_at else "Never",
+        ])
+
+    headers = ["ID", "Prefix", "Name", "Team", "Level", "Active", "Last Used", "Expires"]
+    print(tabulate(table_data, headers=headers, tablefmt="grid"))
+
+
+def revoke_api_key(key_id: int, permanent: bool = False):
+    """Revoke or delete an API key"""
+    db = get_database()
+    session = next(db.get_session())
+
+    try:
+        if permanent:
+            success = APIKeyManager.delete_api_key(session, key_id)
+            action = "deleted"
+        else:
+            success = APIKeyManager.revoke_api_key(session, key_id)
+            action = "revoked"
+
+        if success:
+            print(f"✓ API key {action} successfully (ID: {key_id})")
+        else:
+            print(f"✗ API key not found (ID: {key_id})")
+            sys.exit(1)
+
+    except Exception as e:
+        print(f"✗ Error: {e}")
+        sys.exit(1)
+
+
+def show_usage(team_id: int = None, api_key_id: int = None, days: int = 30):
+    """Show usage statistics"""
+    db = get_database()
+    session = next(db.get_session())
+
+    if team_id:
+        stats = UsageTracker.get_team_usage_stats(session, team_id)
+        print(f"\nUsage Statistics for Team ID {team_id}")
+        print("=" * 60)
+        print(f"Period: {stats['period']['start']} to {stats['period']['end']}")
+        print(f"\nRequests:")
+        print(f"  Total: {stats['requests']['total']}")
+        print(f"  Successful: {stats['requests']['successful']}")
+        print(f"  Failed: {stats['requests']['failed']}")
+        print(f"  Success Rate: {stats['requests']['success_rate']:.1f}%")
+        print(f"\nPerformance:")
+        print(f"  Avg Response Time: {stats['performance']['avg_response_time_ms']:.0f}ms")
+
+        if stats['models']:
+            print(f"\nTop Models Used:")
+            for model_stat in stats['models'][:5]:
+                print(f"  {model_stat['model']}: {model_stat['requests']} requests")
+
+    elif api_key_id:
+        stats = UsageTracker.get_api_key_usage_stats(session, api_key_id)
+        print(f"\nUsage Statistics for API Key ID {api_key_id}")
+        print("=" * 60)
+        print(f"Period: {stats['period']['start']} to {stats['period']['end']}")
+        print(f"\nRequests:")
+        print(f"  Total: {stats['requests']['total']}")
+        print(f"  Successful: {stats['requests']['successful']}")
+        print(f"  Failed: {stats['requests']['failed']}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Manage teams and API keys")
+    subparsers = parser.add_subparsers(dest="command", help="Command to execute")
+
+    # Init database
+    subparsers.add_parser("init", help="Initialize the database")
+
+    # Team commands
+    team_parser = subparsers.add_parser("team", help="Team management")
+    team_subparsers = team_parser.add_subparsers(dest="subcommand")
+
+    team_create = team_subparsers.add_parser("create", help="Create a new team")
+    team_create.add_argument("name", help="Team name")
+    team_create.add_argument("--description", help="Team description")
+    team_create.add_argument("--daily-quota", type=int, help="Daily request quota")
+    team_create.add_argument("--monthly-quota", type=int, help="Monthly request quota")
+
+    team_subparsers.add_parser("list", help="List all teams")
+
+    # API Key commands
+    key_parser = subparsers.add_parser("key", help="API key management")
+    key_subparsers = key_parser.add_subparsers(dest="subcommand")
+
+    key_create = key_subparsers.add_parser("create", help="Create a new API key")
+    key_create.add_argument("team_id", type=int, help="Team ID")
+    key_create.add_argument("name", help="Key name")
+    key_create.add_argument("--level", choices=["user", "team_lead", "admin"], default="user", help="Access level")
+    key_create.add_argument("--description", help="Key description")
+    key_create.add_argument("--expires", type=int, help="Expiration in days")
+
+    key_list = key_subparsers.add_parser("list", help="List API keys")
+    key_list.add_argument("--team-id", type=int, help="Filter by team ID")
+
+    key_revoke = key_subparsers.add_parser("revoke", help="Revoke an API key")
+    key_revoke.add_argument("key_id", type=int, help="API key ID")
+    key_revoke.add_argument("--permanent", action="store_true", help="Permanently delete (instead of just revoking)")
+
+    # Usage commands
+    usage_parser = subparsers.add_parser("usage", help="View usage statistics")
+    usage_parser.add_argument("--team-id", type=int, help="Team ID")
+    usage_parser.add_argument("--key-id", type=int, help="API Key ID")
+    usage_parser.add_argument("--days", type=int, default=30, help="Number of days to look back")
+
+    args = parser.parse_args()
+
+    if not args.command:
+        parser.print_help()
+        sys.exit(1)
+
+    # Execute commands
+    if args.command == "init":
+        init_database()
+
+    elif args.command == "team":
+        if args.subcommand == "create":
+            create_team(args.name, args.description, args.daily_quota, args.monthly_quota)
+        elif args.subcommand == "list":
+            list_teams()
+        else:
+            team_parser.print_help()
+
+    elif args.command == "key":
+        if args.subcommand == "create":
+            create_api_key(args.team_id, args.name, args.level, args.description, args.expires)
+        elif args.subcommand == "list":
+            list_api_keys(args.team_id)
+        elif args.subcommand == "revoke":
+            revoke_api_key(args.key_id, args.permanent)
+        else:
+            key_parser.print_help()
+
+    elif args.command == "usage":
+        show_usage(args.team_id, args.key_id, args.days)
+
+
+if __name__ == "__main__":
+    main()

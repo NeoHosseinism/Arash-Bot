@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     
     # Core Configuration
     ENVIRONMENT: str = "development"
-    OPENROUTER_SERVICE_URL: str
+    AI_SERVICE_URL: str
     SESSION_TIMEOUT_MINUTES: int = 30
     
     # Telegram Configuration
