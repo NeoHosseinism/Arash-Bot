@@ -76,6 +76,44 @@ def list_teams():
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
 
+def delete_team(team_id: int, force: bool = False):
+    """Delete a team"""
+    db = get_database()
+    session = next(db.get_session())
+
+    try:
+        # Get team name before deletion
+        team = APIKeyManager.get_team_by_id(session, team_id)
+        if not team:
+            print(f"[ERROR] Team with ID {team_id} not found")
+            sys.exit(1)
+
+        team_name = team.name
+
+        # Confirm deletion
+        if not force:
+            response = input(f"Are you sure you want to delete team '{team_name}' (ID: {team_id})? [y/N]: ")
+            if response.lower() != 'y':
+                print("Deletion cancelled")
+                return
+
+        success = APIKeyManager.delete_team(session, team_id, force=force)
+
+        if success:
+            print(f"[OK] Team '{team_name}' deleted successfully (ID: {team_id})")
+        else:
+            print(f"[ERROR] Failed to delete team")
+            sys.exit(1)
+
+    except ValueError as e:
+        print(f"[ERROR] {e}")
+        print("\nUse --force to delete team along with all API keys and usage logs")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[ERROR] Error deleting team: {e}")
+        sys.exit(1)
+
+
 def create_api_key(
     team_id: int,
     name: str,
@@ -245,6 +283,10 @@ def main():
 
     team_subparsers.add_parser("list", help="List all teams")
 
+    team_delete = team_subparsers.add_parser("delete", help="Delete a team")
+    team_delete.add_argument("team_id", type=int, help="Team ID")
+    team_delete.add_argument("--force", action="store_true", help="Force delete (removes all keys and usage logs)")
+
     # API Key commands
     key_parser = subparsers.add_parser("key", help="API key management")
     key_subparsers = key_parser.add_subparsers(dest="subcommand")
@@ -284,6 +326,8 @@ def main():
             create_team(args.name, args.description, args.daily_quota, args.monthly_quota)
         elif args.subcommand == "list":
             list_teams()
+        elif args.subcommand == "delete":
+            delete_team(args.team_id, args.force)
         else:
             team_parser.print_help()
 

@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models.database import APIKey, AccessLevel, Team
+from app.models.database import APIKey, AccessLevel, Team, UsageLog
 
 logger = logging.getLogger(__name__)
 
@@ -351,3 +351,51 @@ class APIKeyManager:
 
         logger.info(f"Updated team: {team.name} (ID: {team.id})")
         return team
+
+    @staticmethod
+    def delete_team(db: Session, team_id: int, force: bool = False) -> bool:
+        """
+        Delete a team. By default, only deletes if no active API keys exist.
+
+        Args:
+            db: Database session
+            team_id: Team ID to delete
+            force: If True, delete team and all associated API keys and usage logs
+
+        Returns:
+            True if deleted, False if not found or has active keys
+        """
+        team = db.query(Team).filter(Team.id == team_id).first()
+
+        if not team:
+            logger.warning(f"Team not found for deletion: ID {team_id}")
+            return False
+
+        # Check for active API keys
+        active_keys = db.query(APIKey).filter(
+            APIKey.team_id == team_id,
+            APIKey.is_active == True
+        ).count()
+
+        if active_keys > 0 and not force:
+            logger.warning(f"Cannot delete team {team.name}: has {active_keys} active API keys. Use force=True to delete anyway.")
+            raise ValueError(f"Team has {active_keys} active API keys. Revoke them first or use --force flag.")
+
+        team_name = team.name
+
+        # If force, delete all associated API keys and usage logs
+        if force:
+            # Delete usage logs first (foreign key dependency)
+            deleted_logs = db.query(UsageLog).filter(UsageLog.team_id == team_id).delete()
+
+            # Delete API keys
+            deleted_keys = db.query(APIKey).filter(APIKey.team_id == team_id).delete()
+
+            logger.info(f"Force deleting team {team_name}: removed {deleted_keys} keys and {deleted_logs} usage logs")
+
+        # Delete the team
+        db.delete(team)
+        db.commit()
+
+        logger.info(f"Deleted team: {team_name} (ID: {team_id})")
+        return True
