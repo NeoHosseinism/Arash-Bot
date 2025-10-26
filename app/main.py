@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     logger.info("=" * 60)
-    logger.info("Starting Arash Messenger Bot Service v1.0")
+    logger.info("Starting Arash External API Service v1.0")
     logger.info("=" * 60)
     
     app.state.start_time = datetime.now()
@@ -74,7 +74,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    logger.info("Shutting down Arash Messenger Bot Service...")
+    logger.info("Shutting down Arash External API Service...")
     
     # Cancel cleanup task
     cleanup_task.cancel()
@@ -114,9 +114,9 @@ async def periodic_cleanup():
 
 # Create FastAPI app
 app = FastAPI(
-    title="Arash Messenger Bot Service",
+    title="Arash External API Service",
     version="1.0.0",
-    description="Unified bot service supporting Telegram (public) and Internal (private) platforms",
+    description="External API service supporting Telegram (public) and Internal (private) platforms with enterprise features",
     docs_url="/docs" if settings.ENABLE_API_DOCS else None,
     redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,
     lifespan=lifespan

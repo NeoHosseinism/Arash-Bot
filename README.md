@@ -1,6 +1,6 @@
-# Arash Messenger Bot v1.0
+# Arash External API Service v1.0
 
-A professional, enterprise-ready multi-platform chatbot service with advanced team-based API key management, usage tracking, and AI model integration. Supports Telegram (public) and Internal (private) messaging platforms.
+A professional, enterprise-ready external API service with advanced team-based API key management, usage tracking, and AI model integration. Supports Telegram (public) and Internal (private) messaging platforms.
 
 ## Features
 
@@ -42,7 +42,7 @@ A professional, enterprise-ready multi-platform chatbot service with advanced te
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd arash-bot
+cd Arash-Bot
 
 # Create virtual environment
 python -m venv venv
@@ -107,7 +107,7 @@ API docs available at `http://localhost:8001/docs`
 ## Project Structure
 
 ```
-arash-bot/
+Arash-Bot/
 ├── app/
 │   ├── api/
 │   │   ├── routes.py              # Main API routes
@@ -381,17 +381,17 @@ The system tracks:
 
 ### Logs
 
-Logs are stored in `logs/arash_bot_service.log`:
+Logs are stored in `logs/arash_api_service.log`:
 
 ```bash
 # View logs
-tail -f logs/arash_bot_service.log
+tail -f logs/arash_api_service.log
 
 # Search for errors
-grep ERROR logs/arash_bot_service.log
+grep ERROR logs/arash_api_service.log
 
 # Filter by team
-grep "team_id=5" logs/arash_bot_service.log
+grep "team_id=5" logs/arash_api_service.log
 ```
 
 ### Statistics Dashboard
@@ -432,7 +432,7 @@ DATABASE_URL=postgresql://postgres:password@host:port/database
 
 For development, SQLite can be used:
 ```bash
-DATABASE_URL=sqlite:///./arash_bot.db
+DATABASE_URL=sqlite:///./arash_api.db
 ```
 
 ### Docker Deployment
@@ -463,7 +463,7 @@ services:
   postgres:
     image: postgres:15
     environment:
-      POSTGRES_DB: arash_bot
+      POSTGRES_DB: arash_api
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: your_password
     volumes:
@@ -476,7 +476,7 @@ services:
     depends_on:
       - postgres
     environment:
-      DATABASE_URL: postgresql://postgres:your_password@postgres:5432/arash_bot
+      DATABASE_URL: postgresql://postgres:your_password@postgres:5432/arash_api
     env_file:
       - .env
     ports:
@@ -549,7 +549,7 @@ python scripts/manage_api_keys.py usage --team-id 1
 
 - Verify FastAPI service is running
 - Check bot token in `.env`
-- Review logs: `tail -f logs/arash_bot_service.log`
+- Review logs: `tail -f logs/arash_api_service.log`
 - Test AI service connectivity
 
 ## Migration Guide
@@ -578,7 +578,7 @@ python scripts/manage_api_keys.py usage --team-id 1
 
 For issues or questions:
 
-1. **Check logs**: `logs/arash_bot_service.log`
+1. **Check logs**: `logs/arash_api_service.log`
 2. **Review API docs**: `http://localhost:8001/docs`
 3. **Test configuration**: `GET /platforms` and `GET /health`
 4. **Usage analytics**: Use CLI tool to check team usage

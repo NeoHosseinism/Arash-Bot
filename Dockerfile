@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Arash Bot
+# Multi-stage Dockerfile for Arash External API Service
 # Optimized for production deployment
 
 # Stage 1: Base image with Python

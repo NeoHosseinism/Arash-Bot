@@ -1,11 +1,11 @@
-# Arash Bot - Makefile
+# Arash External API Service - Makefile
 # Minimal commands for common development tasks
 
 .PHONY: help install run-api run-bot test lint clean docker-build docker-run db-init
 
 # Default target
 help:
-	@echo "Arash Bot - Available Commands:"
+	@echo "Arash External API Service - Available Commands:"
 	@echo ""
 	@echo "  make install        Install dependencies"
 	@echo "  make run-api        Run FastAPI service"
@@ -47,13 +47,13 @@ clean:
 
 # Docker commands
 docker-build:
-	docker build -t arash-bot:latest .
+	docker build -t arash-api-service:latest .
 
 docker-run:
-	docker run --env-file .env -p 8000:8000 arash-bot:latest
+	docker run --env-file .env -p 8000:8000 arash-api-service:latest
 
 docker-dev:
-	docker run --env-file .env -p 8000:8000 -v $(PWD):/app arash-bot:latest
+	docker run --env-file .env -p 8000:8000 -v $(PWD):/app arash-api-service:latest
 
 # Database commands
 db-init:

@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     
     # Logging
     LOG_LEVEL: str = "INFO"
-    LOG_FILE: str = "logs/arash_bot_service.log"
+    LOG_FILE: str = "logs/arash_api_service.log"
     
     # Features
     ENABLE_IMAGE_PROCESSING: bool = True

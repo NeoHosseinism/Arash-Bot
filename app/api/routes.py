@@ -42,7 +42,7 @@ async def root():
     internal_config = platform_manager.get_config("internal")
 
     return HealthCheckResponse(
-        service="Arash Messenger Bot",
+        service="Arash External API Service",
         version="1.0.0",
         status="healthy",
         platforms={
@@ -71,7 +71,7 @@ async def health_check():
 
     return {
         "status": "healthy" if ai_service_healthy else "degraded",
-        "service": "Arash Messenger Bot",
+        "service": "Arash External API Service",
         "version": "1.0.0",
         "components": {
             "api": "healthy",

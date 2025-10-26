@@ -151,7 +151,7 @@ class Database:
             database_url: Database connection string. If None, reads from environment.
         """
         if database_url is None:
-            database_url = os.getenv("DATABASE_URL", "sqlite:///./arash_bot.db")
+            database_url = os.getenv("DATABASE_URL", "sqlite:///./arash_api.db")
 
         logger.info(f"Initializing database connection: {database_url.split('@')[-1] if '@' in database_url else database_url}")
 

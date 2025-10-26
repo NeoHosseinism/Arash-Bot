@@ -1,6 +1,6 @@
-# Arash Bot - Complete Architecture Documentation
+# Arash External API Service - Complete Architecture Documentation
 
-This document provides a comprehensive overview of the Arash Bot system architecture, including all modules, classes, functions, data flows, and integrations.
+This document provides a comprehensive overview of the Arash External API Service system architecture, including all modules, classes, functions, data flows, and integrations.
 
 ## Table of Contents
 

@@ -1,6 +1,6 @@
 # Tests
 
-Test suite for Arash Messenger Bot.
+Test suite for Arash External API Service.
 
 ## 📁 Structure
 
