@@ -3,6 +3,7 @@ Usage Tracking Service
 Tracks API usage, enforces quotas, and provides usage analytics.
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
@@ -11,9 +12,8 @@ from sqlalchemy.orm import Session
 
 from app.core.name_mapping import get_friendly_model_name
 from app.models.database import APIKey, Team, UsageLog
-from app.utils.logger import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class UsageTracker:

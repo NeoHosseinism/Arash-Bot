@@ -5,15 +5,15 @@ Handles creation, validation, and management of API keys for team-based access c
 
 import hashlib
 import secrets
+import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
 from app.models.database import APIKey, AccessLevel, Team
-from app.utils.logger import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class APIKeyManager:

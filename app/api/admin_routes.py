@@ -2,6 +2,7 @@
 Admin API routes for team and API key management
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, Depends
@@ -11,9 +12,8 @@ from app.models.database import AccessLevel, get_db_session
 from app.services.api_key_manager import APIKeyManager
 from app.services.usage_tracker import UsageTracker
 from app.api.dependencies import require_admin_access, require_team_lead_access
-from app.utils.logger import get_logger
 
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
