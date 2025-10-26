@@ -1,33 +1,48 @@
 # Arash Messenger Bot v1.0
 
-A professional, scalable multi-platform chatbot service supporting Telegram (public) and Internal (private) messaging platforms with AI model integration via OpenRouter.
+A professional, enterprise-ready multi-platform chatbot service with advanced team-based API key management, usage tracking, and AI model integration. Supports Telegram (public) and Internal (private) messaging platforms.
 
-## 🌟 Features
+## Features
 
-- **Multi-Platform Support**: Telegram (public) and Internal (private) platforms
-- **Multiple AI Models**: Support for 11+ AI models including GPT-5, Claude Sonnet 4, Gemini, Grok, and more
-- **Platform-Specific Configuration**: Different models, rate limits, and features per platform
-- **Smart Rate Limiting**: Per-user, per-platform rate limiting
+### Core Capabilities
+- **Multi-Platform Support**: Telegram (public) and Internal (private) platforms with platform-specific configurations
+- **Multiple AI Models**: Support for 15+ AI models including GPT-5, Claude Opus 4, Gemini, Grok, DeepSeek, and more
+- **Friendly Model Names**: Clean, readable model names (e.g., "Grok 4 Beta" instead of technical IDs)
+- **Smart Rate Limiting**: Per-user, per-platform rate limiting with quota management
 - **Session Management**: Automatic session cleanup and conversation history
-- **Image Processing**: Support for image uploads and vision models
-- **Command System**: Extensible command processor with platform-aware access control
-- **Production-Ready**: Proper error handling, logging, retry logic, and monitoring
+- **Image Processing**: Support for image uploads and vision-enabled models
 
-## 📋 Requirements
+### Enterprise Features
+- **Team-Based Access Control**: Organize users into teams with hierarchical permissions
+- **Multi-Level API Keys**: User, Team Lead, and Admin access levels
+- **Usage Tracking**: Comprehensive logging of all API requests with analytics
+- **Quota Management**: Daily and monthly quotas per team or per API key
+- **PostgreSQL Database**: Production-ready database with connection pooling
+- **CLI Admin Tool**: Command-line interface for managing teams, keys, and monitoring usage
+
+### Security & Monitoring
+- **Confidential Logging**: No sensitive service information exposed in logs
+- **SHA256 Key Hashing**: API keys securely hashed and never stored in plain text
+- **Flexible Authentication**: Database-based keys with legacy fallback support
+- **Usage Analytics**: Track requests, response times, model usage, and costs
+- **Terminal-Friendly**: All output works in basic Linux/Docker terminals
+
+## Requirements
 
 - Python 3.9+
+- PostgreSQL 12+ (or SQLite for development)
 - Telegram Bot Token (from @BotFather)
-- OpenRouter Service Access
+- AI Service Access
 - Internal API Key (for private platform)
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone and Setup
 
 ```bash
 # Clone the repository
 git clone <your-repo-url>
-cd arash-messenger-bot
+cd arash-bot
 
 # Create virtual environment
 python -m venv venv
@@ -43,189 +58,330 @@ pip install -r requirements.txt
 # Copy environment template
 cp .env.example .env
 
-# Edit .env and fill in your credentials
+# Edit .env and configure your settings
 nano .env  # or use any text editor
 ```
 
-**Important:** Make sure to set:
+**Important environment variables:**
 - `TELEGRAM_BOT_TOKEN`: Your bot token from @BotFather
-- `INTERNAL_API_KEY`: Generate a secure random key (min 32 characters)
-- `OPENROUTER_SERVICE_URL`: Your OpenRouter service URL
+- `INTERNAL_API_KEY`: Secure random key (min 32 characters) for legacy auth
+- `AI_SERVICE_URL`: Your AI service endpoint
+- `DATABASE_URL`: PostgreSQL connection string (provided in .env.example)
 
-### 3. Run Services
+### 3. Initialize Database
+
+```bash
+# Initialize the database and create tables
+python scripts/manage_api_keys.py init
+```
+
+### 4. Create Your First Team and API Key
+
+```bash
+# Create a team
+python scripts/manage_api_keys.py team create "Engineering Team" \
+    --description "Main engineering team" \
+    --monthly-quota 50000
+
+# Create an admin API key for the team
+python scripts/manage_api_keys.py key create 1 "Admin Key" \
+    --level admin \
+    --description "Administrator access key"
+
+# The command will output your API key - save it securely!
+```
+
+### 5. Run Services
 
 ```bash
 # Terminal 1: Run FastAPI service
 python run_service.py
 
-# Terminal 2: Run Telegram bot
-python run_telegram_bot.py
+# Terminal 2: Run Telegram bot (optional)
+python run_bot.py
 ```
 
 The FastAPI service will be available at `http://localhost:8001`
 API docs available at `http://localhost:8001/docs`
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-arash-messenger-bot/
+arash-bot/
 ├── app/
-│   ├── models/                 # Data models
-│   │   ├── schemas.py          # Pydantic schemas
-│   │   └── session.py          # Session model
-│   ├── services/               # Business logic
-│   │   ├── command_processor.py
-│   │   ├── message_processor.py
-│   │   ├── openrouter_client.py
-│   │   ├── platform_manager.py
-│   │   └── session_manager.py
-│   ├── utils/                  # Utilities
+│   ├── api/
+│   │   ├── routes.py              # Main API routes
+│   │   ├── admin_routes.py        # Team & key management routes
+│   │   └── dependencies.py        # Auth & validation
+│   ├── core/
+│   │   ├── config.py              # Configuration management
+│   │   ├── constants.py           # Constants & messages
+│   │   └── name_mapping.py        # Model name mappings
+│   ├── models/
+│   │   ├── database.py            # Database models (teams, keys, usage)
+│   │   ├── schemas.py             # API schemas
+│   │   └── session.py             # Session model
+│   ├── services/
+│   │   ├── ai_client.py           # AI service client
+│   │   ├── api_key_manager.py     # API key management
+│   │   ├── command_processor.py   # Command handler
+│   │   ├── message_processor.py   # Message processing
+│   │   ├── platform_manager.py    # Platform configs
+│   │   ├── session_manager.py     # Session management
+│   │   └── usage_tracker.py       # Usage tracking & quotas
+│   ├── utils/
 │   │   ├── helpers.py
 │   │   ├── logger.py
 │   │   └── parsers.py
-│   └── main.py                 # FastAPI application
-├── telegram/                   # Telegram bot
-│   ├── bot.py                  # Bot setup
-│   ├── client.py               # Service client
-│   └── handlers.py             # Message handlers
-├── tests/                      # Test files
-├── .env.example                # Environment template
-├── .gitignore
+│   └── main.py                    # FastAPI application
+├── scripts/
+│   └── manage_api_keys.py         # CLI admin tool
+├── telegram_bot/
+│   ├── bot.py                     # Bot setup
+│   └── handlers.py                # Message handlers
+├── tests/                         # Test files
+├── .env.example                   # Environment template
 ├── requirements.txt
-├── run_service.py              # Service entry point
-├── run_telegram_bot.py                  # Bot entry point
+├── run_service.py                 # Service entry point
+├── run_bot.py                     # Bot entry point
 └── README.md
 ```
 
-## 🔧 Configuration
+## Database Schema
+
+The system uses PostgreSQL (or SQLite for dev) with three main tables:
+
+### Tables
+- **teams**: Team information, quotas, and settings
+- **api_keys**: Hashed API keys with access levels and expiration
+- **usage_logs**: Request logs with metadata (model, timing, success/failure)
+
+**Note**: Chat conversation history is NOT stored in this database - it's handled by the AI service for scalability.
+
+## Configuration
 
 ### Platform Configurations
 
 #### Telegram (Public)
-- **Model**: `google/gemini-2.0-flash-001` (fixed)
+- **Default Model**: Gemini 2.0 Flash
 - **Rate Limit**: 20 messages/minute
-- **Commands**: start, help, status, translate
+- **Commands**: start, help, status, translate, model, models
 - **History**: 10 messages max
-- **Model Switching**: Disabled
+- **Model Switching**: Enabled (limited model selection)
+- **Authentication**: Not required
 
 #### Internal (Private)
-- **Default Model**: `openai/gpt-5-chat`
-- **Available Models**: 11 models (GPT-5, Claude, Gemini, Grok, etc.)
+- **Default Model**: GPT-5 Chat
+- **Available Models**: 11+ models (GPT-5, Claude, Gemini, Grok, etc.)
 - **Rate Limit**: 60 messages/minute
 - **Commands**: All commands available
 - **History**: 30 messages max
-- **Model Switching**: Enabled
-- **Authentication**: Required
+- **Model Switching**: Enabled (full model catalog)
+- **Authentication**: Required (API key)
 
 ### Available Models
 
-```
-google/gemini-2.0-flash-001
-deepseek/deepseek-chat-v3-0324
-openai/gpt-4o-mini
-google/gemma-3-1b-it
-anthropic/claude-sonnet-4
-openai/gpt-4.1
-openai/gpt-4o-search-preview
-x-ai/grok-4
-meta-llama/llama-4-maverick
-google/gemini-2.5-flash
-openai/gpt-5-chat
-```
-
-### Model Aliases (for easier switching)
+Models are displayed with friendly names:
 
 ```
-claude, sonnet → anthropic/claude-sonnet-4
-gpt, gpt5 → openai/gpt-5-chat
-gpt4 → openai/gpt-4.1
-mini → openai/gpt-4o-mini
-web, search → openai/gpt-4o-search-preview
-gemini → google/gemini-2.5-flash
-grok → x-ai/grok-4
-deepseek → deepseek/deepseek-chat-v3-0324
-llama → meta-llama/llama-4-maverick
+Gemini 2.0 Flash          (google/gemini-2.0-flash-001)
+Gemini 2.5 Flash          (google/gemini-2.5-flash)
+GPT-5 Chat                (openai/gpt-5-chat)
+GPT-4.1                   (openai/gpt-4.1)
+GPT-4o                    (openai/gpt-4o)
+GPT-4o Mini               (openai/gpt-4o-mini)
+GPT-4o Search             (openai/gpt-4o-search)
+Claude Opus 4             (anthropic/claude-opus-4)
+Claude Sonnet 4           (anthropic/claude-sonnet-4)
+DeepSeek Chat V3          (deepseek/deepseek-chat-v3-0324)
+DeepSeek R1               (deepseek/deepseek-r1)
+Grok 4                    (x-ai/grok-4)
+Llama 4 Maverick          (meta-llama/llama-4-maverick)
+Mistral Large             (mistralai/mistral-large)
 ```
 
-## 📚 API Documentation
+## API Key Management
 
-### Endpoints
+### Access Levels
+
+1. **USER**: Basic access to AI service
+2. **TEAM_LEAD**: View team usage, manage team members
+3. **ADMIN**: Full access - create teams, manage keys, view all usage
+
+### CLI Tool Usage
+
+#### Initialize Database
+```bash
+python scripts/manage_api_keys.py init
+```
+
+#### Team Management
+```bash
+# Create team
+python scripts/manage_api_keys.py team create "Data Science" \
+    --description "Data science team" \
+    --daily-quota 1000 \
+    --monthly-quota 30000
+
+# List teams
+python scripts/manage_api_keys.py team list
+```
+
+#### API Key Management
+```bash
+# Create API key
+python scripts/manage_api_keys.py key create 1 "Production API" \
+    --level admin \
+    --description "Production deployment key" \
+    --expires 365
+
+# List keys
+python scripts/manage_api_keys.py key list --team-id 1
+
+# Revoke key
+python scripts/manage_api_keys.py key revoke 5
+```
+
+#### Usage Monitoring
+```bash
+# View team usage
+python scripts/manage_api_keys.py usage --team-id 1 --days 30
+
+# View API key usage
+python scripts/manage_api_keys.py usage --key-id 5 --days 7
+```
+
+## API Documentation
+
+### Core Endpoints
 
 #### Health & Info
 - `GET /` - Health check with platform info
-- `GET /health` - Detailed health check
+- `GET /health` - Detailed health check with service status
 - `GET /platforms` - Get platform configurations
+- `GET /stats` - Service statistics
 
 #### Message Processing
 - `POST /message` - Process a message
 - `POST /webhook/{platform}` - Platform webhook handler
 
 #### Session Management
-- `GET /sessions` - List all sessions (auth required for details)
-- `GET /session/{session_id}` - Get specific session
+- `GET /sessions` - List all sessions
+- `GET /session/{session_id}` - Get specific session details
 - `DELETE /session/{session_id}` - Delete session (admin only)
+- `POST /admin/clear-sessions` - Clear all sessions (admin only)
 
-#### Statistics & Admin
-- `GET /stats` - Service statistics
-- `POST /admin/clear-sessions` - Clear sessions (admin only)
+### Admin API Endpoints
 
-### Example: Send Message
+All admin endpoints require authentication and appropriate access level.
 
+#### Team Management (Admin only)
+- `POST /admin/teams` - Create team
+- `GET /admin/teams` - List teams
+- `GET /admin/teams/{id}` - Get team details
+- `PATCH /admin/teams/{id}` - Update team
+
+#### API Key Management
+- `POST /admin/api-keys` - Create API key (Admin only)
+- `GET /admin/api-keys` - List API keys (Team Lead+)
+- `DELETE /admin/api-keys/{id}` - Revoke/delete key (Admin only)
+
+#### Usage Tracking
+- `GET /admin/usage/team/{id}` - Team usage stats (Team Lead+)
+- `GET /admin/usage/api-key/{id}` - Key usage stats (Team Lead+)
+- `GET /admin/usage/quota/{id}` - Check quota status (Team Lead+)
+- `GET /admin/usage/recent` - Recent usage logs (Team Lead+)
+
+### API Usage Examples
+
+#### Send Message (with API Key)
 ```bash
 curl -X POST http://localhost:8001/message \
   -H "Content-Type: application/json" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
+  -H "Authorization: Bearer ak_your_api_key_here" \
   -d '{
     "platform": "internal",
     "user_id": "user123",
     "chat_id": "chat456",
     "message_id": "msg789",
-    "text": "Hello, what models are available?"
+    "text": "What models are available?"
   }'
 ```
 
-## 🤖 Telegram Bot Commands
+#### Create Team (Admin)
+```bash
+curl -X POST http://localhost:8001/admin/teams \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer ak_admin_key_here" \
+  -d '{
+    "name": "Engineering Team",
+    "description": "Main engineering team",
+    "monthly_quota": 50000,
+    "daily_quota": 2000
+  }'
+```
 
-### Public Commands (Telegram)
+#### Get Usage Statistics
+```bash
+curl -X GET "http://localhost:8001/admin/usage/team/1?days=30" \
+  -H "Authorization: Bearer ak_team_lead_key_here"
+```
+
+## Telegram Bot Commands
+
+### Public Commands
 - `/start` - Welcome message
 - `/help` - Show available commands
 - `/status` - Show session status
 - `/translate [lang] [text]` - Translate text
-
-### Private Commands (Internal Only)
 - `/model [name]` - Switch AI model
 - `/models` - List available models
+
+### Private Commands (Internal Only)
 - `/clear` - Clear conversation history
 - `/summarize` - Summarize conversation
 - `/settings` - User settings
 
-## 🔐 Security
+## Security
 
 ### Best Practices Implemented
 
-1. **Environment Variables**: All secrets in `.env` (never committed)
-2. **API Key Authentication**: Required for internal platform
-3. **Webhook Verification**: Optional webhook secret validation
-4. **Rate Limiting**: Per-user, per-platform limits
-5. **Input Validation**: Pydantic models for all inputs
-6. **Error Handling**: Comprehensive error handling with logging
-7. **CORS**: Configurable CORS origins
+1. **API Key Hashing**: SHA256 hashing, keys never stored in plain text
+2. **Access Control**: Hierarchical access levels with permission checks
+3. **Rate Limiting**: Per-user and per-team quota enforcement
+4. **Input Validation**: Pydantic models for all API inputs
+5. **Database Security**: Parameterized queries, connection pooling
+6. **Confidential Logging**: No service-specific information in logs
+7. **Environment Variables**: All secrets in `.env` file
+8. **CORS Configuration**: Configurable allowed origins
 
 ### Generating Secure Keys
 
 ```bash
-# Generate a secure API key
+# Generate a secure API key (for legacy INTERNAL_API_KEY)
 python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 # Generate webhook secret
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-## 📊 Monitoring
+**Note**: For team-based access, use the CLI tool to generate API keys which are automatically hashed.
+
+## Monitoring & Analytics
+
+### Usage Tracking
+
+The system tracks:
+- **Request Count**: Total, successful, and failed requests
+- **Model Usage**: Which models are being used by which teams
+- **Response Times**: Average response time per request
+- **Token Usage**: If provided by AI service
+- **Cost Tracking**: Estimated costs (if configured)
+- **Quota Status**: Current usage vs limits
 
 ### Logs
 
-Logs are stored in `logs/arash_bot_service.log` with rotation.
+Logs are stored in `logs/arash_bot_service.log`:
 
 ```bash
 # View logs
@@ -233,125 +389,209 @@ tail -f logs/arash_bot_service.log
 
 # Search for errors
 grep ERROR logs/arash_bot_service.log
+
+# Filter by team
+grep "team_id=5" logs/arash_bot_service.log
 ```
 
-### Statistics API
+### Statistics Dashboard
 
 ```bash
 # Get service statistics
 curl http://localhost:8001/stats
+
+# Get team usage (last 30 days)
+python scripts/manage_api_keys.py usage --team-id 1 --days 30
 ```
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Install test dependencies
-pip install pytest pytest-asyncio
+pip install pytest pytest-asyncio httpx
 
-# Run tests
+# Run all tests
 pytest tests/
 
 # Run with coverage
 pytest --cov=app tests/
+
+# Run specific test file
+pytest tests/test_api_keys.py -v
 ```
 
-## 🚢 Deployment
+## Deployment
 
-### Docker (Recommended)
+### PostgreSQL Setup
+
+The system requires PostgreSQL for production. Connection details are in `.env.example`:
+
+```bash
+DATABASE_URL=postgresql://postgres:password@host:port/database
+```
+
+For development, SQLite can be used:
+```bash
+DATABASE_URL=sqlite:///./arash_bot.db
+```
+
+### Docker Deployment
 
 ```dockerfile
-# Dockerfile example
 FROM python:3.11-slim
 
 WORKDIR /app
 
+# Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy application
 COPY . .
 
-# Run both services
-CMD ["sh", "-c", "python run_service.py & python run_telegram_bot.py"]
+# Initialize database on startup
+CMD python scripts/manage_api_keys.py init && \
+    python run_service.py
 ```
 
-### Systemd Service
+### Docker Compose
 
-```ini
-# /etc/systemd/system/arash-bot.service
-[Unit]
-Description=Arash Messenger Bot Service
-After=network.target
+```yaml
+version: '3.8'
 
-[Service]
-Type=simple
-User=www-data
-WorkingDirectory=/opt/arash-bot
-Environment="PATH=/opt/arash-bot/venv/bin"
-ExecStart=/opt/arash-bot/venv/bin/python run_service.py
-Restart=always
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: arash_bot
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: your_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
-[Install]
-WantedBy=multi-user.target
+  bot-service:
+    build: .
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgresql://postgres:your_password@postgres:5432/arash_bot
+    env_file:
+      - .env
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./logs:/app/logs
+
+volumes:
+  postgres_data:
 ```
 
 ### Production Checklist
 
 - [ ] Set `ENVIRONMENT=production` in `.env`
-- [ ] Generate strong API keys (min 32 characters)
-- [ ] Configure CORS origins (don't use `*`)
-- [ ] Set up SSL/TLS for webhooks
+- [ ] Configure PostgreSQL database with backups
+- [ ] Generate strong API keys (use CLI tool)
+- [ ] Set up SSL/TLS certificates
 - [ ] Configure reverse proxy (nginx/caddy)
 - [ ] Set up log rotation
-- [ ] Enable monitoring (Prometheus/Grafana)
-- [ ] Set up backups for session data
-- [ ] Configure Redis for session persistence
+- [ ] Enable monitoring (Prometheus/Grafana recommended)
 - [ ] Set `ENABLE_API_DOCS=false` for production
+- [ ] Configure CORS origins (don't use `*`)
+- [ ] Set up database connection pooling
+- [ ] Initialize teams and API keys before launch
+- [ ] Test quota enforcement
+- [ ] Configure rate limits appropriately
 
-## 🔄 Migration from Old Version
+## Troubleshooting
 
-If you're migrating from the previous version:
+### Database Issues
 
-1. **Update environment variables** - New `.env` format
-2. **Update model names** - Some model IDs have changed
-3. **Review API endpoints** - New endpoint structure
-4. **Update client code** - New response format
+**Connection failed**
+```bash
+# Test connection
+python -c "from app.models.database import get_database; db = get_database(); print('OK' if db.test_connection() else 'FAILED')"
 
-## 🐛 Troubleshooting
+# Check connection string
+echo $DATABASE_URL
+```
 
-### Bot not responding
-- Check if FastAPI service is running
-- Verify bot token in `.env`
-- Check logs for errors
-- Ensure bot service URL is correct
+**Tables not created**
+```bash
+# Manually initialize
+python scripts/manage_api_keys.py init
+```
 
-### Rate limit errors
-- Increase rate limit in `.env`
-- Check if user is being rate limited
-- Review session cleanup intervals
+### API Key Issues
 
-### Model switching not working
-- Verify platform is "internal"
-- Check if model name is correct
-- Use model aliases for easier switching
+**Invalid API key**
+- Check key format (should start with `ak_`)
+- Verify key is active: `python scripts/manage_api_keys.py key list`
+- Check expiration date
 
-### Authentication failures
-- Verify API key is correct
-- Check Authorization header format
-- Ensure internal platform authentication is enabled
+**Permission denied**
+- Verify access level: USER < TEAM_LEAD < ADMIN
+- Check endpoint requirements in API docs
 
-## 📞 Support
+### Rate Limiting
+
+**Quota exceeded**
+```bash
+# Check current usage
+python scripts/manage_api_keys.py usage --team-id 1
+
+# Increase quota
+# (Update via database or recreate team with higher limits)
+```
+
+### Bot Not Responding
+
+- Verify FastAPI service is running
+- Check bot token in `.env`
+- Review logs: `tail -f logs/arash_bot_service.log`
+- Test AI service connectivity
+
+## Migration Guide
+
+### From Previous Version
+
+1. **Update environment variables**
+   - Rename `OPENROUTER_SERVICE_URL` → `AI_SERVICE_URL`
+   - Add `DATABASE_URL` for PostgreSQL
+
+2. **Initialize database**
+   ```bash
+   python scripts/manage_api_keys.py init
+   ```
+
+3. **Create teams and migrate users**
+   - Create teams for your organization
+   - Generate API keys for each team
+   - Update client applications with new keys
+
+4. **Update API calls**
+   - Add `Authorization: Bearer` header with new API keys
+   - Update endpoint URLs if needed
+
+## Support
 
 For issues or questions:
-1. Check the logs: `logs/arash_bot_service.log`
-2. Review API docs: `http://localhost:8001/docs`
-3. Check configuration: `GET /platforms`
 
-## 📝 License
+1. **Check logs**: `logs/arash_bot_service.log`
+2. **Review API docs**: `http://localhost:8001/docs`
+3. **Test configuration**: `GET /platforms` and `GET /health`
+4. **Usage analytics**: Use CLI tool to check team usage
+5. **Database status**: Run `python scripts/manage_api_keys.py init` to verify
+
+## License
 
 [Your License Here]
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-- FastAPI for the excellent framework
+- FastAPI for the excellent web framework
 - python-telegram-bot for Telegram integration
-- OpenRouter for AI model access
+- SQLAlchemy for database ORM
+- PostgreSQL for production database
+- Pydantic for data validation
