@@ -666,9 +666,11 @@ stateDiagram-v2
     Stats --> GetSessionStats
     Unknown --> ErrorResponse
 
-    CheckPlatform --> CheckModelSwitch{Model switching enabled?}
-    CheckModelSwitch -->|Yes| ProcessModelCommand
-    CheckModelSwitch -->|No| ErrorResponse
+    CheckPlatform --> CheckModelSwitch
+    
+    state CheckModelSwitch <<choice>>
+    CheckModelSwitch --> ProcessModelCommand: Model switching enabled
+    CheckModelSwitch --> ErrorResponse: Model switching disabled
 
     GetPlatformConfig --> FormatResponse
     ProcessModelCommand --> UpdateSession
