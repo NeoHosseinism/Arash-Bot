@@ -57,3 +57,14 @@ class ChatSession(BaseModel):
         from datetime import timedelta
         timeout = datetime.now() - timedelta(minutes=timeout_minutes)
         return self.last_activity < timeout
+
+    @property
+    def current_model_friendly(self) -> str:
+        """
+        Get current model as friendly display name.
+
+        Returns:
+            Friendly model name (e.g., "Gemini 2.0 Flash" instead of "google/gemini-2.0-flash-001")
+        """
+        from app.core.name_mapping import get_friendly_model_name
+        return get_friendly_model_name(self.current_model)

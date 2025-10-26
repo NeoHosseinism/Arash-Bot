@@ -29,52 +29,57 @@ class PlatformType(str, Enum):
 
 
 # Model Aliases for easier switching
+# Maps short aliases to FRIENDLY NAMES (not technical IDs)
+# The resolve_model_name() function will convert friendly names to technical IDs
 MODEL_ALIASES = {
     # Claude models (Internal only)
-    "claude": "anthropic/claude-sonnet-4",
-    "claude-4": "anthropic/claude-sonnet-4",
-    "sonnet": "anthropic/claude-sonnet-4",
-    
+    "claude": "Claude Sonnet 4",
+    "claude-4": "Claude Sonnet 4",
+    "sonnet": "Claude Sonnet 4",
+    "opus": "Claude Opus 4.5",
+
     # GPT models
-    "gpt": "openai/gpt-5-chat",
-    "gpt5": "openai/gpt-5-chat",
-    "gpt-5": "openai/gpt-5-chat",
-    "gpt4": "openai/gpt-4.1",
-    "gpt-4": "openai/gpt-4.1",
-    "gpt4-mini": "openai/gpt-4o-mini",
-    "mini": "openai/gpt-4o-mini",
-    "web": "openai/gpt-4o-search-preview",
-    "search": "openai/gpt-4o-search-preview",
-    
+    "gpt": "GPT-5 Chat",
+    "gpt5": "GPT-5 Chat",
+    "gpt-5": "GPT-5 Chat",
+    "gpt4": "GPT-4.1",
+    "gpt-4": "GPT-4.1",
+    "gpt4-mini": "GPT-4o Mini",
+    "mini": "GPT-4o Mini",
+    "web": "GPT-4o Search Preview",
+    "search": "GPT-4o Search Preview",
+    "o1": "O1",
+
     # Gemini models (Available on Telegram)
-    "gemini": "google/gemini-2.5-flash",
-    "gemini-2.5": "google/gemini-2.5-flash",
-    "gemini-2": "google/gemini-2.0-flash-001",
-    "flash": "google/gemini-2.0-flash-001",
-    "flash-2": "google/gemini-2.0-flash-001",
-    "flash-2.5": "google/gemini-2.5-flash",
-    "gemma": "google/gemma-3-1b-it",
-    
+    "gemini": "Gemini 2.5 Flash",
+    "gemini-2.5": "Gemini 2.5 Flash",
+    "gemini-2": "Gemini 2.0 Flash",
+    "flash": "Gemini 2.0 Flash",
+    "flash-2": "Gemini 2.0 Flash",
+    "flash-2.5": "Gemini 2.5 Flash",
+    "gemma": "Gemma 3 1B",
+
     # Other models
-    "grok": "x-ai/grok-4",
-    "deepseek": "deepseek/deepseek-chat-v3-0324",
-    "deep": "deepseek/deepseek-chat-v3-0324",
-    "llama": "meta-llama/llama-4-maverick",
+    "grok": "Grok 4",
+    "deepseek": "DeepSeek Chat V3",
+    "deep": "DeepSeek Chat V3",
+    "llama": "Llama 4 Maverick",
 }
 
 # Telegram-specific aliases (for public users)
+# Maps short aliases to FRIENDLY NAMES
 TELEGRAM_MODEL_ALIASES = {
-    "gemini": "google/gemini-2.5-flash",
-    "gemini-2.5": "google/gemini-2.5-flash",
-    "gemini-2": "google/gemini-2.0-flash-001",
-    "flash": "google/gemini-2.0-flash-001",
-    "flash-2": "google/gemini-2.0-flash-001",
-    "flash-2.5": "google/gemini-2.5-flash",
-    "gemma": "google/gemma-3-1b-it",
-    "deepseek": "deepseek/deepseek-chat-v3-0324",
-    "deep": "deepseek/deepseek-chat-v3-0324",
-    "mini": "openai/gpt-4o-mini",
-    "gpt-mini": "openai/gpt-4o-mini",
+    "gemini": "Gemini 2.5 Flash",
+    "gemini-2.5": "Gemini 2.5 Flash",
+    "gemini-2": "Gemini 2.0 Flash",
+    "flash": "Gemini 2.0 Flash",
+    "flash-2": "Gemini 2.0 Flash",
+    "flash-2.5": "Gemini 2.5 Flash",
+    "gemma": "Gemma 3 1B",
+    "deepseek": "DeepSeek Chat V3",
+    "deep": "DeepSeek Chat V3",
+    "mini": "GPT-4o Mini",
+    "gpt-mini": "GPT-4o Mini",
 }
 
 
