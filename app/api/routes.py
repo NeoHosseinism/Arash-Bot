@@ -28,6 +28,7 @@ from app.api.dependencies import (
 )
 from app.utils.parsers import parse_webhook_data
 from app.core.config import settings
+from app.core.name_mapping import get_friendly_model_name
 
 logger = logging.getLogger(__name__)
 
@@ -48,13 +49,13 @@ async def root():
         platforms={
             "telegram": {
                 "type": "public",
-                "model": telegram_config.model,
+                "model": get_friendly_model_name(telegram_config.model),  # ✓ Show friendly name
                 "rate_limit": telegram_config.rate_limit,
                 "model_switching": False,
             },
             "internal": {
                 "type": "private",
-                "models": internal_config.available_models,
+                "models": [get_friendly_model_name(m) for m in internal_config.available_models],  # ✓ Show friendly names
                 "rate_limit": internal_config.rate_limit,
                 "model_switching": True,
             },
@@ -138,7 +139,7 @@ async def get_platforms():
     return {
         "telegram": {
             "type": "public",
-            "model": telegram_config.model,
+            "model": get_friendly_model_name(telegram_config.model),  # ✓ Show friendly name
             "rate_limit": telegram_config.rate_limit,
             "commands": telegram_config.commands,
             "max_history": telegram_config.max_history,
@@ -146,8 +147,8 @@ async def get_platforms():
         },
         "internal": {
             "type": "private",
-            "default_model": internal_config.model,
-            "available_models": internal_config.available_models,
+            "default_model": get_friendly_model_name(internal_config.model),  # ✓ Show friendly name
+            "available_models": [get_friendly_model_name(m) for m in internal_config.available_models],  # ✓ Show friendly names
             "rate_limit": internal_config.rate_limit,
             "commands": internal_config.commands,
             "max_history": internal_config.max_history,
@@ -185,7 +186,7 @@ async def get_sessions(
             "session_id": session.session_id,
             "platform": session.platform,
             "platform_type": session.platform_config.get("type"),
-            "current_model": session.current_model,
+            "current_model": get_friendly_model_name(session.current_model),  # ✓ Show friendly name
             "message_count": session.message_count,
             "last_activity": session.last_activity.isoformat(),
         }
@@ -262,7 +263,7 @@ async def get_statistics():
         "sessions": 0,
         "messages": 0,
         "active": 0,
-        "model": platform_manager.get_config("telegram").model,
+        "model": get_friendly_model_name(platform_manager.get_config("telegram").model),  # ✓ Show friendly name
     }
 
     internal_stats = {
@@ -283,7 +284,9 @@ async def get_statistics():
         elif session.platform == "internal":
             internal_stats["sessions"] += 1
             internal_stats["messages"] += session.message_count
-            internal_stats["models_used"][session.current_model] += 1
+            # ✓ Convert to friendly name for stats display
+            friendly_model = get_friendly_model_name(session.current_model)
+            internal_stats["models_used"][friendly_model] += 1
             if is_active:
                 internal_stats["active"] += 1
 
