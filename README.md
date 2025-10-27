@@ -7,7 +7,10 @@ A professional, enterprise-ready external API service with advanced team-based A
 ### Core Capabilities
 - **Multi-Platform Support**: Telegram (public) and Internal (private) platforms with platform-specific configurations
 - **Multiple AI Models**: Support for 15+ AI models including GPT-5, Claude Opus 4, Gemini, Grok, DeepSeek, and more
-- **Friendly Model Names**: Clean, readable model names (e.g., "Grok 4 Beta" instead of technical IDs)
+- **User-Friendly Model Names**: Technical model IDs automatically hidden - users see "Gemini 2.0 Flash" instead of "google/gemini-2.0-flash-001"
+  - Friendly names shown in all API responses, Telegram messages, and Swagger UI
+  - Technical IDs only used internally when calling AI services
+  - Supports friendly names, aliases, and technical IDs as input
 - **Smart Rate Limiting**: Per-user, per-platform rate limiting with quota management
 - **Session Management**: Automatic session cleanup and conversation history
 - **Image Processing**: Support for image uploads and vision-enabled models
@@ -17,7 +20,10 @@ A professional, enterprise-ready external API service with advanced team-based A
 - **Multi-Level API Keys**: User, Team Lead, and Admin access levels
 - **Usage Tracking**: Comprehensive logging of all API requests with analytics
 - **Quota Management**: Daily and monthly quotas per team or per API key
-- **PostgreSQL Database**: Production-ready database with connection pooling
+- **PostgreSQL Database**: Production-ready database with connection pooling and smart table detection
+  - Automatically detects existing tables to prevent data loss
+  - Clear terminal output showing which tables were created/skipped
+  - PostgreSQL-only (SQLite no longer supported)
 - **CLI Admin Tool**: Command-line interface for managing teams, keys, and monitoring usage
 
 ### Security & Monitoring
@@ -25,7 +31,9 @@ A professional, enterprise-ready external API service with advanced team-based A
 - **SHA256 Key Hashing**: API keys securely hashed and never stored in plain text
 - **Flexible Authentication**: Database-based keys with legacy fallback support
 - **Usage Analytics**: Track requests, response times, model usage, and costs
-- **Terminal-Friendly**: All output works in basic Linux/Docker terminals
+- **Terminal-Friendly Output**: All logs use ASCII-only characters for Docker/Linux compatibility
+  - No emojis in logs (user-facing messages still support emojis)
+  - Clear status indicators: [OK], [ERROR], [WARNING], [INFO]
 
 ## Requirements
 
@@ -73,6 +81,35 @@ nano .env  # or use any text editor
 ```bash
 # Initialize the database and create tables
 python scripts/manage_api_keys.py init
+```
+
+**Terminal Output Example (First Time):**
+```
+============================================================
+Initializing Database Connection
+============================================================
+Initializing PostgreSQL connection: 37.32.8.181:31917/postgres
+[OK] PostgreSQL engine created successfully
+[OK] PostgreSQL connection successful
+[INFO] No existing tables found, creating new schema...
+[OK] Created new tables: api_keys, teams, usage_logs
+[OK] Database schema is ready
+============================================================
+```
+
+**Terminal Output Example (Existing Tables):**
+```
+============================================================
+Initializing Database Connection
+============================================================
+Initializing PostgreSQL connection: 37.32.8.181:31917/postgres
+[OK] PostgreSQL engine created successfully
+[OK] PostgreSQL connection successful
+[INFO] Found existing tables in database: api_keys, teams, usage_logs
+[OK] Skipped existing tables: api_keys, teams, usage_logs
+[OK] All required tables already exist in database
+[OK] Database schema is ready
+============================================================
 ```
 
 ### 4. Create Your First Team and API Key
@@ -165,16 +202,16 @@ The system uses PostgreSQL with three main tables:
 #### Telegram (Public)
 - **Default Model**: Gemini 2.0 Flash
 - **Rate Limit**: 20 messages/minute
-- **Commands**: start, help, status, translate, model, models
+- **Commands**: `/start`, `/help`, `/status`, `/clear`, `/model`, `/models`
 - **History**: 10 messages max
-- **Model Switching**: Enabled (limited model selection)
+- **Model Switching**: Enabled (5 optimized models)
 - **Authentication**: Not required
 
 #### Internal (Private)
 - **Default Model**: GPT-5 Chat
 - **Available Models**: 11+ models (GPT-5, Claude, Gemini, Grok, etc.)
 - **Rate Limit**: 60 messages/minute
-- **Commands**: All commands available
+- **Commands**: `/start`, `/help`, `/status`, `/clear`, `/model`, `/models`, `/settings`
 - **History**: 30 messages max
 - **Model Switching**: Enabled (full model catalog)
 - **Authentication**: Required (API key)
@@ -199,6 +236,52 @@ Grok 4                    (x-ai/grok-4)
 Llama 4 Maverick          (meta-llama/llama-4-maverick)
 Mistral Large             (mistralai/mistral-large)
 ```
+
+**Note:** Technical IDs (shown in parentheses) are used internally. Users only see and interact with friendly names.
+
+### Bot Commands
+
+All commands work with user-friendly model names and support multiple input formats:
+
+#### Common Commands (Both Platforms)
+
+- **`/start`** - Show welcome message with current model and platform info
+- **`/help`** - Display all available commands and platform details
+- **`/status`** - Show current session status, model, message count, and uptime
+- **`/clear`** - Clear conversation history and start fresh
+- **`/model`** - Switch AI model or list available models
+  - Usage: `/model` (list all models) or `/model <name>` (switch model)
+  - Accepts friendly names: `/model Gemini 2.0 Flash`
+  - Accepts aliases: `/model gemini`, `/model deepseek`
+  - Accepts technical IDs: `/model google/gemini-2.0-flash-001`
+- **`/models`** - List all available models with aliases
+
+#### Internal Platform Only
+
+- **`/settings`** - View user settings and preferences
+
+#### Model Aliases
+
+Quick shortcuts for model switching:
+
+**Telegram:**
+- `gemini`, `flash` → Gemini 2.0 Flash
+- `flash-2.5` → Gemini 2.5 Flash
+- `deepseek`, `deep` → DeepSeek Chat V3
+- `mini` → GPT-4o Mini
+- `gemma` → Gemma 3 1B
+
+**Internal:**
+- `claude`, `sonnet` → Claude Sonnet 4
+- `opus` → Claude Opus 4.5
+- `gpt`, `gpt5` → GPT-5 Chat
+- `gpt4` → GPT-4.1
+- `mini` → GPT-4o Mini
+- `search`, `web` → GPT-4o Search
+- `gemini` → Gemini 2.5 Flash
+- `grok` → Grok 4
+- `deepseek` → DeepSeek Chat V3
+- `llama` → Llama 4 Maverick
 
 ## API Key Management
 
@@ -407,18 +490,39 @@ python scripts/manage_api_keys.py usage --team-id 1 --days 30
 ## Testing
 
 ```bash
-# Install test dependencies
+# Install test dependencies (already in requirements.txt)
 pip install pytest pytest-asyncio httpx
 
 # Run all tests
-pytest tests/
+pytest tests/ -v
 
 # Run with coverage
 pytest --cov=app tests/
 
 # Run specific test file
-pytest tests/test_api_keys.py -v
+pytest tests/test_ai_service.py -v
 ```
+
+**Expected Output:**
+```
+================================= test session starts ==================================
+platform linux -- Python 3.13.4, pytest-8.3.4, pluggy-1.6.0
+collected 9 items
+
+tests/test_ai_service.py::test_base_url_reachable PASSED               [ 11%]
+tests/test_ai_service.py::test_health_endpoint SKIPPED                 [ 22%]
+tests/test_ai_service.py::test_chat_endpoint_format PASSED             [ 33%]
+...
+
+======================= 8 passed, 1 skipped in 6.94s ==========================
+```
+
+**Note:** The `test_health_endpoint` test may be skipped if the AI service doesn't have a `/health` endpoint (returns 404). This is expected behavior.
+
+**Pytest Configuration:**
+- Async tests configured with `pytest-asyncio`
+- Event loop scope set to `function` to avoid warnings
+- Tests automatically skip if external services are unavailable
 
 ## Deployment
 
@@ -570,6 +674,69 @@ python scripts/manage_api_keys.py usage --team-id 1
 4. **Update API calls**
    - Add `Authorization: Bearer` header with new API keys
    - Update endpoint URLs if needed
+
+## Recent Updates & Changes
+
+### Version 1.1 (Latest)
+
+**User-Friendly Model Names** 🎨
+- All technical model IDs automatically hidden from users
+- Users see "Gemini 2.0 Flash" instead of "google/gemini-2.0-flash-001"
+- Friendly names shown in all API responses, Telegram messages, and Swagger UI
+- Supports friendly names, aliases, and technical IDs as input
+- `/model` command accepts multi-word names: `/model Gemini 2.0 Flash`
+
+**PostgreSQL Improvements** 🗄️
+- Removed SQLite support (PostgreSQL now required)
+- Smart table detection prevents data loss
+- Clear terminal output showing which tables exist/were created
+- ASCII-friendly status indicators: `[OK]`, `[ERROR]`, `[WARNING]`, `[INFO]`
+- Automatic .env loading in all scripts
+
+**Command Updates** 🤖
+- **Added** `/clear` command to Telegram platform
+- **Removed** `/translate` command (was non-functional placeholder)
+- **Removed** `/summarize` command (was non-functional placeholder)
+- All commands now show friendly model names
+
+**Testing Improvements** ✅
+- Fixed pytest asyncio configuration warnings
+- Health endpoint test now skips gracefully if unavailable
+- Event loop fixture updated to pytest-asyncio standards
+- No more deprecation warnings
+
+**Terminal Compatibility** 🖥️
+- All log output uses ASCII-only characters
+- Works perfectly in Docker and basic Linux terminals
+- User-facing messages (Telegram/API) still support emojis
+- Clear status indicators replace emojis in logs
+
+**Bug Fixes** 🐛
+- Fixed DATABASE_URL warning on startup
+- Fixed `/clear` command visibility in Telegram
+- Fixed model name display in all endpoints
+- Fixed pytest configuration for Python 3.13+
+
+### Breaking Changes
+
+⚠️ **Important:** If upgrading from a previous version:
+
+1. **Update your `.env` file:**
+   ```bash
+   # Add 'clear' to Telegram commands
+   TELEGRAM_COMMANDS=start,help,status,clear,model,models
+
+   # Remove 'translate' from the list
+   ```
+
+2. **PostgreSQL is now required:**
+   - SQLite is no longer supported
+   - Update `DATABASE_URL` to use PostgreSQL connection string
+
+3. **Model names have changed:**
+   - API responses now return friendly names
+   - Update any code that parses model names from responses
+   - Technical IDs still accepted as input for backward compatibility
 
 ## Support
 
