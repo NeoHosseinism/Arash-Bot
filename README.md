@@ -30,7 +30,7 @@ A professional, enterprise-ready external API service with advanced team-based A
 ## Requirements
 
 - Python 3.9+
-- PostgreSQL 12+ (or SQLite for development)
+- PostgreSQL 12+ (required)
 - Telegram Bot Token (from @BotFather)
 - AI Service Access
 - Internal API Key (for private platform)
@@ -149,7 +149,7 @@ Arash-Bot/
 
 ## Database Schema
 
-The system uses PostgreSQL (or SQLite for dev) with three main tables:
+The system uses PostgreSQL with three main tables:
 
 ### Tables
 - **teams**: Team information, quotas, and settings
@@ -430,10 +430,7 @@ The system requires PostgreSQL for production. Connection details are in `.env.e
 DATABASE_URL=postgresql://postgres:password@host:port/database
 ```
 
-For development, SQLite can be used:
-```bash
-DATABASE_URL=sqlite:///./arash_api.db
-```
+**Note:** PostgreSQL is required. SQLite is no longer supported.
 
 ### Docker Deployment
 

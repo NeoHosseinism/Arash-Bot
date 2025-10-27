@@ -146,34 +146,50 @@ class Database:
 
     def __init__(self, database_url: Optional[str] = None):
         """
-        Initialize database connection.
+        Initialize database connection (PostgreSQL only).
 
         Args:
-            database_url: Database connection string. If None, reads from environment.
+            database_url: PostgreSQL connection string. If None, reads from DATABASE_URL environment variable.
+
+        Raises:
+            ValueError: If database_url is not provided or is not PostgreSQL
         """
         if database_url is None:
-            database_url = os.getenv("DATABASE_URL", "sqlite:///./arash_api.db")
+            database_url = os.getenv("DATABASE_URL")
 
-        logger.info(f"Initializing database connection: {database_url.split('@')[-1] if '@' in database_url else database_url}")
+        if not database_url:
+            raise ValueError(
+                "DATABASE_URL environment variable is required. "
+                "Please set it to a PostgreSQL connection string: "
+                "postgresql://user:password@host:port/database"
+            )
 
-        # Configure engine based on database type
-        engine_args = {}
-        if database_url.startswith("sqlite"):
-            engine_args["connect_args"] = {"check_same_thread": False}
-        elif database_url.startswith("postgresql"):
-            # PostgreSQL-specific settings for better performance
-            engine_args["pool_size"] = 10
-            engine_args["max_overflow"] = 20
-            engine_args["pool_pre_ping"] = True  # Verify connections before using them
-            engine_args["pool_recycle"] = 3600  # Recycle connections after 1 hour
+        # Validate PostgreSQL URL
+        if not database_url.startswith("postgresql"):
+            raise ValueError(
+                f"Only PostgreSQL is supported. "
+                f"DATABASE_URL must start with 'postgresql://' or 'postgresql+psycopg2://'"
+            )
+
+        # Hide password in logs
+        log_url = database_url.split('@')[-1] if '@' in database_url else database_url
+        logger.info(f"Initializing PostgreSQL connection: {log_url}")
+
+        # PostgreSQL-specific settings for better performance
+        engine_args = {
+            "pool_size": 10,
+            "max_overflow": 20,
+            "pool_pre_ping": True,  # Verify connections before using them
+            "pool_recycle": 3600,  # Recycle connections after 1 hour
+        }
 
         try:
             self.engine = create_engine(database_url, **engine_args)
             self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
             self.database_url = database_url
-            logger.info("Database engine created successfully")
+            logger.info("✓ PostgreSQL engine created successfully")
         except Exception as e:
-            logger.error(f"Failed to create database engine: {e}")
+            logger.error(f"✗ Failed to create PostgreSQL engine: {e}")
             raise
 
     def table_exists(self, table_name: str) -> bool:
@@ -196,63 +212,82 @@ class Database:
     def create_tables(self, force: bool = False):
         """
         Create all database tables if they don't exist.
-        Handles scenarios where tables may already exist.
+        Skips tables that already exist in PostgreSQL.
 
         Args:
             force: If True, drop and recreate all tables (use with caution!)
         """
         try:
             if force:
+                print("⚠️  WARNING: Dropping all existing tables (force=True)")
                 logger.warning("Dropping all existing tables (force=True)")
                 Base.metadata.drop_all(bind=self.engine)
 
             # Check which tables already exist
             inspector = inspect(self.engine)
-            existing_tables = inspector.get_table_names()
+            existing_tables = set(inspector.get_table_names())
+            expected_tables = {"teams", "api_keys", "usage_logs"}
 
             if existing_tables:
-                logger.info(f"Found existing tables: {', '.join(existing_tables)}")
+                print(f"ℹ️  Found existing tables in database: {', '.join(sorted(existing_tables))}")
+                logger.info(f"Found existing tables: {', '.join(sorted(existing_tables))}")
             else:
+                print("ℹ️  No existing tables found, creating new schema...")
                 logger.info("No existing tables found, creating new schema")
 
-            # Create all tables (will skip existing ones)
+            # Create all tables (SQLAlchemy will skip existing ones)
             Base.metadata.create_all(bind=self.engine)
 
-            # Verify tables were created
-            new_tables = inspect(self.engine).get_table_names()
-            created_tables = set(new_tables) - set(existing_tables)
+            # Verify what was created
+            new_tables = set(inspect(self.engine).get_table_names())
+            created_tables = new_tables - existing_tables
+            skipped_tables = existing_tables & expected_tables
 
             if created_tables:
-                logger.info(f"Created new tables: {', '.join(created_tables)}")
-            else:
-                logger.info("All tables already exist")
+                print(f"✓ Created new tables: {', '.join(sorted(created_tables))}")
+                logger.info(f"Created new tables: {', '.join(sorted(created_tables))}")
 
+            if skipped_tables:
+                print(f"✓ Skipped existing tables: {', '.join(sorted(skipped_tables))}")
+                logger.info(f"Skipped existing tables (already exist): {', '.join(sorted(skipped_tables))}")
+
+            if not created_tables and existing_tables:
+                print("✓ All required tables already exist in database")
+                logger.info("All required tables already exist")
+
+            print("✓ Database schema is ready")
             logger.info("Database schema ready")
 
         except OperationalError as e:
+            print(f"✗ Database operational error: {e}")
             logger.error(f"Operational error creating tables: {e}")
             raise
         except ProgrammingError as e:
+            print(f"✗ Database programming error: {e}")
             logger.error(f"Programming error creating tables: {e}")
             raise
         except Exception as e:
+            print(f"✗ Unexpected database error: {e}")
             logger.error(f"Unexpected error creating tables: {e}")
             raise
 
     def test_connection(self) -> bool:
         """
-        Test if database connection is working.
+        Test if PostgreSQL connection is working.
 
         Returns:
             True if connection works, False otherwise
         """
         try:
             with self.engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            logger.info("Database connection test successful")
+                result = conn.execute(text("SELECT version()"))
+                version = result.scalar()
+                print(f"✓ PostgreSQL connection successful")
+                logger.info(f"PostgreSQL connection test successful: {version}")
             return True
         except Exception as e:
-            logger.error(f"Database connection test failed: {e}")
+            print(f"✗ PostgreSQL connection failed: {e}")
+            logger.error(f"PostgreSQL connection test failed: {e}")
             return False
 
     def get_session(self):
@@ -270,23 +305,31 @@ _db_instance: Optional[Database] = None
 
 def get_database(database_url: Optional[str] = None) -> Database:
     """
-    Get or create the global database instance.
+    Get or create the global PostgreSQL database instance.
 
     Args:
-        database_url: Database connection string. If None, reads from environment.
+        database_url: PostgreSQL connection string. If None, reads from DATABASE_URL environment variable.
 
     Returns:
         Database instance
+
+    Raises:
+        ValueError: If DATABASE_URL is not set or is not PostgreSQL
     """
     global _db_instance
     if _db_instance is None:
+        print("=" * 60)
+        print("Initializing Database Connection")
+        print("=" * 60)
         _db_instance = Database(database_url)
         # Test connection
         if _db_instance.test_connection():
             # Create tables if they don't exist
             _db_instance.create_tables()
         else:
-            logger.error("Database connection failed - API key management will not be available")
+            print("✗ Database connection failed - API key management will not be available")
+            logger.error("PostgreSQL connection failed - API key management will not be available")
+        print("=" * 60)
     return _db_instance
 
 
