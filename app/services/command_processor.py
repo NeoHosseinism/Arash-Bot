@@ -23,8 +23,6 @@ class CommandProcessor:
             "clear": self.handle_clear,
             "model": self.handle_model,
             "models": self.handle_models,
-            "summarize": self.handle_summarize,
-            "translate": self.handle_translate,
             "settings": self.handle_settings,
         }
 
@@ -248,32 +246,6 @@ class CommandProcessor:
             models_text += "• llama → Llama 4 Maverick\n"
 
         return models_text
-
-    async def handle_summarize(self, session: ChatSession, args: List[str]) -> str:
-        """Handle /summarize command (private only)"""
-        if session.platform != "internal":
-            return MESSAGES_FA["internal_only"]
-
-        if not session.history:
-            return MESSAGES_FA["session_no_history"]
-
-        return "📝 خلاصه‌سازی گفت‌وگو در حال پردازش است..."
-
-    async def handle_translate(self, session: ChatSession, args: List[str]) -> str:
-        """Handle /translate command"""
-        if "translate" not in platform_manager.get_allowed_commands(session.platform):
-            return "❌ ترجمه برای این پلتفرم در دسترس نیست."
-
-        if len(args) < 2:
-            return (
-                "**استفاده:** `/translate [زبان] [متن]`\n\n"
-                "**مثال:** `/translate english سلام دنیا`"
-            )
-
-        language = args[0]
-        text = " ".join(args[1:])
-
-        return f"🌐 در حال ترجمه به {language}: *{text}*\n"
 
     async def handle_settings(self, session: ChatSession, args: List[str]) -> str:
         """Handle /settings command (private only)"""
