@@ -1,5 +1,5 @@
 """
-FastAPI application entry point
+FastAPI application entry point with integrated Telegram bot
 """
 import asyncio
 from datetime import datetime
@@ -23,17 +23,29 @@ from app.utils.logger import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
+# Telegram bot integration
+telegram_bot = None
+telegram_task = None
+if settings.RUN_TELEGRAM_BOT:
+    from telegram_bot.bot import TelegramBot
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
+    global telegram_bot, telegram_task
+
     # Startup
     logger.info("=" * 60)
-    logger.info("Starting Arash External API Service v1.0")
+    logger.info("Starting Arash External API Service v1.1")
     logger.info("=" * 60)
-    
+
     app.state.start_time = datetime.now()
-    
+
+    # Log database configuration
+    logger.info(f"Database: {settings.database_name} ({settings.ENVIRONMENT})")
+    logger.info(f"   Host: {settings.DB_HOST}:{settings.DB_PORT}")
+
     # Log platform configurations
     logger.info("Platform Configurations:")
 
@@ -65,16 +77,44 @@ async def lifespan(app: FastAPI):
 
     logger.info(f"\nAI Service: {settings.AI_SERVICE_URL}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
+
+    # Start Telegram bot if enabled
+    if settings.RUN_TELEGRAM_BOT:
+        logger.info("Starting integrated Telegram bot...")
+        try:
+            telegram_bot = TelegramBot(service_url=f"http://localhost:{settings.API_PORT}")
+            telegram_bot.setup()
+            # Run bot in background task
+            telegram_task = asyncio.create_task(run_telegram_bot())
+            logger.info("[OK] Telegram bot started successfully")
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to start Telegram bot: {e}")
+    else:
+        logger.info("Telegram bot disabled (RUN_TELEGRAM_BOT=false)")
+
     logger.info("[OK] Service ready to handle requests!")
     logger.info("=" * 60)
-    
+
     # Start periodic cleanup task
     cleanup_task = asyncio.create_task(periodic_cleanup())
-    
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down Arash External API Service...")
+
+    # Stop Telegram bot
+    if telegram_bot and telegram_task:
+        logger.info("Stopping Telegram bot...")
+        telegram_task.cancel()
+        try:
+            await telegram_task
+        except asyncio.CancelledError:
+            pass
+        if telegram_bot.application:
+            await telegram_bot.application.stop()
+            await telegram_bot.application.shutdown()
+        logger.info("Telegram bot stopped")
     
     # Cancel cleanup task
     cleanup_task.cancel()
@@ -97,6 +137,24 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete.")
 
 
+async def run_telegram_bot():
+    """Run Telegram bot in background"""
+    try:
+        if telegram_bot:
+            # Use run_polling for async operation
+            await telegram_bot.application.initialize()
+            await telegram_bot.application.start()
+            await telegram_bot.application.updater.start_polling(drop_pending_updates=True)
+            # Keep running until cancelled
+            while True:
+                await asyncio.sleep(1)
+    except asyncio.CancelledError:
+        logger.info("Telegram bot task cancelled")
+        raise
+    except Exception as e:
+        logger.error(f"Error in Telegram bot: {e}", exc_info=True)
+
+
 async def periodic_cleanup():
     """Periodic cleanup of old sessions"""
     while True:
@@ -115,7 +173,7 @@ async def periodic_cleanup():
 # Create FastAPI app
 app = FastAPI(
     title="Arash External API Service",
-    version="1.0.0",
+    version="1.1.0",
     description="External API service supporting Telegram (public) and Internal (private) platforms with enterprise features",
     docs_url="/docs" if settings.ENABLE_API_DOCS else None,
     redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,

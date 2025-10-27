@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     """Application settings with validation - Pydantic V2"""
     
     # Core Configuration
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = "dev"  # dev, stage, prod, hotfix
     AI_SERVICE_URL: str
     SESSION_TIMEOUT_MINUTES: int = 30
     
@@ -46,15 +46,30 @@ class Settings(BaseSettings):
     ENABLE_IMAGE_PROCESSING: bool = True
     MAX_IMAGE_SIZE_MB: int = 20
     
-    # Database (Optional)
-    REDIS_URL: Optional[str] = None
+    # Database Configuration
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_USER: str
+    DB_PASSWORD: str
+    DB_NAME_DEV: str = "arash_dev"
+    DB_NAME_STAGE: str = "arash_stage"
+    DB_NAME_PROD: str = "arash_prod"
+    DB_NAME_HOTFIX: str = "arash_hotfix"
+
+    # Legacy DATABASE_URL support (optional, will be overridden by multi-env config)
     DATABASE_URL: Optional[str] = None
-    
+
+    # Optional Redis
+    REDIS_URL: Optional[str] = None
+
     # API Server
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8001
+    API_PORT: int = 3000  # Changed from 8001 to 3000 for K8s
     ENABLE_API_DOCS: bool = True
     CORS_ORIGINS: str = "*"
+
+    # Telegram Bot Integration
+    RUN_TELEGRAM_BOT: bool = True
     
     # Pydantic V2 model configuration
     model_config = SettingsConfigDict(
@@ -163,14 +178,56 @@ class Settings(BaseSettings):
         return self.MAX_IMAGE_SIZE_MB * 1024 * 1024
     
     @property
+    def database_name(self) -> str:
+        """Get database name based on environment"""
+        env_map = {
+            "dev": self.DB_NAME_DEV,
+            "development": self.DB_NAME_DEV,  # Legacy support
+            "stage": self.DB_NAME_STAGE,
+            "staging": self.DB_NAME_STAGE,  # Legacy support
+            "prod": self.DB_NAME_PROD,
+            "production": self.DB_NAME_PROD,  # Legacy support
+            "hotfix": self.DB_NAME_HOTFIX
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.DB_NAME_DEV)
+
+    @property
+    def database_url(self) -> str:
+        """Build database URL based on environment"""
+        # If DATABASE_URL is explicitly set, use it (legacy support)
+        if self.DATABASE_URL:
+            return self.DATABASE_URL
+
+        # Otherwise, build from multi-environment config
+        return (
+            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.database_name}"
+        )
+
+    @property
+    def sync_database_url(self) -> str:
+        """Build synchronous database URL for Alembic migrations"""
+        # If DATABASE_URL is explicitly set, convert it
+        if self.DATABASE_URL:
+            return self.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+
+        # Otherwise, build from multi-environment config
+        return (
+            f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.database_name}"
+        )
+
+    @property
     def is_production(self) -> bool:
         """Check if running in production"""
-        return self.ENVIRONMENT.lower() == "production"
-    
+        env = self.ENVIRONMENT.lower()
+        return env in ("prod", "production")
+
     @property
     def is_development(self) -> bool:
         """Check if running in development"""
-        return self.ENVIRONMENT.lower() == "development"
+        env = self.ENVIRONMENT.lower()
+        return env in ("dev", "development")
 
 
 # Global settings instance
