@@ -187,9 +187,9 @@ class Database:
             self.engine = create_engine(database_url, **engine_args)
             self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
             self.database_url = database_url
-            logger.info("✓ PostgreSQL engine created successfully")
+            logger.info("[OK] PostgreSQL engine created successfully")
         except Exception as e:
-            logger.error(f"✗ Failed to create PostgreSQL engine: {e}")
+            logger.error(f"[ERROR] Failed to create PostgreSQL engine: {e}")
             raise
 
     def table_exists(self, table_name: str) -> bool:
@@ -219,7 +219,7 @@ class Database:
         """
         try:
             if force:
-                print("⚠️  WARNING: Dropping all existing tables (force=True)")
+                print("[WARNING] Dropping all existing tables (force=True)")
                 logger.warning("Dropping all existing tables (force=True)")
                 Base.metadata.drop_all(bind=self.engine)
 
@@ -229,10 +229,10 @@ class Database:
             expected_tables = {"teams", "api_keys", "usage_logs"}
 
             if existing_tables:
-                print(f"ℹ️  Found existing tables in database: {', '.join(sorted(existing_tables))}")
+                print(f"[INFO] Found existing tables in database: {', '.join(sorted(existing_tables))}")
                 logger.info(f"Found existing tables: {', '.join(sorted(existing_tables))}")
             else:
-                print("ℹ️  No existing tables found, creating new schema...")
+                print("[INFO] No existing tables found, creating new schema...")
                 logger.info("No existing tables found, creating new schema")
 
             # Create all tables (SQLAlchemy will skip existing ones)
@@ -244,30 +244,30 @@ class Database:
             skipped_tables = existing_tables & expected_tables
 
             if created_tables:
-                print(f"✓ Created new tables: {', '.join(sorted(created_tables))}")
+                print(f"[OK] Created new tables: {', '.join(sorted(created_tables))}")
                 logger.info(f"Created new tables: {', '.join(sorted(created_tables))}")
 
             if skipped_tables:
-                print(f"✓ Skipped existing tables: {', '.join(sorted(skipped_tables))}")
+                print(f"[OK] Skipped existing tables: {', '.join(sorted(skipped_tables))}")
                 logger.info(f"Skipped existing tables (already exist): {', '.join(sorted(skipped_tables))}")
 
             if not created_tables and existing_tables:
-                print("✓ All required tables already exist in database")
+                print("[OK] All required tables already exist in database")
                 logger.info("All required tables already exist")
 
-            print("✓ Database schema is ready")
+            print("[OK] Database schema is ready")
             logger.info("Database schema ready")
 
         except OperationalError as e:
-            print(f"✗ Database operational error: {e}")
+            print(f"[ERROR] Database operational error: {e}")
             logger.error(f"Operational error creating tables: {e}")
             raise
         except ProgrammingError as e:
-            print(f"✗ Database programming error: {e}")
+            print(f"[ERROR] Database programming error: {e}")
             logger.error(f"Programming error creating tables: {e}")
             raise
         except Exception as e:
-            print(f"✗ Unexpected database error: {e}")
+            print(f"[ERROR] Unexpected database error: {e}")
             logger.error(f"Unexpected error creating tables: {e}")
             raise
 
@@ -282,11 +282,11 @@ class Database:
             with self.engine.connect() as conn:
                 result = conn.execute(text("SELECT version()"))
                 version = result.scalar()
-                print(f"✓ PostgreSQL connection successful")
+                print("[OK] PostgreSQL connection successful")
                 logger.info(f"PostgreSQL connection test successful: {version}")
             return True
         except Exception as e:
-            print(f"✗ PostgreSQL connection failed: {e}")
+            print(f"[ERROR] PostgreSQL connection failed: {e}")
             logger.error(f"PostgreSQL connection test failed: {e}")
             return False
 
@@ -327,7 +327,7 @@ def get_database(database_url: Optional[str] = None) -> Database:
             # Create tables if they don't exist
             _db_instance.create_tables()
         else:
-            print("✗ Database connection failed - API key management will not be available")
+            print("[ERROR] Database connection failed - API key management will not be available")
             logger.error("PostgreSQL connection failed - API key management will not be available")
         print("=" * 60)
     return _db_instance
