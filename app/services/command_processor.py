@@ -151,10 +151,7 @@ class CommandProcessor:
         return status_text
 
     async def handle_clear(self, session: ChatSession, args: List[str]) -> str:
-        """Handle /clear command (private only)"""
-        if not platform_manager.can_switch_models(session.platform):
-            return MESSAGES_FA["command_not_available_telegram"].format(command="clear")
-
+        """Handle /clear command - clears conversation history"""
         session.clear_history()
         return MESSAGES_FA["session_cleared"]
 

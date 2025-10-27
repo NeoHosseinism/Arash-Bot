@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     )
     TELEGRAM_RATE_LIMIT: int = 20
     TELEGRAM_MAX_HISTORY: int = 10
-    TELEGRAM_COMMANDS: str = "start,help,status,model,models"
+    TELEGRAM_COMMANDS: str = "start,help,status,clear,model,models"
     TELEGRAM_ADMIN_USERS: str = ""
     TELEGRAM_WEBHOOK_URL: Optional[str] = None
     
