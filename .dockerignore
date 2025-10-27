@@ -1,9 +1,14 @@
-# Git
+# ===========================
+# Git & Version Control
+# ===========================
 .git
 .gitignore
+.gitattributes
 .github
 
+# ===========================
 # Python
+# ===========================
 __pycache__
 *.py[cod]
 *$py.class
@@ -24,40 +29,109 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual environments
+# ===========================
+# Virtual Environments
+# ===========================
 venv/
 ENV/
 env/
 .venv
+.env/
+virtualenv/
 
-# Testing
+# ===========================
+# Testing & Coverage
+# ===========================
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
+.nox/
+.hypothesis/
+pytest.ini
+tests/
+test_*.py
+*_test.py
 
-# IDE
+# ===========================
+# IDE & Editors
+# ===========================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+.project
+.pydevproject
+.settings/
+*.sublime-*
 
-# OS
+# ===========================
+# OS Files
+# ===========================
 .DS_Store
 Thumbs.db
+desktop.ini
 
+# ===========================
 # Documentation
+# ===========================
 *.md
 !README.md
 docs/
+ARCHITECTURE.md
+MODEL_MAPPING_FIX.md
 
-# Environment
+# ===========================
+# Environment & Secrets
+# ===========================
+.env
+.env.*
+!.env.example
 .env.local
 .env.*.local
 
-# Other
-TODO.md
+# ===========================
+# Logs & Database
+# ===========================
+logs/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# ===========================
+# Development Tools
+# ===========================
 Makefile
+TODO.md
+.editorconfig
+
+# ===========================
+# Docker (don't copy into container)
+# ===========================
+Dockerfile
+.dockerignore
 docker-compose.yml
+docker-compose.*.yml
+
+# ===========================
+# CI/CD
+# ===========================
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+Jenkinsfile
+
+# ===========================
+# Temporary & Cache
+# ===========================
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+temp/
