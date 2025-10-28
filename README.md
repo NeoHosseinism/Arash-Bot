@@ -186,57 +186,127 @@ Full API documentation available at `http://localhost:3000/docs`
 
 ## Configuration
 
-### Environment-Based Configuration
+### Comprehensive Environment-Based Configuration
 
-The application uses the `ENVIRONMENT` variable to automatically select the correct database and apply environment-specific optimizations:
+The application uses the `ENVIRONMENT` variable as a **master switch** that controls ALL configuration settings. Every configurable parameter can be different per environment:
 
 ```bash
-# Switch between environments by changing one variable
-ENVIRONMENT=dev      # Uses arash_dev database, DEBUG log level
-ENVIRONMENT=stage    # Uses arash_stage database, INFO log level
-ENVIRONMENT=prod     # Uses arash_prod database, WARNING log level
+# Switch entire application configuration with ONE variable
+ENVIRONMENT=dev      # Development configuration
+ENVIRONMENT=stage    # Staging configuration
+ENVIRONMENT=prod     # Production configuration
 ```
 
-**Benefits:**
-- **Simple switching**: DevOps only changes one variable
-- **Less error-prone**: All database names predefined in configuration
-- **Environment-aware**: Code automatically optimizes based on environment
-- **Centralized**: All environment configs in one place
+**What's controlled per environment:**
+- **Database**: Host, port, user, password, database name
+- **Logging**: Log level (DEBUG/INFO/WARNING)
+- **API Docs**: Enable/disable Swagger UI
+- **CORS**: Allowed origins
+- **Redis**: Connection URLs
+- **Features**: Debug mode, optimizations
+- **More**: Easy to add new per-environment settings
 
 ### Database Configuration
 
-Database names are **predefined** for each environment in `.env`:
+**ALL database parameters** are environment-specific - each environment can use completely different databases:
 
 ```bash
-# PostgreSQL connection (same for all environments)
-DB_HOST=localhost
-DB_PORT=5432
-DB_USER=arash_user
-DB_PASSWORD=your_password
-
-# Predefined database names
+# Development Database (localhost)
+DB_HOST_DEV=localhost
+DB_PORT_DEV=5432
+DB_USER_DEV=arash_dev_user
+DB_PASSWORD_DEV=dev_password
 DB_NAME_DEV=arash_dev
+
+# Staging Database (separate server)
+DB_HOST_STAGE=staging-db.example.com
+DB_PORT_STAGE=5432
+DB_USER_STAGE=arash_stage_user
+DB_PASSWORD_STAGE=stage_password
 DB_NAME_STAGE=arash_stage
+
+# Production Database (different server, different credentials)
+DB_HOST_PROD=prod-db.example.com
+DB_PORT_PROD=5432
+DB_USER_PROD=arash_prod_user
+DB_PASSWORD_PROD=prod_password
 DB_NAME_PROD=arash_prod
 
-# ENVIRONMENT variable determines which database to use
-ENVIRONMENT=dev  # Change this to switch databases
+# Switch databases by changing ENVIRONMENT
+ENVIRONMENT=prod  # Automatically uses all prod settings
 ```
 
-**Database connection is built automatically** from individual parameters - no need to manually construct connection strings.
+**Complete isolation**: Dev, staging, and prod can have entirely different infrastructure.
 
 ### Environment-Aware Features
 
-The application automatically adjusts behavior based on `ENVIRONMENT`:
+The application automatically configures everything based on `ENVIRONMENT`:
 
-| Feature | dev | stage | prod |
+| Setting | dev | stage | prod |
 |---------|-----|-------|------|
-| **Database** | arash_dev | arash_stage | arash_prod |
+| **DB Host** | localhost | staging-db.example.com | prod-db.example.com |
+| **DB User** | arash_dev_user | arash_stage_user | arash_prod_user |
+| **DB Password** | dev_password | stage_password | prod_password |
+| **DB Name** | arash_dev | arash_stage | arash_prod |
 | **Log Level** | DEBUG | INFO | WARNING |
-| **API Docs** | Enabled | Enabled | Optional |
+| **API Docs** | Enabled | Enabled | Disabled |
+| **CORS** | * (all) | * (all) | Specific domains |
+| **Redis** | None | staging-redis | prod-redis |
 | **Debug Features** | Enabled | Disabled | Disabled |
 
-You can override log level by setting `LOG_LEVEL` explicitly in `.env`.
+### Benefits
+
+1. **Maximum Flexibility** ✅
+   - Every setting can be different per environment
+   - Easy to add new per-environment configurations
+   - Complete infrastructure isolation
+
+2. **Simple to Use** ✅
+   - Change ONE variable (`ENVIRONMENT`) to switch everything
+   - No manual configuration management
+   - Less error-prone than multiple variables
+
+3. **Enterprise-Ready** ✅
+   - Dev uses local database
+   - Stage uses staging server with staging credentials
+   - Prod uses production server with prod credentials
+   - Each environment completely isolated
+
+4. **Developer-Friendly** ✅
+   - Code can check `settings.is_production`, `settings.is_development`
+   - Auto-optimizations based on environment
+   - Properties like `settings.db_host`, `settings.log_level` return correct values
+
+### Using Environment Settings in Code
+
+Developers can write environment-aware code:
+
+```python
+from app.core.config import settings
+
+# Access environment-specific database settings
+db_host = settings.db_host        # Returns correct host based on ENVIRONMENT
+db_user = settings.db_user        # Returns correct user based on ENVIRONMENT
+db_name = settings.db_name        # Returns correct database name
+
+# Environment checks
+if settings.is_production:
+    # Production-only logic
+    setup_production_monitoring()
+elif settings.is_development:
+    # Development-only features
+    enable_debug_toolbar()
+
+# Get environment-aware settings
+log_level = settings.log_level            # DEBUG/INFO/WARNING based on env
+api_docs_enabled = settings.enable_api_docs  # true/false based on env
+cors = settings.cors_origins_list         # Different origins per env
+
+# Debug features
+if settings.enable_debug_features:
+    # Only runs in development
+    log_detailed_metrics()
+```
 
 ### Platform Configurations
 
@@ -285,17 +355,30 @@ kubectl apply -f manifests/prod/
 
 ### Production Checklist
 
-- [ ] Configure PostgreSQL database (provided by DevOps)
-- [ ] Set `ENVIRONMENT=prod` in `.env`
-- [ ] Verify `DB_NAME_PROD` points to production database
-- [ ] Run database migrations with `make migrate-up`
-- [ ] Generate secure `INTERNAL_API_KEY` (32+ characters)
-- [ ] Create initial teams and API keys
-- [ ] Set `ENABLE_API_DOCS=false` (optional, for security)
-- [ ] Configure CORS origins (don't use `*`)
-- [ ] Set up log rotation
-- [ ] Test quota enforcement
-- [ ] Verify log level is WARNING or ERROR
+- [ ] **Set ENVIRONMENT**: Set `ENVIRONMENT=prod` in `.env` or K8s config
+- [ ] **Database Configuration**:
+  - [ ] Configure `DB_HOST_PROD` to production database server
+  - [ ] Set `DB_USER_PROD` with production database user
+  - [ ] Set `DB_PASSWORD_PROD` with secure production password
+  - [ ] Verify `DB_NAME_PROD` points to production database
+- [ ] **Security Settings**:
+  - [ ] Generate secure `INTERNAL_API_KEY` (32+ characters)
+  - [ ] Set `CORS_ORIGINS_PROD` to specific allowed domains (no `*`)
+  - [ ] Verify `ENABLE_API_DOCS_PROD=false` (disabled for security)
+  - [ ] Configure production Redis URL if using (`REDIS_URL_PROD`)
+- [ ] **Database Setup**:
+  - [ ] Run database migrations with `ENVIRONMENT=prod make migrate-up`
+  - [ ] Create initial teams and API keys
+  - [ ] Test quota enforcement
+- [ ] **Monitoring**:
+  - [ ] Verify `LOG_LEVEL_PROD=WARNING` or `ERROR`
+  - [ ] Set up log rotation
+  - [ ] Configure production monitoring
+- [ ] **Testing**:
+  - [ ] Test with `ENVIRONMENT=prod` locally first
+  - [ ] Verify all prod settings are correct
+  - [ ] Check API docs are disabled
+  - [ ] Verify CORS restrictions work
 
 ## Security
 

@@ -38,38 +38,58 @@ class Settings(BaseSettings):
     INTERNAL_WEBHOOK_SECRET: Optional[str] = None
     INTERNAL_ADMIN_USERS: str = ""
 
-    # Logging
-    LOG_LEVEL: Optional[str] = None  # Auto-set based on ENVIRONMENT if not specified
+    # Logging Configuration (per environment)
+    LOG_LEVEL_DEV: str = "DEBUG"
+    LOG_LEVEL_STAGE: str = "INFO"
+    LOG_LEVEL_PROD: str = "WARNING"
     LOG_FILE: str = "logs/arash_api_service.log"
 
-    # Features
+    # Features Configuration (per environment)
     ENABLE_IMAGE_PROCESSING: bool = True
     MAX_IMAGE_SIZE_MB: int = 20
 
-    # Database Configuration (Environment-based)
-    # DevOps team sets ENVIRONMENT to switch between databases
-    # All database names are predefined - just change ENVIRONMENT variable
-    DB_HOST: str = "localhost"
-    DB_PORT: int = 5432
-    DB_USER: str = "arash_user"  # Default user, override in .env
-    DB_PASSWORD: str = "change_me_in_production"  # Default password, MUST override in .env
+    # API Docs - can be disabled per environment
+    ENABLE_API_DOCS_DEV: bool = True
+    ENABLE_API_DOCS_STAGE: bool = True
+    ENABLE_API_DOCS_PROD: bool = False
 
-    # Predefined database names for each environment
+    # Database Configuration (Environment-based - Complete per-env configuration)
+    # All database parameters can be different per environment
+
+    # Development Environment Database
+    DB_HOST_DEV: str = "localhost"
+    DB_PORT_DEV: int = 5432
+    DB_USER_DEV: str = "arash_user"
+    DB_PASSWORD_DEV: str = "dev_password"
     DB_NAME_DEV: str = "arash_dev"
+
+    # Staging Environment Database
+    DB_HOST_STAGE: str = "localhost"
+    DB_PORT_STAGE: int = 5432
+    DB_USER_STAGE: str = "arash_user"
+    DB_PASSWORD_STAGE: str = "stage_password"
     DB_NAME_STAGE: str = "arash_stage"
+
+    # Production Environment Database
+    DB_HOST_PROD: str = "localhost"
+    DB_PORT_PROD: int = 5432
+    DB_USER_PROD: str = "arash_user"
+    DB_PASSWORD_PROD: str = "prod_password"
     DB_NAME_PROD: str = "arash_prod"
 
-    # Fallback database name (used if ENVIRONMENT doesn't match any predefined env)
-    DB_NAME: str = "arash_db"
+    # Redis Configuration (per environment)
+    REDIS_URL_DEV: Optional[str] = None
+    REDIS_URL_STAGE: Optional[str] = None
+    REDIS_URL_PROD: Optional[str] = None
 
-    # Optional Redis
-    REDIS_URL: Optional[str] = None
+    # CORS Configuration (per environment)
+    CORS_ORIGINS_DEV: str = "*"
+    CORS_ORIGINS_STAGE: str = "*"
+    CORS_ORIGINS_PROD: str = "https://arash-api.irisaprime.ir"
 
     # API Server
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 3000  # Changed from 8001 to 3000 for K8s
-    ENABLE_API_DOCS: bool = True
-    CORS_ORIGINS: str = "*"
 
     # Telegram Bot Integration
     RUN_TELEGRAM_BOT: bool = True
@@ -169,11 +189,25 @@ class Settings(BaseSettings):
         return {user.strip() for user in self.INTERNAL_ADMIN_USERS.split(",") if user.strip()}
     
     @property
+    def cors_origins(self) -> str:
+        """Get CORS origins based on ENVIRONMENT"""
+        env_map = {
+            "dev": self.CORS_ORIGINS_DEV,
+            "development": self.CORS_ORIGINS_DEV,
+            "stage": self.CORS_ORIGINS_STAGE,
+            "staging": self.CORS_ORIGINS_STAGE,
+            "prod": self.CORS_ORIGINS_PROD,
+            "production": self.CORS_ORIGINS_PROD,
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.CORS_ORIGINS_DEV)
+
+    @property
     def cors_origins_list(self) -> List[str]:
         """Get CORS origins as list"""
-        if self.CORS_ORIGINS == "*":
+        origins = self.cors_origins
+        if origins == "*":
             return ["*"]
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        return [origin.strip() for origin in origins.split(",") if origin.strip()]
     
     @property
     def max_image_size_bytes(self) -> int:
@@ -181,8 +215,60 @@ class Settings(BaseSettings):
         return self.MAX_IMAGE_SIZE_MB * 1024 * 1024
     
     @property
-    def database_name(self) -> str:
-        """Get database name based on ENVIRONMENT variable"""
+    def db_host(self) -> str:
+        """Get database host based on ENVIRONMENT"""
+        env_map = {
+            "dev": self.DB_HOST_DEV,
+            "development": self.DB_HOST_DEV,
+            "stage": self.DB_HOST_STAGE,
+            "staging": self.DB_HOST_STAGE,
+            "prod": self.DB_HOST_PROD,
+            "production": self.DB_HOST_PROD,
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.DB_HOST_DEV)
+
+    @property
+    def db_port(self) -> int:
+        """Get database port based on ENVIRONMENT"""
+        env_map = {
+            "dev": self.DB_PORT_DEV,
+            "development": self.DB_PORT_DEV,
+            "stage": self.DB_PORT_STAGE,
+            "staging": self.DB_PORT_STAGE,
+            "prod": self.DB_PORT_PROD,
+            "production": self.DB_PORT_PROD,
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.DB_PORT_DEV)
+
+    @property
+    def db_user(self) -> str:
+        """Get database user based on ENVIRONMENT"""
+        env_map = {
+            "dev": self.DB_USER_DEV,
+            "development": self.DB_USER_DEV,
+            "stage": self.DB_USER_STAGE,
+            "staging": self.DB_USER_STAGE,
+            "prod": self.DB_USER_PROD,
+            "production": self.DB_USER_PROD,
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.DB_USER_DEV)
+
+    @property
+    def db_password(self) -> str:
+        """Get database password based on ENVIRONMENT"""
+        env_map = {
+            "dev": self.DB_PASSWORD_DEV,
+            "development": self.DB_PASSWORD_DEV,
+            "stage": self.DB_PASSWORD_STAGE,
+            "staging": self.DB_PASSWORD_STAGE,
+            "prod": self.DB_PASSWORD_PROD,
+            "production": self.DB_PASSWORD_PROD,
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.DB_PASSWORD_DEV)
+
+    @property
+    def db_name(self) -> str:
+        """Get database name based on ENVIRONMENT"""
         env_map = {
             "dev": self.DB_NAME_DEV,
             "development": self.DB_NAME_DEV,
@@ -191,40 +277,62 @@ class Settings(BaseSettings):
             "prod": self.DB_NAME_PROD,
             "production": self.DB_NAME_PROD,
         }
-        return env_map.get(self.ENVIRONMENT.lower(), self.DB_NAME)
+        return env_map.get(self.ENVIRONMENT.lower(), self.DB_NAME_DEV)
 
     @property
     def database_url(self) -> str:
-        """Build async database URL for SQLAlchemy from individual parameters"""
+        """Build async database URL for SQLAlchemy from environment-specific parameters"""
         return (
-            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.database_name}"
+            f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
     @property
     def sync_database_url(self) -> str:
-        """Build synchronous database URL for Alembic migrations from individual parameters"""
+        """Build synchronous database URL for Alembic migrations from environment-specific parameters"""
         return (
-            f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.database_name}"
+            f"postgresql://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
     @property
-    def effective_log_level(self) -> str:
-        """Get log level - uses LOG_LEVEL if set, otherwise defaults based on ENVIRONMENT"""
-        if self.LOG_LEVEL:
-            return self.LOG_LEVEL.upper()
-
-        # Environment-based defaults
-        env_log_levels = {
-            "dev": "DEBUG",
-            "development": "DEBUG",
-            "stage": "INFO",
-            "staging": "INFO",
-            "prod": "WARNING",
-            "production": "WARNING",
+    def redis_url(self) -> Optional[str]:
+        """Get Redis URL based on ENVIRONMENT"""
+        env_map = {
+            "dev": self.REDIS_URL_DEV,
+            "development": self.REDIS_URL_DEV,
+            "stage": self.REDIS_URL_STAGE,
+            "staging": self.REDIS_URL_STAGE,
+            "prod": self.REDIS_URL_PROD,
+            "production": self.REDIS_URL_PROD,
         }
-        return env_log_levels.get(self.ENVIRONMENT.lower(), "INFO")
+        return env_map.get(self.ENVIRONMENT.lower(), self.REDIS_URL_DEV)
+
+    @property
+    def log_level(self) -> str:
+        """Get log level based on ENVIRONMENT"""
+        env_map = {
+            "dev": self.LOG_LEVEL_DEV,
+            "development": self.LOG_LEVEL_DEV,
+            "stage": self.LOG_LEVEL_STAGE,
+            "staging": self.LOG_LEVEL_STAGE,
+            "prod": self.LOG_LEVEL_PROD,
+            "production": self.LOG_LEVEL_PROD,
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.LOG_LEVEL_DEV)
+
+    @property
+    def enable_api_docs(self) -> bool:
+        """Get API docs enabled status based on ENVIRONMENT"""
+        env_map = {
+            "dev": self.ENABLE_API_DOCS_DEV,
+            "development": self.ENABLE_API_DOCS_DEV,
+            "stage": self.ENABLE_API_DOCS_STAGE,
+            "staging": self.ENABLE_API_DOCS_STAGE,
+            "prod": self.ENABLE_API_DOCS_PROD,
+            "production": self.ENABLE_API_DOCS_PROD,
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.ENABLE_API_DOCS_DEV)
 
     @property
     def is_production(self) -> bool:
