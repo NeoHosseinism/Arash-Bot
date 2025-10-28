@@ -79,19 +79,14 @@ async def process_message_endpoint(
         )
 
     # Extract team info from validated API key
-    team_id = api_key.team_id if api_key else None
-    api_key_id = api_key.id if api_key else None
-    api_key_prefix = api_key.key_prefix if api_key else None
+    team_id = api_key.team_id
+    api_key_id = api_key.id
+    api_key_prefix = api_key.key_prefix
 
     # SECURITY: Tag session with team info for isolation
-    # This is done in process_message by passing team info to session creation
-    # For now, we'll add it to the message metadata
     message.metadata["team_id"] = team_id
     message.metadata["api_key_id"] = api_key_id
     message.metadata["api_key_prefix"] = api_key_prefix
-
-    # Add auth token to message
-    message.auth_token = settings.INTERNAL_API_KEY  # For backward compatibility
 
     return await message_processor.process_message(message)
 

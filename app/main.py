@@ -186,8 +186,9 @@ app = FastAPI(
     title="Arash External API Service",
     version="1.1.0",
     description="External API service supporting Telegram (public) and Internal (private) platforms with enterprise features",
-    docs_url="/docs" if settings.ENABLE_API_DOCS else None,
-    redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,
+    docs_url="/api/v1/docs" if settings.ENABLE_API_DOCS else None,
+    redoc_url="/api/v1/redoc" if settings.ENABLE_API_DOCS else None,
+    openapi_url="/api/v1/openapi.json" if settings.ENABLE_API_DOCS else None,
     lifespan=lifespan
 )
 
@@ -216,9 +217,23 @@ async def global_exception_handler(request, exc):
     )
 
 
-# Include routes
-app.include_router(router)
-app.include_router(admin_router)
+# Include routes with versioning
+# API v1 endpoints
+app.include_router(router, prefix="/api/v1", tags=["v1"])
+app.include_router(admin_router, prefix="/api/v1")
+
+# Root health check (unversioned for backward compatibility)
+@app.get("/health")
+async def root_health_check():
+    """Root health check endpoint (unversioned)"""
+    ai_service_healthy = await ai_client.health_check()
+    return {
+        "status": "healthy" if ai_service_healthy else "degraded",
+        "service": "Arash External API Service",
+        "version": "1.1.0",
+        "api_version": "v1",
+        "timestamp": datetime.now().isoformat(),
+    }
 
 
 # Development server helper
