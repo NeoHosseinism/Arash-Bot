@@ -188,24 +188,31 @@ Full API documentation available at `http://localhost:3000/docs`
 
 ### Environment-Based Configuration (DevOps-Friendly)
 
-The configuration is split into **two types**:
+**All configuration uses generic variables set by DevOps per deployment:**
 
-**1. Application Behavior (controlled by ENVIRONMENT variable):**
-- Log levels (DEBUG/INFO/WARNING)
-- API documentation (enabled/disabled)
-- CORS settings (permissive/restrictive)
-- Debug features
+**Application Behavior Settings:**
+- Log level: `LOG_LEVEL` (DEBUG/INFO/WARNING)
+- API documentation: `ENABLE_API_DOCS` (true/false)
+- CORS settings: `CORS_ORIGINS` (*/domains)
 
-**2. Infrastructure (set by DevOps per deployment):**
-- Database credentials (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
-- Redis URLs
-- Service endpoints
+**Infrastructure Settings:**
+- Database: `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
+- Redis: `REDIS_URL`
+- Service endpoints: `AI_SERVICE_URL`
+
+**Environment Identifier:**
+- `ENVIRONMENT` (dev/stage/prod) - Used only for logging/monitoring
 
 ```bash
-# DevOps sets these ONCE per deployment:
-ENVIRONMENT=dev   # Controls application behavior
+# DevOps sets ALL parameters per deployment in K8s ConfigMap/Secret:
+ENVIRONMENT=dev   # For logging/monitoring only
 
-# DevOps sets these parameters in K8s ConfigMap/Secret:
+# Application behavior (DevOps sets per deployment)
+LOG_LEVEL=DEBUG   # DevOps sets: DEBUG/INFO/WARNING
+ENABLE_API_DOCS=true   # DevOps sets: true for dev/stage, false for prod
+CORS_ORIGINS=*   # DevOps sets: "*" for dev/stage, domains for prod
+
+# Infrastructure (DevOps sets per deployment)
 DB_HOST=dev-db.cluster.local
 DB_PORT=5432
 DB_USER=arash_dev
@@ -214,10 +221,11 @@ DB_NAME=arash_dev
 ```
 
 **Why this design?**
-1. **Less work**: DevOps sets 5 params (not 15)
+1. **Less work**: DevOps sets ~8 core params per deployment (not ~24 with per-environment duplicates)
 2. **More secure**: Each environment only has credentials it needs
-3. **K8s-friendly**: Works with ConfigMaps/Secrets
-4. **Simpler**: No duplicate configs across environments
+3. **K8s-friendly**: Works perfectly with ConfigMaps/Secrets
+4. **Simpler**: Same variable names everywhere, just different VALUES per deployment
+5. **Flexible**: Easy to add new environments without code changes
 
 ### Database Configuration
 
@@ -248,32 +256,32 @@ DB_NAME=arash_prod
 
 **Security**: Each environment only has the credentials it needs. No prod credentials in dev!
 
-### Environment-Aware Features
+### Configuration Variables
 
-**Application behavior controlled by ENVIRONMENT:**
+**All settings are generic variables set by DevOps per deployment:**
 
-| Setting | dev | stage | prod |
-|---------|-----|-------|------|
-| **Log Level** | DEBUG | INFO | WARNING |
-| **API Docs** | Enabled | Enabled | Disabled |
-| **CORS** | * (all) | * (all) | Specific domains |
-| **Debug Features** | Enabled | Disabled | Disabled |
+| Setting | Variable | dev | stage | prod |
+|---------|----------|-----|-------|------|
+| **Log Level** | LOG_LEVEL | DEBUG | INFO | WARNING |
+| **API Docs** | ENABLE_API_DOCS | true | true | false |
+| **CORS** | CORS_ORIGINS | * | * | Specific domains |
+| **DB Host** | DB_HOST | localhost / dev-db.local | stage-db.cluster.local | prod-db.cluster.local |
+| **DB User** | DB_USER | arash_dev | arash_stage | arash_prod |
+| **DB Password** | DB_PASSWORD | From K8s Secret | From K8s Secret | From K8s Secret |
+| **DB Name** | DB_NAME | arash_dev | arash_stage | arash_prod |
 
-**Infrastructure set by DevOps (same variable names, different values):**
-
-| Setting | Variable | Example |
-|---------|----------|---------|
-| **DB Host** | DB_HOST | dev-db.local / stage-db.local / prod-db.local |
-| **DB User** | DB_USER | Different per deployment |
-| **DB Password** | DB_PASSWORD | From K8s Secret |
-| **DB Name** | DB_NAME | arash_dev / arash_stage / arash_prod |
+**ENVIRONMENT variable:**
+- Used only for logging/monitoring to identify which environment is running
+- Does NOT control application behavior (use specific variables above)
+- Code can check `settings.is_production`, `settings.is_development`, `settings.is_staging`
 
 ### Benefits
 
 1. **DevOps-Friendly** ✅
-   - Only 5 database parameters to manage (not 15)
+   - ~8 core parameters per deployment (not ~24 with duplicates)
    - Same variable names across all environments
    - Works perfectly with K8s ConfigMaps/Secrets
+   - Easy to add new environments (just different VALUES)
 
 2. **More Secure** ✅
    - Each environment only has credentials it needs
@@ -282,13 +290,13 @@ DB_NAME=arash_prod
 
 3. **Kubernetes-Ready** ✅
    - Works with cluster service names
-   - ConfigMap for non-sensitive config
-   - Secrets for passwords
+   - ConfigMap for non-sensitive config (LOG_LEVEL, CORS_ORIGINS, etc.)
+   - Secrets for passwords (DB_PASSWORD, API keys)
 
 4. **Simpler for Everyone** ✅
    - Less configuration to manage
    - Less chance of errors
-   - Easier to understand
+   - Easier to understand and maintain
 
 ### Using Settings in Code
 
@@ -310,10 +318,10 @@ elif settings.is_development:
     # Development-only features
     enable_debug_toolbar()
 
-# Get environment-aware application settings
-log_level = settings.log_level            # DEBUG/INFO/WARNING based on ENVIRONMENT
-api_docs_enabled = settings.enable_api_docs  # true/false based on ENVIRONMENT
-cors = settings.cors_origins_list         # Different per ENVIRONMENT
+# Access application settings (DevOps sets these per deployment)
+log_level = settings.LOG_LEVEL            # Generic variable (DEBUG/INFO/WARNING)
+api_docs_enabled = settings.ENABLE_API_DOCS  # Generic variable (true/false)
+cors = settings.cors_origins_list         # Parsed from CORS_ORIGINS
 
 # Debug features
 if settings.enable_debug_features:

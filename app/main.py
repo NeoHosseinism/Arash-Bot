@@ -48,8 +48,8 @@ async def lifespan(app: FastAPI):
 
     # Log environment configuration
     logger.info(f"Environment: {settings.ENVIRONMENT.upper()}")
-    logger.info(f"Log Level: {settings.log_level}")
-    logger.info(f"API Docs: {'Enabled' if settings.enable_api_docs else 'Disabled'}")
+    logger.info(f"Log Level: {settings.LOG_LEVEL}")
+    logger.info(f"API Docs: {'Enabled' if settings.ENABLE_API_DOCS else 'Disabled'}")
 
     # Log database configuration
     logger.info(f"Database: {settings.DB_NAME}")

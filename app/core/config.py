@@ -38,20 +38,16 @@ class Settings(BaseSettings):
     INTERNAL_WEBHOOK_SECRET: Optional[str] = None
     INTERNAL_ADMIN_USERS: str = ""
 
-    # Logging Configuration (per environment - application behavior)
-    LOG_LEVEL_DEV: str = "DEBUG"
-    LOG_LEVEL_STAGE: str = "INFO"
-    LOG_LEVEL_PROD: str = "WARNING"
+    # Logging Configuration (Generic - set by DevOps per deployment)
+    LOG_LEVEL: str = "DEBUG"  # DevOps sets: DEBUG for dev, INFO for stage, WARNING for prod
     LOG_FILE: str = "logs/arash_api_service.log"
 
     # Features Configuration
     ENABLE_IMAGE_PROCESSING: bool = True
     MAX_IMAGE_SIZE_MB: int = 20
 
-    # API Docs - controlled by ENVIRONMENT (application behavior)
-    ENABLE_API_DOCS_DEV: bool = True
-    ENABLE_API_DOCS_STAGE: bool = True
-    ENABLE_API_DOCS_PROD: bool = False
+    # API Docs (Generic - set by DevOps per deployment)
+    ENABLE_API_DOCS: bool = True  # DevOps sets: true for dev/stage, false for prod
 
     # Database Configuration (Generic - set by DevOps per deployment)
     # DevOps sets these in K8s ConfigMap/Secret for each environment
@@ -65,10 +61,8 @@ class Settings(BaseSettings):
     # Redis Configuration (Generic - set by DevOps per deployment)
     REDIS_URL: Optional[str] = None
 
-    # CORS Configuration (per environment - application behavior)
-    CORS_ORIGINS_DEV: str = "*"
-    CORS_ORIGINS_STAGE: str = "*"
-    CORS_ORIGINS_PROD: str = "https://arash-api.irisaprime.ir"
+    # CORS Configuration (Generic - set by DevOps per deployment)
+    CORS_ORIGINS: str = "*"  # DevOps sets: "*" for dev/stage, specific domain for prod
 
     # API Server
     API_HOST: str = "0.0.0.0"
@@ -172,25 +166,11 @@ class Settings(BaseSettings):
         return {user.strip() for user in self.INTERNAL_ADMIN_USERS.split(",") if user.strip()}
     
     @property
-    def cors_origins(self) -> str:
-        """Get CORS origins based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.CORS_ORIGINS_DEV,
-            "development": self.CORS_ORIGINS_DEV,
-            "stage": self.CORS_ORIGINS_STAGE,
-            "staging": self.CORS_ORIGINS_STAGE,
-            "prod": self.CORS_ORIGINS_PROD,
-            "production": self.CORS_ORIGINS_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.CORS_ORIGINS_DEV)
-
-    @property
     def cors_origins_list(self) -> List[str]:
         """Get CORS origins as list"""
-        origins = self.cors_origins
-        if origins == "*":
+        if self.CORS_ORIGINS == "*":
             return ["*"]
-        return [origin.strip() for origin in origins.split(",") if origin.strip()]
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
     
     @property
     def max_image_size_bytes(self) -> int:
@@ -213,31 +193,6 @@ class Settings(BaseSettings):
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
-    @property
-    def log_level(self) -> str:
-        """Get log level based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.LOG_LEVEL_DEV,
-            "development": self.LOG_LEVEL_DEV,
-            "stage": self.LOG_LEVEL_STAGE,
-            "staging": self.LOG_LEVEL_STAGE,
-            "prod": self.LOG_LEVEL_PROD,
-            "production": self.LOG_LEVEL_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.LOG_LEVEL_DEV)
-
-    @property
-    def enable_api_docs(self) -> bool:
-        """Get API docs enabled status based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.ENABLE_API_DOCS_DEV,
-            "development": self.ENABLE_API_DOCS_DEV,
-            "stage": self.ENABLE_API_DOCS_STAGE,
-            "staging": self.ENABLE_API_DOCS_STAGE,
-            "prod": self.ENABLE_API_DOCS_PROD,
-            "production": self.ENABLE_API_DOCS_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.ENABLE_API_DOCS_DEV)
 
     @property
     def is_production(self) -> bool:
