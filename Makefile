@@ -189,22 +189,25 @@ ifndef MSG
 	@exit 1
 endif
 	@echo "[Migration] Creating new migration: $(MSG)"
-	poetry run python migrate.py create "$(MSG)"
+	poetry run alembic revision --autogenerate -m "$(MSG)"
 	@echo "[OK] Migration created"
 
 migrate-up:
 	@echo "[Migration] Applying pending migrations..."
-	poetry run python migrate.py upgrade
+	poetry run alembic upgrade head
 	@echo "[OK] Migrations applied"
 
 migrate-down:
 	@echo "[Migration] Rolling back last migration..."
-	poetry run python migrate.py downgrade
+	poetry run alembic downgrade -1
 	@echo "[OK] Migration rolled back"
 
 migrate-status:
 	@echo "[Migration] Current migration status:"
-	poetry run python migrate.py current
+	poetry run alembic current
+	@echo ""
+	@echo "Migration history:"
+	poetry run alembic history
 
 # ============================================================================
 # Database Management (API Keys & Teams)

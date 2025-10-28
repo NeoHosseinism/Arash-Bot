@@ -12,10 +12,9 @@ class Settings(BaseSettings):
     """Application settings with validation - Pydantic V2"""
     
     # Core Configuration
-    ENVIRONMENT: str = "dev"  # dev, stage, prod, hotfix
     AI_SERVICE_URL: str
     SESSION_TIMEOUT_MINUTES: int = 30
-    
+
     # Telegram Configuration
     TELEGRAM_BOT_TOKEN: str
     TELEGRAM_DEFAULT_MODEL: str = "google/gemini-2.0-flash-001"
@@ -28,7 +27,7 @@ class Settings(BaseSettings):
     TELEGRAM_COMMANDS: str = "start,help,status,clear,model,models"
     TELEGRAM_ADMIN_USERS: str = ""
     TELEGRAM_WEBHOOK_URL: Optional[str] = None
-    
+
     # Internal Configuration
     INTERNAL_DEFAULT_MODEL: str = "openai/gpt-5-chat"
     INTERNAL_MODELS: str
@@ -37,27 +36,23 @@ class Settings(BaseSettings):
     INTERNAL_API_KEY: str
     INTERNAL_WEBHOOK_SECRET: Optional[str] = None
     INTERNAL_ADMIN_USERS: str = ""
-    
+
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/arash_api_service.log"
-    
+
     # Features
     ENABLE_IMAGE_PROCESSING: bool = True
     MAX_IMAGE_SIZE_MB: int = 20
-    
-    # Database Configuration
+
+    # Database Configuration (Simplified - Single Database)
+    # DevOps team sets DB_NAME to the appropriate database for each environment
+    # Examples: arash_dev, arash_stage, arash_prod
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
-    DB_USER: str
-    DB_PASSWORD: str
-    DB_NAME_DEV: str = "arash_dev"
-    DB_NAME_STAGE: str = "arash_stage"
-    DB_NAME_PROD: str = "arash_prod"
-    DB_NAME_HOTFIX: str = "arash_hotfix"
-
-    # Legacy DATABASE_URL support (optional, will be overridden by multi-env config)
-    DATABASE_URL: Optional[str] = None
+    DB_USER: str = "arash_user"  # Default user, override in .env
+    DB_PASSWORD: str = "change_me_in_production"  # Default password, MUST override in .env
+    DB_NAME: str = "arash_db"  # Single database name, set by DevOps for each environment
 
     # Optional Redis
     REDIS_URL: Optional[str] = None
@@ -178,56 +173,20 @@ class Settings(BaseSettings):
         return self.MAX_IMAGE_SIZE_MB * 1024 * 1024
     
     @property
-    def database_name(self) -> str:
-        """Get database name based on environment"""
-        env_map = {
-            "dev": self.DB_NAME_DEV,
-            "development": self.DB_NAME_DEV,  # Legacy support
-            "stage": self.DB_NAME_STAGE,
-            "staging": self.DB_NAME_STAGE,  # Legacy support
-            "prod": self.DB_NAME_PROD,
-            "production": self.DB_NAME_PROD,  # Legacy support
-            "hotfix": self.DB_NAME_HOTFIX
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.DB_NAME_DEV)
-
-    @property
     def database_url(self) -> str:
-        """Build database URL based on environment"""
-        # If DATABASE_URL is explicitly set, use it (legacy support)
-        if self.DATABASE_URL:
-            return self.DATABASE_URL
-
-        # Otherwise, build from multi-environment config
+        """Build async database URL for SQLAlchemy from individual parameters"""
         return (
             f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.database_name}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
     @property
     def sync_database_url(self) -> str:
-        """Build synchronous database URL for Alembic migrations"""
-        # If DATABASE_URL is explicitly set, convert it
-        if self.DATABASE_URL:
-            return self.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
-
-        # Otherwise, build from multi-environment config
+        """Build synchronous database URL for Alembic migrations from individual parameters"""
         return (
             f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.database_name}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
-
-    @property
-    def is_production(self) -> bool:
-        """Check if running in production"""
-        env = self.ENVIRONMENT.lower()
-        return env in ("prod", "production")
-
-    @property
-    def is_development(self) -> bool:
-        """Check if running in development"""
-        env = self.ENVIRONMENT.lower()
-        return env in ("dev", "development")
 
 
 # Global settings instance
