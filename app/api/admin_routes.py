@@ -1,17 +1,26 @@
 """
 Admin API routes for team and API key management
+
+ADMIN ENDPOINTS: These endpoints expose platform details including Telegram.
+Only accessible with admin API keys.
 """
 
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+from typing import List, Optional, Dict, Any
+from collections import defaultdict
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Header
 from pydantic import BaseModel
 
 from app.models.database import AccessLevel, get_db_session
+from app.models.schemas import HealthCheckResponse, StatsResponse
 from app.services.api_key_manager import APIKeyManager
 from app.services.usage_tracker import UsageTracker
+from app.services.session_manager import session_manager
+from app.services.platform_manager import platform_manager
 from app.api.dependencies import require_admin_access, require_team_lead_access
+from app.core.name_mapping import get_friendly_model_name
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +119,151 @@ class UsageStatsResponse(BaseModel):
     cost: dict
     performance: dict
     models: List[dict]
+
+
+# ===========================
+# Platform Information Endpoints (Admin Only)
+# ===========================
+
+
+@router.get("/", response_model=HealthCheckResponse)
+async def admin_root(
+    api_key=Depends(require_admin_access),
+):
+    """
+    Root endpoint with platform information (ADMIN ONLY)
+
+    SECURITY: Exposes Telegram platform details - Admin access required
+    """
+    telegram_config = platform_manager.get_config("telegram")
+    internal_config = platform_manager.get_config("internal")
+
+    return HealthCheckResponse(
+        service="Arash External API Service",
+        version="1.1.0",
+        status="healthy",
+        platforms={
+            "telegram": {
+                "type": "public",
+                "model": get_friendly_model_name(telegram_config.model),
+                "rate_limit": telegram_config.rate_limit,
+                "model_switching": False,
+            },
+            "internal": {
+                "type": "private",
+                "models": [get_friendly_model_name(m) for m in internal_config.available_models],
+                "rate_limit": internal_config.rate_limit,
+                "model_switching": True,
+            },
+        },
+        active_sessions=len(session_manager.sessions),
+        timestamp=datetime.now(),
+    )
+
+
+@router.get("/platforms")
+async def get_platforms(
+    api_key=Depends(require_admin_access),
+):
+    """
+    Get ALL platform configurations (ADMIN ONLY)
+
+    SECURITY: Exposes Telegram platform details - Admin access required
+    """
+    telegram_config = platform_manager.get_config("telegram")
+    internal_config = platform_manager.get_config("internal")
+
+    return {
+        "telegram": {
+            "type": "public",
+            "model": get_friendly_model_name(telegram_config.model),
+            "rate_limit": telegram_config.rate_limit,
+            "commands": telegram_config.commands,
+            "max_history": telegram_config.max_history,
+            "features": {"model_switching": False, "requires_auth": False},
+        },
+        "internal": {
+            "type": "private",
+            "default_model": get_friendly_model_name(internal_config.model),
+            "available_models": [get_friendly_model_name(m) for m in internal_config.available_models],
+            "rate_limit": internal_config.rate_limit,
+            "commands": internal_config.commands,
+            "max_history": internal_config.max_history,
+            "features": {"model_switching": True, "requires_auth": True},
+        },
+    }
+
+
+@router.get("/stats", response_model=StatsResponse)
+async def get_statistics(
+    api_key=Depends(require_admin_access),
+):
+    """
+    Get ALL service statistics (ADMIN ONLY)
+
+    SECURITY: Exposes stats for ALL platforms including Telegram - Admin access required
+    """
+    total_sessions = len(session_manager.sessions)
+    active_sessions = session_manager.get_active_session_count(minutes=5)
+
+    # Statistics by platform
+    telegram_stats = {
+        "sessions": 0,
+        "messages": 0,
+        "active": 0,
+        "model": get_friendly_model_name(platform_manager.get_config("telegram").model),
+    }
+
+    internal_stats = {
+        "sessions": 0,
+        "messages": 0,
+        "active": 0,
+        "models_used": defaultdict(int),
+    }
+
+    for session in session_manager.sessions.values():
+        is_active = not session.is_expired(5)
+
+        if session.platform == "telegram":
+            telegram_stats["sessions"] += 1
+            telegram_stats["messages"] += session.message_count
+            if is_active:
+                telegram_stats["active"] += 1
+        elif session.platform == "internal":
+            internal_stats["sessions"] += 1
+            internal_stats["messages"] += session.message_count
+            friendly_model = get_friendly_model_name(session.current_model)
+            internal_stats["models_used"][friendly_model] += 1
+            if is_active:
+                internal_stats["active"] += 1
+
+    return StatsResponse(
+        total_sessions=total_sessions,
+        active_sessions=active_sessions,
+        telegram=telegram_stats,
+        internal={**internal_stats, "models_used": dict(internal_stats["models_used"])},
+        uptime_seconds=0,  # Will be set by main app
+    )
+
+
+# ==========================================
+# WEBHOOK ENDPOINTS - CURRENTLY DISABLED
+# ==========================================
+# Webhooks are not in use yet. Uncomment when needed.
+#
+# @router.post("/webhook/{platform}")
+# async def admin_webhook_handler(
+#     platform: str,
+#     data: Dict[str, Any],
+#     background_tasks: BackgroundTasks,
+#     x_webhook_secret: Optional[str] = Header(None),
+#     api_key=Depends(require_admin_access),
+# ):
+#     """Platform webhook handler (ADMIN ONLY - DISABLED)"""
+#     raise HTTPException(
+#         status_code=501,
+#         detail="Webhook functionality is not currently enabled"
+#     )
 
 
 # ===========================

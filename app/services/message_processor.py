@@ -19,14 +19,22 @@ class MessageProcessor:
     """Processes messages with platform-aware logic"""
     
     async def process_message(self, message: IncomingMessage) -> BotResponse:
-        """Process incoming message"""
-        
+        """Process incoming message with team isolation"""
+
         try:
-            # Get or create session
+            # Extract team info from metadata (set by API endpoint)
+            team_id = message.metadata.get("team_id")
+            api_key_id = message.metadata.get("api_key_id")
+            api_key_prefix = message.metadata.get("api_key_prefix")
+
+            # Get or create session with team isolation
             session = session_manager.get_or_create_session(
                 platform=message.platform,
                 user_id=message.user_id,
-                chat_id=message.chat_id
+                chat_id=message.chat_id,
+                team_id=team_id,
+                api_key_id=api_key_id,
+                api_key_prefix=api_key_prefix
             )
             
             # Check authentication if required

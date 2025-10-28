@@ -27,14 +27,22 @@ class SessionManager:
         """Generate unique session key"""
         return f"{platform}:{chat_id}"
     
-    def get_or_create_session(self, platform: str, user_id: str, chat_id: str) -> ChatSession:
-        """Get existing session or create new one with platform-specific config"""
+    def get_or_create_session(
+        self,
+        platform: str,
+        user_id: str,
+        chat_id: str,
+        team_id: int | None = None,
+        api_key_id: int | None = None,
+        api_key_prefix: str | None = None
+    ) -> ChatSession:
+        """Get existing session or create new one with platform-specific config and team isolation"""
         key = self.get_session_key(platform, chat_id)
-        
+
         if key not in self.sessions:
             # Get platform configuration
             config = platform_manager.get_config(platform)
-            
+
             self.sessions[key] = ChatSession(
                 session_id=hashlib.md5(key.encode()).hexdigest(),
                 platform=platform,
@@ -42,16 +50,21 @@ class SessionManager:
                 user_id=user_id,
                 chat_id=chat_id,
                 current_model=config.model,
-                is_admin=platform_manager.is_admin(platform, user_id)
+                is_admin=platform_manager.is_admin(platform, user_id),
+                # Team isolation - CRITICAL for security
+                team_id=team_id,
+                api_key_id=api_key_id,
+                api_key_prefix=api_key_prefix
             )
-            
+
             friendly_platform = get_friendly_platform_name(platform)
             masked_id = mask_session_id(self.sessions[key].session_id)
-            logger.info(f"Created new session for {friendly_platform} (session: {masked_id})")
+            team_info = f" (team: {team_id}, key: {api_key_prefix})" if team_id else ""
+            logger.info(f"Created new session for {friendly_platform} (session: {masked_id}){team_info}")
         else:
             # Update last activity
             self.sessions[key].update_activity()
-        
+
         return self.sessions[key]
     
     def get_session(self, platform: str, chat_id: str) -> ChatSession:
@@ -159,6 +172,17 @@ class SessionManager:
             s for s in self.sessions.values()
             if s.last_activity > threshold
         ])
+
+    def get_sessions_by_team(self, team_id: int) -> List[ChatSession]:
+        """Get all sessions for a specific team (for team isolation)"""
+        return [
+            session for session in self.sessions.values()
+            if session.team_id == team_id
+        ]
+
+    def get_session_count_by_team(self, team_id: int) -> int:
+        """Get count of sessions for a specific team"""
+        return len(self.get_sessions_by_team(team_id))
 
 
 # Global instance
