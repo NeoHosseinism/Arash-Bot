@@ -52,9 +52,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"API Docs: {'Enabled' if settings.enable_api_docs else 'Disabled'}")
 
     # Log database configuration
-    logger.info(f"Database: {settings.db_name}")
-    logger.info(f"   Host: {settings.db_host}:{settings.db_port}")
-    logger.info(f"   User: {settings.db_user}")
+    logger.info(f"Database: {settings.DB_NAME}")
+    logger.info(f"   Host: {settings.DB_HOST}:{settings.DB_PORT}")
+    logger.info(f"   User: {settings.DB_USER}")
 
     # Initialize database with Alembic migrations
     try:

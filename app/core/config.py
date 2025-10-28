@@ -38,51 +38,34 @@ class Settings(BaseSettings):
     INTERNAL_WEBHOOK_SECRET: Optional[str] = None
     INTERNAL_ADMIN_USERS: str = ""
 
-    # Logging Configuration (per environment)
+    # Logging Configuration (per environment - application behavior)
     LOG_LEVEL_DEV: str = "DEBUG"
     LOG_LEVEL_STAGE: str = "INFO"
     LOG_LEVEL_PROD: str = "WARNING"
     LOG_FILE: str = "logs/arash_api_service.log"
 
-    # Features Configuration (per environment)
+    # Features Configuration
     ENABLE_IMAGE_PROCESSING: bool = True
     MAX_IMAGE_SIZE_MB: int = 20
 
-    # API Docs - can be disabled per environment
+    # API Docs - controlled by ENVIRONMENT (application behavior)
     ENABLE_API_DOCS_DEV: bool = True
     ENABLE_API_DOCS_STAGE: bool = True
     ENABLE_API_DOCS_PROD: bool = False
 
-    # Database Configuration (Environment-based - Complete per-env configuration)
-    # All database parameters can be different per environment
+    # Database Configuration (Generic - set by DevOps per deployment)
+    # DevOps sets these in K8s ConfigMap/Secret for each environment
+    # Each deployment only has the credentials it needs (security)
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_USER: str = "arash_user"
+    DB_PASSWORD: str = "change_me_in_production"
+    DB_NAME: str = "arash_db"
 
-    # Development Environment Database
-    DB_HOST_DEV: str = "localhost"
-    DB_PORT_DEV: int = 5432
-    DB_USER_DEV: str = "arash_user"
-    DB_PASSWORD_DEV: str = "dev_password"
-    DB_NAME_DEV: str = "arash_dev"
+    # Redis Configuration (Generic - set by DevOps per deployment)
+    REDIS_URL: Optional[str] = None
 
-    # Staging Environment Database
-    DB_HOST_STAGE: str = "localhost"
-    DB_PORT_STAGE: int = 5432
-    DB_USER_STAGE: str = "arash_user"
-    DB_PASSWORD_STAGE: str = "stage_password"
-    DB_NAME_STAGE: str = "arash_stage"
-
-    # Production Environment Database
-    DB_HOST_PROD: str = "localhost"
-    DB_PORT_PROD: int = 5432
-    DB_USER_PROD: str = "arash_user"
-    DB_PASSWORD_PROD: str = "prod_password"
-    DB_NAME_PROD: str = "arash_prod"
-
-    # Redis Configuration (per environment)
-    REDIS_URL_DEV: Optional[str] = None
-    REDIS_URL_STAGE: Optional[str] = None
-    REDIS_URL_PROD: Optional[str] = None
-
-    # CORS Configuration (per environment)
+    # CORS Configuration (per environment - application behavior)
     CORS_ORIGINS_DEV: str = "*"
     CORS_ORIGINS_STAGE: str = "*"
     CORS_ORIGINS_PROD: str = "https://arash-api.irisaprime.ir"
@@ -215,98 +198,20 @@ class Settings(BaseSettings):
         return self.MAX_IMAGE_SIZE_MB * 1024 * 1024
     
     @property
-    def db_host(self) -> str:
-        """Get database host based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.DB_HOST_DEV,
-            "development": self.DB_HOST_DEV,
-            "stage": self.DB_HOST_STAGE,
-            "staging": self.DB_HOST_STAGE,
-            "prod": self.DB_HOST_PROD,
-            "production": self.DB_HOST_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.DB_HOST_DEV)
-
-    @property
-    def db_port(self) -> int:
-        """Get database port based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.DB_PORT_DEV,
-            "development": self.DB_PORT_DEV,
-            "stage": self.DB_PORT_STAGE,
-            "staging": self.DB_PORT_STAGE,
-            "prod": self.DB_PORT_PROD,
-            "production": self.DB_PORT_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.DB_PORT_DEV)
-
-    @property
-    def db_user(self) -> str:
-        """Get database user based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.DB_USER_DEV,
-            "development": self.DB_USER_DEV,
-            "stage": self.DB_USER_STAGE,
-            "staging": self.DB_USER_STAGE,
-            "prod": self.DB_USER_PROD,
-            "production": self.DB_USER_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.DB_USER_DEV)
-
-    @property
-    def db_password(self) -> str:
-        """Get database password based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.DB_PASSWORD_DEV,
-            "development": self.DB_PASSWORD_DEV,
-            "stage": self.DB_PASSWORD_STAGE,
-            "staging": self.DB_PASSWORD_STAGE,
-            "prod": self.DB_PASSWORD_PROD,
-            "production": self.DB_PASSWORD_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.DB_PASSWORD_DEV)
-
-    @property
-    def db_name(self) -> str:
-        """Get database name based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.DB_NAME_DEV,
-            "development": self.DB_NAME_DEV,
-            "stage": self.DB_NAME_STAGE,
-            "staging": self.DB_NAME_STAGE,
-            "prod": self.DB_NAME_PROD,
-            "production": self.DB_NAME_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.DB_NAME_DEV)
-
-    @property
     def database_url(self) -> str:
-        """Build async database URL for SQLAlchemy from environment-specific parameters"""
+        """Build async database URL for SQLAlchemy from generic parameters"""
         return (
-            f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
 
     @property
     def sync_database_url(self) -> str:
-        """Build synchronous database URL for Alembic migrations from environment-specific parameters"""
+        """Build synchronous database URL for Alembic migrations from generic parameters"""
         return (
-            f"postgresql://{self.db_user}:{self.db_password}"
-            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
-
-    @property
-    def redis_url(self) -> Optional[str]:
-        """Get Redis URL based on ENVIRONMENT"""
-        env_map = {
-            "dev": self.REDIS_URL_DEV,
-            "development": self.REDIS_URL_DEV,
-            "stage": self.REDIS_URL_STAGE,
-            "staging": self.REDIS_URL_STAGE,
-            "prod": self.REDIS_URL_PROD,
-            "production": self.REDIS_URL_PROD,
-        }
-        return env_map.get(self.ENVIRONMENT.lower(), self.REDIS_URL_DEV)
 
     @property
     def log_level(self) -> str:
