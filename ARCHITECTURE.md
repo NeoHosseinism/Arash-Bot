@@ -878,7 +878,7 @@ graph TB
     subgraph "Environment Variables (.env)"
         ENV1[AI_SERVICE_URL]
         ENV2[INTERNAL_API_KEY]
-        ENV3[DATABASE_URL]
+        ENV3[DB_HOST/PORT/USER/PASSWORD/NAME]
         ENV4[TELEGRAM_BOT_TOKEN]
         ENV5[API_HOST/PORT]
         ENV6[LOG_LEVEL]

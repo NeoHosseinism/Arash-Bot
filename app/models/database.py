@@ -149,19 +149,21 @@ class Database:
         Initialize database connection (PostgreSQL only).
 
         Args:
-            database_url: PostgreSQL connection string. If None, reads from DATABASE_URL environment variable.
+            database_url: PostgreSQL connection string. If None, builds from config settings
+                         (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME).
 
         Raises:
             ValueError: If database_url is not provided or is not PostgreSQL
         """
         if database_url is None:
-            database_url = os.getenv("DATABASE_URL")
+            # Build URL from config settings (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
+            from app.core.config import settings
+            database_url = settings.sync_database_url
 
         if not database_url:
             raise ValueError(
-                "DATABASE_URL environment variable is required. "
-                "Please set it to a PostgreSQL connection string: "
-                "postgresql://user:password@host:port/database"
+                "Database configuration is required. "
+                "Please set DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME in environment variables."
             )
 
         # Validate PostgreSQL URL
@@ -271,13 +273,14 @@ def get_database(database_url: Optional[str] = None) -> Database:
     Get or create the global PostgreSQL database instance.
 
     Args:
-        database_url: PostgreSQL connection string. If None, reads from DATABASE_URL environment variable.
+        database_url: PostgreSQL connection string. If None, builds from config settings
+                     (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME).
 
     Returns:
         Database instance
 
     Raises:
-        ValueError: If DATABASE_URL is not set or is not PostgreSQL
+        ValueError: If database configuration is not set or is not PostgreSQL
     """
     global _db_instance
     if _db_instance is None:

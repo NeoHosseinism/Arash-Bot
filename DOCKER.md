@@ -388,13 +388,17 @@ networks:
 
 ### External PostgreSQL
 
-If using external PostgreSQL, remove `postgres` service and update `DATABASE_URL`:
+If using external PostgreSQL, remove `postgres` service and set database parameters:
 
 ```yaml
 services:
   api:
     environment:
-      DATABASE_URL: postgresql://user:pass@external-host:5432/dbname
+      DB_HOST: external-host
+      DB_PORT: 5432
+      DB_USER: user
+      DB_PASSWORD: pass
+      DB_NAME: dbname
 ```
 
 ### Multiple Environments
