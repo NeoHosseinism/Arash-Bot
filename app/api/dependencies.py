@@ -61,14 +61,21 @@ def verify_api_key(
         pass
 
     # Fallback to legacy INTERNAL_API_KEY for backward compatibility
+    # ⚠️ SECURITY WARNING: Legacy auth does NOT provide team isolation
+    # TODO: Remove this fallback after all clients migrate to database API keys
     if authorization.credentials == settings.INTERNAL_API_KEY:
-        # Create a virtual API key object for legacy auth
-        # This allows old code to continue working
-        return None  # Legacy mode
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(
+            "⚠️ SECURITY: Legacy INTERNAL_API_KEY used - NO TEAM ISOLATION! "
+            "Migrate to database-based API keys immediately."
+        )
+        # Return None to indicate legacy mode (no team isolation)
+        return None
 
     raise HTTPException(
         status_code=403,
-        detail="Invalid API key"
+        detail="Invalid API key. Use database-based API keys for team isolation."
     )
 
 
@@ -78,6 +85,8 @@ def verify_internal_api_key(
     """
     Verify internal API key (legacy support).
     For backward compatibility with existing code.
+
+    ⚠️ WARNING: This function is deprecated. Use verify_api_key() instead for team isolation.
     """
     if not authorization:
         raise HTTPException(
@@ -95,11 +104,19 @@ def verify_internal_api_key(
         pass
 
     # Fallback to legacy key
+    # ⚠️ SECURITY WARNING: Legacy auth does NOT provide team isolation
     if authorization.credentials != settings.INTERNAL_API_KEY:
         raise HTTPException(
             status_code=403,
-            detail="Invalid API key"
+            detail="Invalid API key. Use database-based API keys for team isolation."
         )
+
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "⚠️ SECURITY: Legacy INTERNAL_API_KEY used via verify_internal_api_key() - "
+        "NO TEAM ISOLATION! Migrate to verify_api_key() dependency."
+    )
 
     return authorization
 

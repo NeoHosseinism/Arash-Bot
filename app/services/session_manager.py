@@ -23,8 +23,18 @@ class SessionManager:
         self.sessions: Dict[str, ChatSession] = {}
         self.rate_limits: Dict[str, List[float]] = defaultdict(list)
     
-    def get_session_key(self, platform: str, chat_id: str) -> str:
-        """Generate unique session key"""
+    def get_session_key(self, platform: str, chat_id: str, team_id: int | None = None) -> str:
+        """
+        Generate unique session key with team isolation
+
+        SECURITY: Includes team_id to prevent session collision between teams.
+        If Team A and Team B both use chat_id="user123", they get DIFFERENT sessions.
+
+        For Telegram bot (no team_id), uses platform:chat_id
+        For internal API (has team_id), uses platform:team_id:chat_id
+        """
+        if team_id is not None:
+            return f"{platform}:{team_id}:{chat_id}"
         return f"{platform}:{chat_id}"
     
     def get_or_create_session(
@@ -37,7 +47,8 @@ class SessionManager:
         api_key_prefix: str | None = None
     ) -> ChatSession:
         """Get existing session or create new one with platform-specific config and team isolation"""
-        key = self.get_session_key(platform, chat_id)
+        # SECURITY: Include team_id in key to prevent session collision
+        key = self.get_session_key(platform, chat_id, team_id)
 
         if key not in self.sessions:
             # Get platform configuration
@@ -67,14 +78,14 @@ class SessionManager:
 
         return self.sessions[key]
     
-    def get_session(self, platform: str, chat_id: str) -> ChatSession:
+    def get_session(self, platform: str, chat_id: str, team_id: int | None = None) -> ChatSession:
         """Get existing session"""
-        key = self.get_session_key(platform, chat_id)
+        key = self.get_session_key(platform, chat_id, team_id)
         return self.sessions.get(key)
-    
-    def delete_session(self, platform: str, chat_id: str) -> bool:
+
+    def delete_session(self, platform: str, chat_id: str, team_id: int | None = None) -> bool:
         """Delete a session"""
-        key = self.get_session_key(platform, chat_id)
+        key = self.get_session_key(platform, chat_id, team_id)
         if key in self.sessions:
             del self.sessions[key]
             logger.info(f"Deleted session: {key}")

@@ -391,13 +391,38 @@ async def list_api_keys(
     team_id: Optional[int] = None,
     api_key=Depends(require_team_lead_access),
 ):
-    """List API keys, optionally filtered by team (Team Lead or Admin)"""
+    """
+    List API keys, filtered by team
+
+    SECURITY: Team leads can ONLY list their own team's API keys.
+    Admins can list any team's keys or all keys.
+    """
     db = get_db_session()
+
+    # SECURITY: Enforce team isolation (unless admin)
+    if api_key:  # Not None (not legacy auth)
+        from app.models.database import AccessLevel
+        is_admin = AccessLevel(api_key.access_level) == AccessLevel.ADMIN
+
+        if not is_admin:
+            # Team leads can only list their own team's keys
+            if team_id and team_id != api_key.team_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied: You can only list your own team's API keys"
+                )
+            # Force team_id to be the authenticated team's ID
+            team_id = api_key.team_id
 
     if team_id:
         keys = APIKeyManager.list_team_api_keys(db, team_id)
     else:
-        # List all teams and their keys (admin only would be better)
+        # List all teams and their keys (admin only)
+        if api_key and AccessLevel(api_key.access_level) != AccessLevel.ADMIN:
+            raise HTTPException(
+                status_code=403,
+                detail="Only admins can list all API keys"
+            )
         teams = APIKeyManager.list_all_teams(db)
         keys = []
         for team in teams:
@@ -439,13 +464,29 @@ async def get_team_usage(
     days: int = 30,
     api_key=Depends(require_team_lead_access),
 ):
-    """Get usage statistics for a team"""
+    """
+    Get usage statistics for a team
+
+    SECURITY: Team leads can ONLY access their own team's usage.
+    Admins can access any team's usage.
+    """
     db = get_db_session()
 
     # Verify team exists
     team = APIKeyManager.get_team_by_id(db, team_id)
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
+
+    # SECURITY: Check team ownership (unless admin)
+    if api_key:  # Not None (not legacy auth)
+        from app.models.database import AccessLevel
+        is_admin = AccessLevel(api_key.access_level) == AccessLevel.ADMIN
+
+        if not is_admin and api_key.team_id != team_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: You can only view your own team's usage statistics"
+            )
 
     start_date = datetime.utcnow() - timedelta(days=days)
     stats = UsageTracker.get_team_usage_stats(db, team_id, start_date)
@@ -459,8 +500,34 @@ async def get_api_key_usage(
     days: int = 30,
     api_key=Depends(require_team_lead_access),
 ):
-    """Get usage statistics for an API key"""
+    """
+    Get usage statistics for an API key
+
+    SECURITY: Team leads can ONLY access API keys from their own team.
+    Admins can access any API key.
+    """
     db = get_db_session()
+
+    # Get the target API key to check team ownership
+    from sqlalchemy.orm import sessionmaker
+    from app.models.database import APIKey as DBAPIKey, AccessLevel
+
+    Session = sessionmaker(bind=db.bind)
+    session = Session()
+    target_key = session.query(DBAPIKey).filter(DBAPIKey.id == api_key_id).first()
+
+    if not target_key:
+        raise HTTPException(status_code=404, detail="API key not found")
+
+    # SECURITY: Check team ownership (unless admin)
+    if api_key:  # Not None (not legacy auth)
+        is_admin = AccessLevel(api_key.access_level) == AccessLevel.ADMIN
+
+        if not is_admin and api_key.team_id != target_key.team_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: This API key belongs to another team"
+            )
 
     start_date = datetime.utcnow() - timedelta(days=days)
     stats = UsageTracker.get_api_key_usage_stats(db, api_key_id, start_date)
@@ -474,19 +541,34 @@ async def check_quota(
     period: str = "daily",
     api_key=Depends(require_team_lead_access),
 ):
-    """Check quota status for an API key"""
+    """
+    Check quota status for an API key
+
+    SECURITY: Team leads can ONLY check quotas for their own team's API keys.
+    Admins can check any API key.
+    """
     db = get_db_session()
 
     # Get the API key
     from sqlalchemy.orm import sessionmaker
-    from app.models.database import APIKey
+    from app.models.database import APIKey as DBAPIKey, AccessLevel
 
     Session = sessionmaker(bind=db.bind)
     session = Session()
-    key = session.query(APIKey).filter(APIKey.id == api_key_id).first()
+    key = session.query(DBAPIKey).filter(DBAPIKey.id == api_key_id).first()
 
     if not key:
         raise HTTPException(status_code=404, detail="API key not found")
+
+    # SECURITY: Check team ownership (unless admin)
+    if api_key:  # Not None (not legacy auth)
+        is_admin = AccessLevel(api_key.access_level) == AccessLevel.ADMIN
+
+        if not is_admin and api_key.team_id != key.team_id:
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied: This API key belongs to another team"
+            )
 
     if period not in ["daily", "monthly"]:
         raise HTTPException(
@@ -506,8 +588,28 @@ async def get_recent_usage(
     limit: int = 100,
     api_key=Depends(require_team_lead_access),
 ):
-    """Get recent usage logs"""
+    """
+    Get recent usage logs
+
+    SECURITY: Team leads can ONLY view their own team's usage logs.
+    Admins can view any team's logs.
+    """
     db = get_db_session()
+
+    # SECURITY: Enforce team isolation (unless admin)
+    if api_key:  # Not None (not legacy auth)
+        from app.models.database import AccessLevel
+        is_admin = AccessLevel(api_key.access_level) == AccessLevel.ADMIN
+
+        if not is_admin:
+            # Team leads can only view their own team's logs
+            if team_id and team_id != api_key.team_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied: You can only view your own team's usage logs"
+                )
+            # Force team_id to be the authenticated team's ID
+            team_id = api_key.team_id
 
     logs = UsageTracker.get_recent_usage(
         db=db,
