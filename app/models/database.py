@@ -211,65 +211,28 @@ class Database:
 
     def create_tables(self, force: bool = False):
         """
-        Create all database tables if they don't exist.
-        Skips tables that already exist in PostgreSQL.
+        DEPRECATED: Use Alembic migrations instead.
+
+        This method is kept for backward compatibility with scripts but should not be used.
+        Database schema should be managed through Alembic migrations.
+
+        To initialize database with migrations:
+            from app.core.database_init import initialize_database
+            initialize_database()
+
+        To create a new migration:
+            alembic revision --autogenerate -m "description"
+
+        To apply migrations:
+            alembic upgrade head
 
         Args:
-            force: If True, drop and recreate all tables (use with caution!)
+            force: Not used (kept for compatibility)
         """
-        try:
-            if force:
-                print("[WARNING] Dropping all existing tables (force=True)")
-                logger.warning("Dropping all existing tables (force=True)")
-                Base.metadata.drop_all(bind=self.engine)
-
-            # Check which tables already exist
-            inspector = inspect(self.engine)
-            existing_tables = set(inspector.get_table_names())
-            expected_tables = {"teams", "api_keys", "usage_logs"}
-
-            if existing_tables:
-                print(f"[INFO] Found existing tables in database: {', '.join(sorted(existing_tables))}")
-                logger.info(f"Found existing tables: {', '.join(sorted(existing_tables))}")
-            else:
-                print("[INFO] No existing tables found, creating new schema...")
-                logger.info("No existing tables found, creating new schema")
-
-            # Create all tables (SQLAlchemy will skip existing ones)
-            Base.metadata.create_all(bind=self.engine)
-
-            # Verify what was created
-            new_tables = set(inspect(self.engine).get_table_names())
-            created_tables = new_tables - existing_tables
-            skipped_tables = existing_tables & expected_tables
-
-            if created_tables:
-                print(f"[OK] Created new tables: {', '.join(sorted(created_tables))}")
-                logger.info(f"Created new tables: {', '.join(sorted(created_tables))}")
-
-            if skipped_tables:
-                print(f"[OK] Skipped existing tables: {', '.join(sorted(skipped_tables))}")
-                logger.info(f"Skipped existing tables (already exist): {', '.join(sorted(skipped_tables))}")
-
-            if not created_tables and existing_tables:
-                print("[OK] All required tables already exist in database")
-                logger.info("All required tables already exist")
-
-            print("[OK] Database schema is ready")
-            logger.info("Database schema ready")
-
-        except OperationalError as e:
-            print(f"[ERROR] Database operational error: {e}")
-            logger.error(f"Operational error creating tables: {e}")
-            raise
-        except ProgrammingError as e:
-            print(f"[ERROR] Database programming error: {e}")
-            logger.error(f"Programming error creating tables: {e}")
-            raise
-        except Exception as e:
-            print(f"[ERROR] Unexpected database error: {e}")
-            logger.error(f"Unexpected error creating tables: {e}")
-            raise
+        print("[WARNING] create_tables() is deprecated - use Alembic migrations")
+        print("[INFO] Run: alembic upgrade head")
+        logger.warning("create_tables() is deprecated - use Alembic migrations instead")
+        logger.info("To initialize database, use: from app.core.database_init import initialize_database")
 
     def test_connection(self) -> bool:
         """
@@ -324,8 +287,10 @@ def get_database(database_url: Optional[str] = None) -> Database:
         _db_instance = Database(database_url)
         # Test connection
         if _db_instance.test_connection():
-            # Create tables if they don't exist
-            _db_instance.create_tables()
+            print("[OK] Database connection established")
+            logger.info("Database connection established")
+            # Note: Database schema is managed by Alembic migrations
+            # Run migrations on startup using: from app.core.database_init import initialize_database
         else:
             print("[ERROR] Database connection failed - API key management will not be available")
             logger.error("PostgreSQL connection failed - API key management will not be available")

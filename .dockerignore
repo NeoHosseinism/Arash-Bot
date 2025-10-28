@@ -97,7 +97,9 @@ MODEL_MAPPING_FIX.md
 # ===========================
 # Logs & Database
 # ===========================
-logs/
+# Note: Don't exclude logs/ directory - it's created at runtime
+# Only exclude log files themselves
+logs/*.log
 *.log
 *.db
 *.sqlite

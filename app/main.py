@@ -17,6 +17,7 @@ from app.services.session_manager import session_manager
 from app.services.platform_manager import platform_manager
 from app.services.ai_client import ai_client
 from app.models.database import get_database
+from app.core.database_init import initialize_database, create_logs_directory
 from app.utils.logger import setup_logging
 
 # Setup logging
@@ -42,9 +43,27 @@ async def lifespan(app: FastAPI):
 
     app.state.start_time = datetime.now()
 
+    # Create logs directory (safe for all environments including Docker)
+    create_logs_directory()
+
+    # Log environment configuration
+    logger.info(f"Environment: {settings.ENVIRONMENT.upper()}")
+    logger.info(f"Log Level: {settings.log_level}")
+    logger.info(f"API Docs: {'Enabled' if settings.enable_api_docs else 'Disabled'}")
+
     # Log database configuration
-    logger.info(f"Database: {settings.database_name} ({settings.ENVIRONMENT})")
-    logger.info(f"   Host: {settings.DB_HOST}:{settings.DB_PORT}")
+    logger.info(f"Database: {settings.db_name}")
+    logger.info(f"   Host: {settings.db_host}:{settings.db_port}")
+    logger.info(f"   User: {settings.db_user}")
+
+    # Initialize database with Alembic migrations
+    try:
+        if not initialize_database():
+            logger.error("[ERROR] Database initialization failed - API key management may not work")
+        else:
+            logger.info("[OK] Database initialized successfully with Alembic migrations")
+    except Exception as e:
+        logger.error(f"[ERROR] Database initialization failed: {e}")
 
     # Log platform configurations
     logger.info("Platform Configurations:")
@@ -66,14 +85,6 @@ async def lifespan(app: FastAPI):
     logger.info(f"    - Commands: {len(internal_config.commands)}")
     logger.info(f"    - Max History: {internal_config.max_history}")
     logger.info(f"    - Authentication: {'Required' if internal_config.requires_auth else 'Not required'}")
-
-    # Initialize database for API key management
-    try:
-        db = get_database()
-        db.create_tables()
-        logger.info("[OK] Database initialized successfully")
-    except Exception as e:
-        logger.warning(f"[WARNING] Database initialization failed (API key management disabled): {e}")
 
     logger.info(f"\nAI Service: {settings.AI_SERVICE_URL}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
