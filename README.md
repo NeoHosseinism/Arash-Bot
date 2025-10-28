@@ -34,7 +34,7 @@ nano .env
 ```
 
 **Required environment variables:**
-- `DB_NAME`: Database name (e.g., arash_dev, arash_stage, arash_prod)
+- `ENVIRONMENT`: Environment name (`dev`, `stage`, `prod`) - Controls database selection and optimizations
 - `DB_USER`, `DB_PASSWORD`: PostgreSQL credentials
 - `TELEGRAM_BOT_TOKEN`: Bot token from @BotFather
 - `INTERNAL_API_KEY`: Secure random key (min 32 characters)
@@ -186,27 +186,57 @@ Full API documentation available at `http://localhost:3000/docs`
 
 ## Configuration
 
-### Database Configuration (Simplified)
+### Environment-Based Configuration
 
-The application uses a **single database name** configured via environment variables. DevOps team sets `DB_NAME` to the appropriate database for each environment:
+The application uses the `ENVIRONMENT` variable to automatically select the correct database and apply environment-specific optimizations:
 
 ```bash
-# Development
-DB_NAME=arash_dev
-
-# Staging
-DB_NAME=arash_stage
-
-# Production
-DB_NAME=arash_prod
+# Switch between environments by changing one variable
+ENVIRONMENT=dev      # Uses arash_dev database, DEBUG log level
+ENVIRONMENT=stage    # Uses arash_stage database, INFO log level
+ENVIRONMENT=prod     # Uses arash_prod database, WARNING log level
 ```
 
-Database connection parameters are built from individual variables:
-- `DB_HOST` (default: localhost)
-- `DB_PORT` (default: 5432)
-- `DB_USER` (default: arash_user)
-- `DB_PASSWORD` (required)
-- `DB_NAME` (default: arash_db)
+**Benefits:**
+- **Simple switching**: DevOps only changes one variable
+- **Less error-prone**: All database names predefined in configuration
+- **Environment-aware**: Code automatically optimizes based on environment
+- **Centralized**: All environment configs in one place
+
+### Database Configuration
+
+Database names are **predefined** for each environment in `.env`:
+
+```bash
+# PostgreSQL connection (same for all environments)
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=arash_user
+DB_PASSWORD=your_password
+
+# Predefined database names
+DB_NAME_DEV=arash_dev
+DB_NAME_STAGE=arash_stage
+DB_NAME_PROD=arash_prod
+
+# ENVIRONMENT variable determines which database to use
+ENVIRONMENT=dev  # Change this to switch databases
+```
+
+**Database connection is built automatically** from individual parameters - no need to manually construct connection strings.
+
+### Environment-Aware Features
+
+The application automatically adjusts behavior based on `ENVIRONMENT`:
+
+| Feature | dev | stage | prod |
+|---------|-----|-------|------|
+| **Database** | arash_dev | arash_stage | arash_prod |
+| **Log Level** | DEBUG | INFO | WARNING |
+| **API Docs** | Enabled | Enabled | Optional |
+| **Debug Features** | Enabled | Disabled | Disabled |
+
+You can override log level by setting `LOG_LEVEL` explicitly in `.env`.
 
 ### Platform Configurations
 
@@ -256,14 +286,16 @@ kubectl apply -f manifests/prod/
 ### Production Checklist
 
 - [ ] Configure PostgreSQL database (provided by DevOps)
-- [ ] Set `DB_NAME` to production database
+- [ ] Set `ENVIRONMENT=prod` in `.env`
+- [ ] Verify `DB_NAME_PROD` points to production database
 - [ ] Run database migrations with `make migrate-up`
 - [ ] Generate secure `INTERNAL_API_KEY` (32+ characters)
 - [ ] Create initial teams and API keys
-- [ ] Set `ENABLE_API_DOCS=false`
+- [ ] Set `ENABLE_API_DOCS=false` (optional, for security)
 - [ ] Configure CORS origins (don't use `*`)
 - [ ] Set up log rotation
 - [ ] Test quota enforcement
+- [ ] Verify log level is WARNING or ERROR
 
 ## Security
 

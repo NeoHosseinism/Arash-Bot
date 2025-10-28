@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     """Application settings with validation - Pydantic V2"""
     
     # Core Configuration
+    ENVIRONMENT: str = "dev"  # dev, stage, prod - Controls database selection and optimizations
     AI_SERVICE_URL: str
     SESSION_TIMEOUT_MINUTES: int = 30
 
@@ -38,21 +39,28 @@ class Settings(BaseSettings):
     INTERNAL_ADMIN_USERS: str = ""
 
     # Logging
-    LOG_LEVEL: str = "INFO"
+    LOG_LEVEL: Optional[str] = None  # Auto-set based on ENVIRONMENT if not specified
     LOG_FILE: str = "logs/arash_api_service.log"
 
     # Features
     ENABLE_IMAGE_PROCESSING: bool = True
     MAX_IMAGE_SIZE_MB: int = 20
 
-    # Database Configuration (Simplified - Single Database)
-    # DevOps team sets DB_NAME to the appropriate database for each environment
-    # Examples: arash_dev, arash_stage, arash_prod
+    # Database Configuration (Environment-based)
+    # DevOps team sets ENVIRONMENT to switch between databases
+    # All database names are predefined - just change ENVIRONMENT variable
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
     DB_USER: str = "arash_user"  # Default user, override in .env
     DB_PASSWORD: str = "change_me_in_production"  # Default password, MUST override in .env
-    DB_NAME: str = "arash_db"  # Single database name, set by DevOps for each environment
+
+    # Predefined database names for each environment
+    DB_NAME_DEV: str = "arash_dev"
+    DB_NAME_STAGE: str = "arash_stage"
+    DB_NAME_PROD: str = "arash_prod"
+
+    # Fallback database name (used if ENVIRONMENT doesn't match any predefined env)
+    DB_NAME: str = "arash_db"
 
     # Optional Redis
     REDIS_URL: Optional[str] = None
@@ -173,11 +181,24 @@ class Settings(BaseSettings):
         return self.MAX_IMAGE_SIZE_MB * 1024 * 1024
     
     @property
+    def database_name(self) -> str:
+        """Get database name based on ENVIRONMENT variable"""
+        env_map = {
+            "dev": self.DB_NAME_DEV,
+            "development": self.DB_NAME_DEV,
+            "stage": self.DB_NAME_STAGE,
+            "staging": self.DB_NAME_STAGE,
+            "prod": self.DB_NAME_PROD,
+            "production": self.DB_NAME_PROD,
+        }
+        return env_map.get(self.ENVIRONMENT.lower(), self.DB_NAME)
+
+    @property
     def database_url(self) -> str:
         """Build async database URL for SQLAlchemy from individual parameters"""
         return (
             f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.database_name}"
         )
 
     @property
@@ -185,8 +206,45 @@ class Settings(BaseSettings):
         """Build synchronous database URL for Alembic migrations from individual parameters"""
         return (
             f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.database_name}"
         )
+
+    @property
+    def effective_log_level(self) -> str:
+        """Get log level - uses LOG_LEVEL if set, otherwise defaults based on ENVIRONMENT"""
+        if self.LOG_LEVEL:
+            return self.LOG_LEVEL.upper()
+
+        # Environment-based defaults
+        env_log_levels = {
+            "dev": "DEBUG",
+            "development": "DEBUG",
+            "stage": "INFO",
+            "staging": "INFO",
+            "prod": "WARNING",
+            "production": "WARNING",
+        }
+        return env_log_levels.get(self.ENVIRONMENT.lower(), "INFO")
+
+    @property
+    def is_production(self) -> bool:
+        """Check if running in production environment"""
+        return self.ENVIRONMENT.lower() in ("prod", "production")
+
+    @property
+    def is_development(self) -> bool:
+        """Check if running in development environment"""
+        return self.ENVIRONMENT.lower() in ("dev", "development")
+
+    @property
+    def is_staging(self) -> bool:
+        """Check if running in staging environment"""
+        return self.ENVIRONMENT.lower() in ("stage", "staging")
+
+    @property
+    def enable_debug_features(self) -> bool:
+        """Enable debug features in development"""
+        return self.is_development
 
 
 # Global settings instance
