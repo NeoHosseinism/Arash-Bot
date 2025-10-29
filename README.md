@@ -37,7 +37,6 @@ nano .env
 - `ENVIRONMENT`: Environment name (`dev`, `stage`, `prod`) - Controls database selection and optimizations
 - `DB_USER`, `DB_PASSWORD`: PostgreSQL credentials
 - `TELEGRAM_BOT_TOKEN`: Bot token from @BotFather
-- `INTERNAL_API_KEY`: Secure random key (min 32 characters)
 - `AI_SERVICE_URL`: Your AI service endpoint
 
 ### 3. Run Database Migrations
@@ -61,8 +60,9 @@ make run
 ```
 
 The service will be available at:
-- API: `http://localhost:3000`
-- Docs: `http://localhost:3000/docs`
+- API: `http://localhost:3000/api/v1/`
+- Docs: `http://localhost:3000/api/v1/docs`
+- Health: `http://localhost:3000/health`
 
 ## Project Structure
 
@@ -151,29 +151,40 @@ make k8s-deploy-prod            # Deploy to production
 
 ## API Documentation
 
+### API v1 Structure
+
+All API endpoints are prefixed with `/api/v1/` for versioning support.
+
 ### Core Endpoints
 
-- `GET /` - Health check
-- `GET /health` - Detailed health status
-- `POST /message` - Process a message
+- `GET /health` - Health check (unversioned for backward compatibility)
+- `POST /api/v1/message` - Process a message (Requires API key)
+- `GET /api/v1/sessions` - List team's active sessions (Requires API key)
+- `GET /api/v1/session/{id}` - Get session details (Requires API key)
+- `DELETE /api/v1/session/{id}` - Delete session (Requires API key)
 
-### Admin Endpoints (Requires Authentication)
+### Admin Endpoints (Requires Admin Access)
+
+**Platform Information:**
+- `GET /api/v1/admin/` - Platform details and service info (Admin only)
+- `GET /api/v1/admin/platforms` - Full platform configurations (Admin only)
+- `GET /api/v1/admin/stats` - Cross-team statistics (Admin only)
 
 **Team Management:**
-- `POST /admin/teams` - Create team (Admin only)
-- `GET /admin/teams` - List teams
-- `PATCH /admin/teams/{id}` - Update team (Admin only)
+- `POST /api/v1/admin/teams` - Create team (Admin only)
+- `GET /api/v1/admin/teams` - List teams (Admin only)
+- `PATCH /api/v1/admin/teams/{id}` - Update team (Admin only)
 
 **API Key Management:**
-- `POST /admin/api-keys` - Create API key (Admin only)
-- `GET /admin/api-keys` - List API keys (Team Lead+)
-- `DELETE /admin/api-keys/{id}` - Revoke key (Admin only)
+- `POST /api/v1/admin/api-keys` - Create API key (Admin only)
+- `GET /api/v1/admin/api-keys` - List API keys (Team Lead+)
+- `DELETE /api/v1/admin/api-keys/{id}` - Revoke key (Admin only)
 
 **Usage Tracking:**
-- `GET /admin/usage/team/{id}` - Team usage stats (Team Lead+)
-- `GET /admin/usage/api-key/{id}` - Key usage stats (Team Lead+)
+- `GET /api/v1/admin/usage/team/{id}` - Team usage stats (Team Lead+)
+- `GET /api/v1/admin/usage/api-key/{id}` - Key usage stats (Team Lead+)
 
-Full API documentation available at `http://localhost:3000/docs`
+Full API documentation available at `http://localhost:3000/api/v1/docs`
 
 ## Telegram Bot Commands
 
@@ -389,7 +400,7 @@ kubectl apply -f manifests/prod/
 - [ ] Set `DB_PASSWORD` from K8s Secret
 - [ ] Set `DB_NAME` (e.g., arash_prod)
 - [ ] Set `REDIS_URL` if using Redis
-- [ ] Generate secure `INTERNAL_API_KEY` (32+ characters)
+- [ ] Set `TELEGRAM_BOT_TOKEN` from K8s Secret
 
 **Database Setup:**
 - [ ] Run migrations: `ENVIRONMENT=prod make migrate-up`
@@ -409,11 +420,17 @@ kubectl apply -f manifests/prod/
 
 ## Security
 
+- **Database-Only API Keys**: All authentication uses database-backed API keys (no legacy fallback)
 - **API Key Hashing**: SHA256, never stored in plain text
+- **Team Isolation**: Complete session and data isolation between teams
+- **Session Key Isolation**: Team ID included in session keys to prevent collision
 - **Access Levels**: Hierarchical permissions (User → Team Lead → Admin)
 - **Rate Limiting**: Per-user and per-team quota enforcement
 - **Input Validation**: Pydantic models for all inputs
-- **Environment Variables**: All secrets in `.env` file
+- **API Versioning**: All endpoints at `/api/v1/` for future compatibility
+- **Environment Variables**: All secrets in `.env` file or K8s Secrets
+
+For detailed security architecture, see [SECURITY.md](SECURITY.md)
 
 ## Troubleshooting
 

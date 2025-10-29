@@ -1,6 +1,10 @@
-# Arash External API Service - Complete Architecture Documentation
+# Arash External API Service - Complete Architecture Documentation v1.1
 
 This document provides a comprehensive overview of the Arash External API Service system architecture, including all modules, classes, functions, data flows, and integrations.
+
+**Version**: 1.1.0
+**API Version**: v1
+**Last Updated**: 2025-10-29
 
 ## Table of Contents
 
@@ -292,66 +296,60 @@ classDiagram
 
 ---
 
-## API Endpoints
+## API Endpoints (v1)
+
+All API endpoints are prefixed with `/api/v1/` for versioning.
 
 ```mermaid
 graph TB
     subgraph "Public Endpoints - No Auth Required"
-        E1[GET /<br/>Health check with platform info]
-        E2[GET /health<br/>Detailed health check]
-        E3[GET /platforms<br/>Platform configurations]
-        E4[GET /stats<br/>Service statistics]
+        E1[GET /health<br/>Health check unversioned]
     end
 
-    subgraph "Message Endpoints - Optional Auth"
-        E5[POST /message<br/>Process message]
-        E6[POST /webhook/:platform<br/>Platform webhook handler]
+    subgraph "Message Endpoints - Requires API Key"
+        E5[POST /api/v1/message<br/>Process message]
     end
 
-    subgraph "Session Endpoints - Optional Auth"
-        E7[GET /sessions<br/>List active sessions]
-        E8[GET /session/:id<br/>Get session details]
+    subgraph "Session Endpoints - Requires API Key"
+        E7[GET /api/v1/sessions<br/>List team sessions]
+        E8[GET /api/v1/session/:id<br/>Get session details]
+        E9[DELETE /api/v1/session/:id<br/>Delete session]
     end
 
-    subgraph "Admin Endpoints - Requires Internal Auth"
-        E9[DELETE /session/:id<br/>Delete session]
-        E10[POST /admin/clear-sessions<br/>Clear all sessions]
+    subgraph "Admin Platform Info - Requires ADMIN"
+        E10[GET /api/v1/admin/<br/>Platform info]
+        E11[GET /api/v1/admin/platforms<br/>Platform configs]
+        E12[GET /api/v1/admin/stats<br/>Cross-team stats]
     end
 
     subgraph "Team Management - Requires ADMIN"
-        E11[POST /admin/teams<br/>Create team]
-        E12[GET /admin/teams<br/>List teams]
-        E13[GET /admin/teams/:id<br/>Get team details]
-        E14[PUT /admin/teams/:id<br/>Update team]
-        E15[DELETE /admin/teams/:id<br/>Delete team]
+        E13[POST /api/v1/admin/teams<br/>Create team]
+        E14[GET /api/v1/admin/teams<br/>List teams]
+        E15[GET /api/v1/admin/teams/:id<br/>Get team]
+        E16[PUT /api/v1/admin/teams/:id<br/>Update team]
+        E17[DELETE /api/v1/admin/teams/:id<br/>Delete team]
     end
 
     subgraph "API Key Management - Requires ADMIN"
-        E16[POST /admin/teams/:id/keys<br/>Create API key]
-        E17[GET /admin/keys<br/>List all keys]
-        E18[GET /admin/teams/:id/keys<br/>List team keys]
-        E19[PUT /admin/keys/:id<br/>Update key]
-        E20[DELETE /admin/keys/:id<br/>Revoke key]
+        E18[POST /api/v1/admin/api-keys<br/>Create API key]
+        E19[GET /api/v1/admin/api-keys<br/>List keys]
+        E20[DELETE /api/v1/admin/api-keys/:id<br/>Revoke key]
     end
 
     subgraph "Usage Tracking - Requires TEAM_LEAD+"
-        E21[GET /admin/usage/team/:id<br/>Team usage stats]
-        E22[GET /admin/usage/key/:id<br/>Key usage stats]
-        E23[GET /admin/usage/summary<br/>Overall usage summary]
+        E21[GET /api/v1/admin/usage/team/:id<br/>Team usage]
+        E22[GET /api/v1/admin/usage/api-key/:id<br/>Key usage]
+        E23[GET /api/v1/admin/usage/recent<br/>Recent usage]
     end
 
     style E1 fill:#90EE90
-    style E2 fill:#90EE90
-    style E3 fill:#90EE90
-    style E4 fill:#90EE90
     style E5 fill:#FFE4B5
-    style E6 fill:#FFE4B5
     style E7 fill:#FFE4B5
     style E8 fill:#FFE4B5
-    style E9 fill:#FFB6C1
+    style E9 fill:#FFE4B5
     style E10 fill:#FFB6C1
-    style E11 fill:#FF6B6B
-    style E12 fill:#FF6B6B
+    style E11 fill:#FFB6C1
+    style E12 fill:#FFB6C1
     style E13 fill:#FF6B6B
     style E14 fill:#FF6B6B
     style E15 fill:#FF6B6B
@@ -364,6 +362,12 @@ graph TB
     style E22 fill:#FFA07A
     style E23 fill:#FFA07A
 ```
+
+**Key Changes in v1.1**:
+- All endpoints at `/api/v1/` prefix
+- Database-only API key authentication (no legacy)
+- Team isolation enforced on all operations
+- Platform info moved to admin-only endpoints
 
 ---
 
@@ -384,18 +388,14 @@ sequenceDiagram
     participant AI as AI Service
     participant DB as PostgreSQL
 
-    Client->>API: POST /message
-    API->>Auth: Verify API key (if provided)
+    Client->>API: POST /api/v1/message
+    API->>Auth: Verify API key (required)
 
-    alt Has API Key
-        Auth->>DB: Validate key & check quota
-        DB-->>Auth: Key valid, quota OK
-        Auth-->>API: Authenticated
-    else No API Key
-        Auth-->>API: Anonymous (Telegram)
-    end
+    Auth->>DB: Validate key hash & check quota
+    DB-->>Auth: Key valid, quota OK, return team_id
+    Auth-->>API: Authenticated with team_id
 
-    API->>MsgProc: process_message(message)
+    API->>MsgProc: process_message(message, team_id)
 
     alt Is Command (starts with /)
         MsgProc->>CmdProc: process_command(message)
@@ -496,16 +496,12 @@ graph TD
 
     START --> CHECK_HEADER{Has Authorization<br/>Header?}
 
-    CHECK_HEADER -->|No| CHECK_PLATFORM{Platform?}
-    CHECK_PLATFORM -->|Telegram| ALLOW_ANON[Allow Anonymous<br/>Public Platform]
-    CHECK_PLATFORM -->|Internal| REJECT[401 Unauthorized]
+    CHECK_HEADER -->|No| REJECT[401 Unauthorized]
 
     CHECK_HEADER -->|Yes| EXTRACT[Extract Bearer Token]
-    EXTRACT --> CHECK_FORMAT{Format:<br/>ak_xxxxx?}
+    EXTRACT --> CHECK_FORMAT{Format:<br/>sk_xxxxx?}
 
-    CHECK_FORMAT -->|No| CHECK_INTERNAL{Matches<br/>INTERNAL_API_KEY?}
-    CHECK_INTERNAL -->|Yes| ALLOW_INTERNAL[Allow<br/>Internal Access]
-    CHECK_INTERNAL -->|No| REJECT
+    CHECK_FORMAT -->|No| REJECT
 
     CHECK_FORMAT -->|Yes| HASH[Hash token SHA256]
     HASH --> DB_LOOKUP[Query api_keys table]
@@ -525,20 +521,19 @@ graph TD
     CHECK_TEAM -->|Yes| CHECK_QUOTA{Within<br/>quota?}
     CHECK_QUOTA -->|No| REJECT_429[429 Too Many Requests]
 
-    CHECK_QUOTA -->|Yes| CHECK_ACCESS{Required<br/>access level?}
+    CHECK_QUOTA -->|Yes| EXTRACT_TEAM[Extract team_id<br/>from API key]
+    EXTRACT_TEAM --> CHECK_ACCESS{Required<br/>access level?}
 
     CHECK_ACCESS -->|ADMIN required| IS_ADMIN{access_level<br/>= ADMIN?}
-    IS_ADMIN -->|Yes| ALLOW_ADMIN[Allow ADMIN]
+    IS_ADMIN -->|Yes| ALLOW_ADMIN[Allow ADMIN<br/>with team_id]
     IS_ADMIN -->|No| REJECT_403[403 Forbidden]
 
     CHECK_ACCESS -->|TEAM_LEAD required| IS_TEAM_LEAD{access_level<br/>>= TEAM_LEAD?}
-    IS_TEAM_LEAD -->|Yes| ALLOW_LEAD[Allow TEAM_LEAD]
+    IS_TEAM_LEAD -->|Yes| ALLOW_LEAD[Allow TEAM_LEAD<br/>with team_id]
     IS_TEAM_LEAD -->|No| REJECT_403
 
-    CHECK_ACCESS -->|USER required| ALLOW_USER[Allow USER]
+    CHECK_ACCESS -->|USER required| ALLOW_USER[Allow USER<br/>with team_id]
 
-    style ALLOW_ANON fill:#90EE90
-    style ALLOW_INTERNAL fill:#90EE90
     style ALLOW_ADMIN fill:#90EE90
     style ALLOW_LEAD fill:#90EE90
     style ALLOW_USER fill:#90EE90
@@ -546,6 +541,12 @@ graph TD
     style REJECT_429 fill:#FFA500
     style REJECT_403 fill:#FFA500
 ```
+
+**Key Changes in v1.1**:
+- **No legacy authentication** - Database API keys only
+- **No anonymous access** - All endpoints require authentication
+- **Team ID extraction** - Every authenticated request includes team_id
+- **Simpler flow** - Removed INTERNAL_API_KEY and Telegram platform checks
 
 ### Access Level Hierarchy
 
@@ -611,8 +612,11 @@ classDiagram
 classDiagram
     class SessionManager {
         +sessions: Dict[str, Session]
-        +get_or_create_session(platform, user_id, chat_id, config) Session
+        +get_session_key(platform, chat_id, team_id) str
+        +get_or_create_session(platform, user_id, chat_id, config, team_id, api_key_id, api_key_prefix) Session
         +get_session(session_id) Optional[Session]
+        +get_sessions_by_team(team_id) List[Session]
+        +delete_session(platform, chat_id, team_id) bool
         +clear_old_sessions(max_age_hours) int
         +get_active_session_count(minutes) int
     }
@@ -629,6 +633,9 @@ classDiagram
         +last_activity: datetime
         +is_admin: bool
         +platform_config: dict
+        +team_id: Optional[int]
+        +api_key_id: Optional[int]
+        +api_key_prefix: Optional[str]
         +add_message(role, content)
         +get_history(max_messages) List[dict]
         +switch_model(new_model) bool
@@ -920,10 +927,21 @@ This architecture provides:
 
 1. **Multi-platform support**: Telegram (public) and Internal API (private)
 2. **Enterprise features**: Team management, API key auth, usage tracking, quota enforcement
-3. **Confidentiality**: Service-agnostic naming, friendly model names
-4. **Scalability**: Connection pooling, session management, rate limiting
-5. **Monitoring**: Usage analytics, health checks, statistics
-6. **Security**: Multi-level access control (USER/TEAM_LEAD/ADMIN), key hashing, quota limits
-7. **Flexibility**: Model switching, platform-specific configs, extensible design
+3. **Complete team isolation**: Session keys include team_id, all operations filtered by team
+4. **Database-only authentication**: No legacy fallback, all API keys in PostgreSQL
+5. **API versioning**: All endpoints at `/api/v1/` for future compatibility
+6. **Confidentiality**: Service-agnostic naming, friendly model names, Telegram hidden from internal teams
+7. **Scalability**: Connection pooling, session management, rate limiting
+8. **Monitoring**: Usage analytics, health checks, statistics
+9. **Security**: Multi-level access control (USER/TEAM_LEAD/ADMIN), SHA256 key hashing, quota limits
+10. **Flexibility**: Model switching, platform-specific configs, extensible design
 
 The system is designed to serve as a gateway to AI services while providing enterprise-level access control, monitoring, and management capabilities.
+
+### Key Improvements in v1.1
+
+- ✅ **Removed legacy authentication** - Simplified and more secure
+- ✅ **Fixed session key collision** - Team ID included in session keys
+- ✅ **Added team ownership checks** - Complete data isolation between teams
+- ✅ **Added API versioning** - Ready for future v2 without breaking v1 clients
+- ✅ **Strengthened security** - No bypass paths, mandatory team isolation
