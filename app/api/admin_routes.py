@@ -246,24 +246,38 @@ async def get_statistics(
     )
 
 
-# ==========================================
-# WEBHOOK ENDPOINTS - CURRENTLY DISABLED
-# ==========================================
-# Webhooks are not in use yet. Uncomment when needed.
-#
-# @router.post("/webhook/{platform}")
-# async def admin_webhook_handler(
-#     platform: str,
-#     data: Dict[str, Any],
-#     background_tasks: BackgroundTasks,
-#     x_webhook_secret: Optional[str] = Header(None),
-#     api_key=Depends(require_admin_access),
-# ):
-#     """Platform webhook handler (ADMIN ONLY - DISABLED)"""
-#     raise HTTPException(
-#         status_code=501,
-#         detail="Webhook functionality is not currently enabled"
-#     )
+@router.post("/clear-sessions")
+async def clear_sessions(
+    platform: Optional[str] = None,
+    api_key=Depends(require_admin_access),
+):
+    """
+    Clear sessions (ADMIN ONLY)
+
+    SECURITY:
+    - Admin-only endpoint
+    - Can clear all sessions or filter by platform
+    - No team isolation needed (admin has full access)
+    """
+    if platform:
+        keys_to_remove = [
+            key
+            for key, session in session_manager.sessions.items()
+            if session.platform == platform
+        ]
+    else:
+        keys_to_remove = list(session_manager.sessions.keys())
+
+    for key in keys_to_remove:
+        del session_manager.sessions[key]
+
+    logger.info(f"Admin cleared {len(keys_to_remove)} sessions (platform: {platform or 'all'})")
+
+    return {
+        "success": True,
+        "cleared": len(keys_to_remove),
+        "message": f"Cleared {len(keys_to_remove)} sessions",
+    }
 
 
 # ===========================
@@ -518,13 +532,13 @@ async def get_api_key_usage(
         raise HTTPException(status_code=404, detail="API key not found")
 
     # SECURITY: Check team ownership (unless admin)
-    # Check team ownership (unless admin)
+    is_admin = AccessLevel(api_key.access_level) == AccessLevel.ADMIN
 
-        if not is_admin and api_key.team_id != target_key.team_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: This API key belongs to another team"
-            )
+    if not is_admin and api_key.team_id != target_key.team_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: This API key belongs to another team"
+        )
 
     start_date = datetime.utcnow() - timedelta(days=days)
     stats = UsageTracker.get_api_key_usage_stats(db, api_key_id, start_date)
@@ -558,13 +572,13 @@ async def check_quota(
         raise HTTPException(status_code=404, detail="API key not found")
 
     # SECURITY: Check team ownership (unless admin)
-    # Check team ownership (unless admin)
+    is_admin = AccessLevel(api_key.access_level) == AccessLevel.ADMIN
 
-        if not is_admin and api_key.team_id != key.team_id:
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied: This API key belongs to another team"
-            )
+    if not is_admin and api_key.team_id != key.team_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: This API key belongs to another team"
+        )
 
     if period not in ["daily", "monthly"]:
         raise HTTPException(

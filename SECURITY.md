@@ -45,12 +45,12 @@ This service implements comprehensive team isolation to ensure that each team ca
 | `POST /api/v1/admin/api-keys` | ADMIN | No | API key management |
 | `GET /api/v1/admin/usage/*` | TEAM_LEAD | No | Usage statistics |
 
-### Disabled Endpoints
+### Removed Endpoints
 
 | Endpoint | Status | Notes |
 |----------|--------|-------|
-| `/webhook/{platform}` | Commented Out | Not in use - will be enabled later |
-| `/api/v1/admin/webhook/{platform}` | Commented Out | Not in use - will be enabled later |
+| `/webhook/{platform}` | ❌ REMOVED | Completely removed from codebase - not needed |
+| `/api/v1/admin/webhook/{platform}` | ❌ REMOVED | Completely removed from codebase - not needed |
 
 ---
 
@@ -337,7 +337,7 @@ curl -X GET /api/v1/admin/platforms \
 - [x] **Teams cannot see other teams' statistics** - Team filtering on all usage endpoints
 - [x] **Telegram bot hidden** from internal teams
 - [x] **Platform details are admin-only** - Moved to `/api/v1/admin/*`
-- [x] **Webhook endpoints commented out** - Not in use yet
+- [x] **Webhook endpoints completely removed** - Not needed, code cleaned
 - [x] **Usage tracking logs team_id** for all requests
 - [x] **API keys are SHA256 hashed** before storage
 - [x] **Session access checks team ownership** before returning data

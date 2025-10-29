@@ -368,6 +368,7 @@ graph TB
 - Database-only API key authentication (no legacy)
 - Team isolation enforced on all operations
 - Platform info moved to admin-only endpoints
+- Webhook handlers completely removed from codebase
 
 ---
 
@@ -945,3 +946,5 @@ The system is designed to serve as a gateway to AI services while providing ente
 - ✅ **Added team ownership checks** - Complete data isolation between teams
 - ✅ **Added API versioning** - Ready for future v2 without breaking v1 clients
 - ✅ **Strengthened security** - No bypass paths, mandatory team isolation
+- ✅ **Removed webhook handlers** - Cleaner codebase, not needed
+- ✅ **Fixed admin endpoint bugs** - Corrected indentation in usage endpoints

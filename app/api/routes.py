@@ -91,26 +91,6 @@ async def process_message_endpoint(
     return await message_processor.process_message(message)
 
 
-# ==========================================
-# WEBHOOK ENDPOINTS - CURRENTLY DISABLED
-# ==========================================
-# Webhooks are not in use yet. Uncomment when needed.
-#
-# @router.post("/webhook/{platform}", response_model=BotResponse)
-# async def webhook_handler(
-#     platform: str,
-#     data: Dict[str, Any],
-#     background_tasks: BackgroundTasks,
-#     x_webhook_secret: Optional[str] = Header(None),
-#     api_key: APIKey = Depends(verify_api_key),
-# ):
-#     """Platform webhook handler (DISABLED - not in use)"""
-#     raise HTTPException(
-#         status_code=501,
-#         detail="Webhook functionality is not currently enabled"
-#     )
-
-
 @router.get("/sessions", response_model=SessionListResponse)
 async def get_sessions(
     api_key: APIKey = Depends(verify_api_key),
@@ -229,34 +209,3 @@ async def delete_session(
             return {"success": True, "message": "Session deleted"}
 
     raise HTTPException(status_code=404, detail="Session not found")
-
-
-@router.post("/admin/clear-sessions")
-async def clear_sessions(
-    platform: Optional[str] = None,
-    api_key: APIKey = Depends(require_admin_access),
-):
-    """
-    Clear sessions (admin only)
-
-    SECURITY: Admin-only endpoint
-    """
-    if platform:
-        keys_to_remove = [
-            key
-            for key, session in session_manager.sessions.items()
-            if session.platform == platform
-        ]
-    else:
-        keys_to_remove = list(session_manager.sessions.keys())
-
-    for key in keys_to_remove:
-        del session_manager.sessions[key]
-
-    logger.info(f"Admin cleared {len(keys_to_remove)} sessions")
-
-    return {
-        "success": True,
-        "cleared": len(keys_to_remove),
-        "message": f"Cleared {len(keys_to_remove)} sessions",
-    }
