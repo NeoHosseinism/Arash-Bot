@@ -86,6 +86,7 @@ class APIKeyResponse(BaseModel):
     key_prefix: str
     name: str
     team_id: int
+    team_name: str  # Team name for better UX
     access_level: str
     monthly_quota: Optional[int]
     daily_quota: Optional[int]
@@ -112,7 +113,9 @@ class UsageStatsResponse(BaseModel):
     """Response model for usage statistics"""
 
     team_id: Optional[int]
+    team_name: Optional[str]  # Team name for better admin UX
     api_key_id: Optional[int]
+    api_key_name: Optional[str]  # API key name for better admin UX
     period: dict
     requests: dict
     tokens: dict
@@ -203,8 +206,13 @@ async def get_statistics(
 
     SECURITY: Exposes stats for ALL platforms including Telegram - Admin access required
     """
+    db = get_db_session()
     total_sessions = len(session_manager.sessions)
     active_sessions = session_manager.get_active_session_count(minutes=5)
+
+    # Get team name mapping for internal stats
+    teams = APIKeyManager.list_all_teams(db)
+    team_name_map = {team.id: team.name for team in teams}
 
     # Statistics by platform
     telegram_stats = {
@@ -220,6 +228,16 @@ async def get_statistics(
         "active": 0,
         "models_used": defaultdict(int),
     }
+
+    # Statistics by team (for internal platform)
+    team_stats = defaultdict(lambda: {
+        "team_id": None,
+        "team_name": "Unknown",
+        "sessions": 0,
+        "messages": 0,
+        "active": 0,
+        "models_used": defaultdict(int),
+    })
 
     for session in session_manager.sessions.values():
         is_active = not session.is_expired(5)
@@ -237,11 +255,43 @@ async def get_statistics(
             if is_active:
                 internal_stats["active"] += 1
 
+            # Aggregate by team
+            if session.team_id:
+                team_id = session.team_id
+                if team_id not in team_stats:
+                    team_stats[team_id]["team_id"] = team_id
+                    team_stats[team_id]["team_name"] = team_name_map.get(team_id, f"Team {team_id}")
+
+                team_stats[team_id]["sessions"] += 1
+                team_stats[team_id]["messages"] += session.message_count
+                team_stats[team_id]["models_used"][friendly_model] += 1
+                if is_active:
+                    team_stats[team_id]["active"] += 1
+
+    # Convert team stats to list
+    team_breakdown = [
+        {
+            "team_id": stats["team_id"],
+            "team_name": stats["team_name"],
+            "sessions": stats["sessions"],
+            "messages": stats["messages"],
+            "active": stats["active"],
+            "models_used": dict(stats["models_used"]),
+        }
+        for stats in team_stats.values()
+    ]
+    # Sort by sessions descending
+    team_breakdown.sort(key=lambda x: x["sessions"], reverse=True)
+
     return StatsResponse(
         total_sessions=total_sessions,
         active_sessions=active_sessions,
         telegram=telegram_stats,
-        internal={**internal_stats, "models_used": dict(internal_stats["models_used"])},
+        internal={
+            **internal_stats,
+            "models_used": dict(internal_stats["models_used"]),
+            "team_breakdown": team_breakdown,  # Add team breakdown
+        },
         uptime_seconds=0,  # Will be set by main app
     )
 
@@ -394,9 +444,27 @@ async def create_api_key(
         created_by=api_key.key_prefix if api_key else "system",
     )
 
+    # Construct response with team name
+    key_info = APIKeyResponse(
+        id=api_key_obj.id,
+        key_prefix=api_key_obj.key_prefix,
+        name=api_key_obj.name,
+        team_id=api_key_obj.team_id,
+        team_name=team.name,
+        access_level=api_key_obj.access_level,
+        monthly_quota=api_key_obj.monthly_quota_override,
+        daily_quota=api_key_obj.daily_quota_override,
+        is_active=api_key_obj.is_active,
+        created_by=api_key_obj.created_by,
+        description=api_key_obj.description,
+        created_at=api_key_obj.created_at,
+        last_used_at=api_key_obj.last_used_at,
+        expires_at=api_key_obj.expires_at,
+    )
+
     return APIKeyCreateResponse(
         api_key=api_key_string,
-        key_info=APIKeyResponse.from_orm(api_key_obj),
+        key_info=key_info,
     )
 
 
@@ -441,7 +509,30 @@ async def list_api_keys(
         for team in teams:
             keys.extend(APIKeyManager.list_team_api_keys(db, team.id))
 
-    return [APIKeyResponse.from_orm(key) for key in keys]
+    # Manually construct responses with team names
+    responses = []
+    for key in keys:
+        team_name = key.team.name if key.team else "Unknown"
+        responses.append(
+            APIKeyResponse(
+                id=key.id,
+                key_prefix=key.key_prefix,
+                name=key.name,
+                team_id=key.team_id,
+                team_name=team_name,
+                access_level=key.access_level,
+                monthly_quota=key.monthly_quota_override,
+                daily_quota=key.daily_quota_override,
+                is_active=key.is_active,
+                created_by=key.created_by,
+                description=key.description,
+                created_at=key.created_at,
+                last_used_at=key.last_used_at,
+                expires_at=key.expires_at,
+            )
+        )
+
+    return responses
 
 
 @router.delete("/api-keys/{key_id}")
@@ -503,6 +594,9 @@ async def get_team_usage(
     start_date = datetime.utcnow() - timedelta(days=days)
     stats = UsageTracker.get_team_usage_stats(db, team_id, start_date)
 
+    # Add team name for better UX
+    stats["team_name"] = team.name
+
     return UsageStatsResponse(**stats)
 
 
@@ -542,6 +636,10 @@ async def get_api_key_usage(
 
     start_date = datetime.utcnow() - timedelta(days=days)
     stats = UsageTracker.get_api_key_usage_stats(db, api_key_id, start_date)
+
+    # Add team name and API key name for better UX
+    stats["team_name"] = target_key.team.name if target_key.team else "Unknown"
+    stats["api_key_name"] = target_key.name
 
     return stats
 
@@ -627,13 +725,36 @@ async def get_recent_usage(
         limit=limit
     )
 
+    # Build mapping for team names and API key names
+    team_ids = set(log.team_id for log in logs if log.team_id)
+    api_key_ids = set(log.api_key_id for log in logs if log.api_key_id)
+
+    team_name_map = {}
+    for tid in team_ids:
+        team = APIKeyManager.get_team_by_id(db, tid)
+        if team:
+            team_name_map[tid] = team.name
+
+    from sqlalchemy.orm import sessionmaker
+    from app.models.database import APIKey as DBAPIKey
+    Session = sessionmaker(bind=db.bind)
+    session = Session()
+
+    api_key_name_map = {}
+    for kid in api_key_ids:
+        key = session.query(DBAPIKey).filter(DBAPIKey.id == kid).first()
+        if key:
+            api_key_name_map[kid] = key.name
+
     return {
         "count": len(logs),
         "logs": [
             {
                 "id": log.id,
                 "api_key_id": log.api_key_id,
+                "api_key_name": api_key_name_map.get(log.api_key_id, "Unknown"),
                 "team_id": log.team_id,
+                "team_name": team_name_map.get(log.team_id, "Unknown"),
                 "session_id": log.session_id,
                 "platform": log.platform,
                 "model_used": log.model_used,
