@@ -370,7 +370,7 @@ class TestSessionExpiration:
         )
 
         # Manually set last_activity to 2 hours ago
-        session.last_activity = datetime.now() - timedelta(hours=2)
+        session.last_activity = datetime.utcnow() - timedelta(hours=2)
 
         # Should be expired with 30 min timeout
         assert session.is_expired(timeout_minutes=30) is True

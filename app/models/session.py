@@ -34,7 +34,7 @@ class ChatSession(BaseModel):
             "content": content
         })
         self.message_count += 1
-        self.last_activity = datetime.now()
+        self.last_activity = datetime.utcnow()
     
     def clear_history(self):
         """Clear conversation history"""
@@ -47,16 +47,16 @@ class ChatSession(BaseModel):
     
     def update_activity(self):
         """Update last activity timestamp"""
-        self.last_activity = datetime.now()
-    
+        self.last_activity = datetime.utcnow()
+
     def get_uptime_seconds(self) -> float:
         """Get session uptime in seconds"""
-        return (datetime.now() - self.created_at).total_seconds()
-    
+        return (datetime.utcnow() - self.created_at).total_seconds()
+
     def is_expired(self, timeout_minutes: int) -> bool:
         """Check if session is expired"""
         from datetime import timedelta
-        timeout = datetime.now() - timedelta(minutes=timeout_minutes)
+        timeout = datetime.utcnow() - timedelta(minutes=timeout_minutes)
         return self.last_activity < timeout
 
     @property
