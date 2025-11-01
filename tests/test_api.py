@@ -60,8 +60,8 @@ class TestHealthEndpoint:
     """Test health check endpoints"""
 
     def test_root_health_check(self, client):
-        """Test health endpoint (versioned at /api/v1/health)"""
-        response = client.get("/api/v1/health")
+        """Test health endpoint (unversioned at /health for monitoring)"""
+        response = client.get("/health")
         assert response.status_code == 200
         data = response.json()
         assert "status" in data

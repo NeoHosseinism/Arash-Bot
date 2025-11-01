@@ -29,23 +29,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.get("/health")
-async def health_check():
-    """
-    Public health check endpoint (no authentication required)
-
-    SECURITY: Does NOT expose any internal details
-    """
-    ai_service_healthy = await ai_client.health_check()
-
-    return {
-        "status": "healthy" if ai_service_healthy else "degraded",
-        "service": "Arash External API Service",
-        "version": "1.1.0",
-        "timestamp": datetime.now().isoformat(),
-    }
-
-
 @router.post("/chat", response_model=BotResponse)
 async def chat(
     message: IncomingMessage,
