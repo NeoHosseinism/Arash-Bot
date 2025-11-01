@@ -26,28 +26,15 @@ def session_manager():
     return SessionManager()
 
 
-@pytest.fixture
-def platform_config():
-    """Sample platform configuration"""
-    return {
-        "type": "private",
-        "model": "gpt-4",
-        "max_history": 20,
-        "rate_limit": 60,
-        "allow_model_switch": True
-    }
-
-
 class TestSessionCreation:
     """Test session creation"""
 
-    def test_create_session_with_team_id(self, session_manager, platform_config):
+    def test_create_session_with_team_id(self, session_manager):
         """Test creating session with team_id"""
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -61,13 +48,12 @@ class TestSessionCreation:
         assert session.api_key_id == 1
         assert session.api_key_prefix == "sk_test_"
 
-    def test_create_session_without_team_id(self, session_manager, platform_config):
+    def test_create_session_without_team_id(self, session_manager):
         """Test creating session without team_id (Telegram bot)"""
         session = session_manager.get_or_create_session(
             platform="telegram",
             user_id="tg_user1",
             chat_id="tg_chat1",
-            platform_config=platform_config,
             team_id=None,
             api_key_id=None,
             api_key_prefix=None
@@ -115,14 +101,13 @@ class TestSessionKeyGeneration:
 class TestSessionIsolation:
     """Test team isolation at session level"""
 
-    def test_different_teams_cannot_share_sessions(self, session_manager, platform_config):
+    def test_different_teams_cannot_share_sessions(self, session_manager):
         """Test that sessions are isolated by team_id"""
         # Team 1 creates session with chat_id "user123"
         session_team_1 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user123",
             chat_id="user123",
-            platform_config=platform_config,
             team_id=1,
             api_key_id=10,
             api_key_prefix="sk_team1_"
@@ -133,7 +118,6 @@ class TestSessionIsolation:
             platform="internal",
             user_id="user123",
             chat_id="user123",
-            platform_config=platform_config,
             team_id=2,
             api_key_id=20,
             api_key_prefix="sk_team2_"
@@ -146,14 +130,13 @@ class TestSessionIsolation:
         assert session_team_1.api_key_id == 10
         assert session_team_2.api_key_id == 20
 
-    def test_get_sessions_by_team(self, session_manager, platform_config):
+    def test_get_sessions_by_team(self, session_manager):
         """Test filtering sessions by team_id"""
         # Create sessions for team 100
         session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_t100_"
@@ -163,7 +146,6 @@ class TestSessionIsolation:
             platform="internal",
             user_id="user2",
             chat_id="chat2",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_t100_"
@@ -174,7 +156,6 @@ class TestSessionIsolation:
             platform="internal",
             user_id="user3",
             chat_id="chat3",
-            platform_config=platform_config,
             team_id=200,
             api_key_id=2,
             api_key_prefix="sk_t200_"
@@ -195,14 +176,13 @@ class TestSessionIsolation:
 class TestSessionRetrieval:
     """Test session retrieval"""
 
-    def test_get_existing_session(self, session_manager, platform_config):
+    def test_get_existing_session(self, session_manager):
         """Test retrieving existing session"""
         # Create session
         session1 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -213,7 +193,6 @@ class TestSessionRetrieval:
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -222,41 +201,39 @@ class TestSessionRetrieval:
         # Should be the same session
         assert session1.session_id == session2.session_id
 
-    def test_get_session_by_id(self, session_manager, platform_config):
+    def test_get_session_by_id(self, session_manager):
         """Test getting session by session_id"""
         # Create session
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
         )
 
         # Retrieve by session_id
-        retrieved = session_manager.get_session(session.session_id)
+        retrieved = session_manager.get_session_by_id(session.session_id)
         assert retrieved is not None
         assert retrieved.session_id == session.session_id
 
     def test_get_nonexistent_session(self, session_manager):
         """Test getting session that doesn't exist"""
-        retrieved = session_manager.get_session("nonexistent_session_id")
+        retrieved = session_manager.get_session_by_id("nonexistent_session_id")
         assert retrieved is None
 
 
 class TestSessionDeletion:
     """Test session deletion"""
 
-    def test_delete_session_with_team_id(self, session_manager, platform_config):
+    def test_delete_session_with_team_id(self, session_manager):
         """Test deleting session with team_id"""
         # Create session
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -272,17 +249,16 @@ class TestSessionDeletion:
         assert success is True
 
         # Verify deleted
-        retrieved = session_manager.get_session(session.session_id)
+        retrieved = session_manager.get_session_by_id(session.session_id)
         assert retrieved is None
 
-    def test_delete_session_without_team_id(self, session_manager, platform_config):
+    def test_delete_session_without_team_id(self, session_manager):
         """Test deleting session without team_id (Telegram)"""
         # Create session
         session = session_manager.get_or_create_session(
             platform="telegram",
             user_id="tg_user",
             chat_id="tg_chat",
-            platform_config=platform_config,
             team_id=None,
             api_key_id=None,
             api_key_prefix=None
@@ -301,13 +277,12 @@ class TestSessionDeletion:
 class TestSessionHistory:
     """Test session history management"""
 
-    def test_add_message_to_history(self, session_manager, platform_config):
+    def test_add_message_to_history(self, session_manager):
         """Test adding messages to session history"""
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -325,15 +300,12 @@ class TestSessionHistory:
         assert session.history[1]["role"] == "assistant"
         assert session.history[1]["content"] == "Hi there!"
 
-    def test_history_max_limit(self, session_manager, platform_config):
+    def test_history_max_limit(self, session_manager):
         """Test that history respects max_history limit"""
-        platform_config["max_history"] = 5
-
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -343,17 +315,17 @@ class TestSessionHistory:
         for i in range(10):
             session.add_message("user", f"Message {i}")
 
-        # History should be limited to max_history
-        history = session.get_history(max_messages=platform_config["max_history"])
-        assert len(history) <= platform_config["max_history"]
+        # History should be limited when retrieving recent history
+        max_history = 5
+        history = session.get_recent_history(max_messages=max_history)
+        assert len(history) <= max_history
 
-    def test_clear_history(self, session_manager, platform_config):
+    def test_clear_history(self, session_manager):
         """Test clearing session history"""
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -372,13 +344,12 @@ class TestSessionHistory:
 class TestSessionExpiration:
     """Test session expiration"""
 
-    def test_session_is_not_expired(self, session_manager, platform_config):
+    def test_session_is_not_expired(self, session_manager):
         """Test that recent session is not expired"""
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -387,13 +358,12 @@ class TestSessionExpiration:
         # Recent session should not be expired
         assert session.is_expired(timeout_minutes=30) is False
 
-    def test_session_is_expired(self, session_manager, platform_config):
+    def test_session_is_expired(self, session_manager):
         """Test that old session is expired"""
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
             chat_id="chat1",
-            platform_config=platform_config,
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -414,6 +384,7 @@ class TestChatSession:
         session = ChatSession(
             session_id="test_123",
             platform="internal",
+            platform_config={"type": "private", "model": "gpt-4"},
             user_id="user1",
             chat_id="chat1",
             current_model="gpt-4",
@@ -432,6 +403,7 @@ class TestChatSession:
         session = ChatSession(
             session_id="tg_123",
             platform="telegram",
+            platform_config={"type": "private", "model": "gemini-2.0-flash"},
             user_id="tg_user",
             chat_id="tg_chat",
             current_model="gemini-2.0-flash",

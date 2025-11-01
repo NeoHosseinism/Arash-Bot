@@ -9,7 +9,7 @@ Tests for API v1 endpoints including:
 """
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, AsyncMock
 import sys
 from pathlib import Path
 
@@ -119,13 +119,16 @@ class TestAuthenticationV1:
         # Mock valid key
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
-        # Mock message processor response
-        mock_processor.process_message.return_value = {
-            "success": True,
-            "response": "Test response",
-            "session_id": "test_session",
-            "model": "test-model"
-        }
+        # Mock message processor response with AsyncMock
+        from app.models.schemas import BotResponse
+        mock_processor.process_message = AsyncMock(return_value=BotResponse(
+            success=True,
+            response="Test response",
+            data={
+                "session_id": "test_session",
+                "model": "test-model"
+            }
+        ))
 
         response = client.post(
             "/api/v1/message",
@@ -149,7 +152,7 @@ class TestTeamIsolationV1:
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
-    @patch("app.services.session_manager.session_manager")
+    @patch("app.api.routes.session_manager")
     def test_session_listing_filtered_by_team(self, mock_sess_mgr, mock_get_db, mock_key_mgr, client, mock_api_key_user):
         """Test that /sessions only returns team's sessions"""
         # Mock valid key for team 100
@@ -162,6 +165,11 @@ class TestTeamIsolationV1:
         team_session.platform = "internal"
         team_session.user_id = "user1"
         team_session.message_count = 5
+        team_session.current_model = "gpt-4"
+        team_session.last_activity = Mock()
+        team_session.last_activity.isoformat.return_value = "2025-11-01T00:00:00"
+        team_session.history = []
+        team_session.chat_id = "chat1"
 
         mock_sess_mgr.get_sessions_by_team.return_value = [team_session]
 
@@ -176,7 +184,7 @@ class TestTeamIsolationV1:
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
-    @patch("app.services.session_manager.session_manager")
+    @patch("app.api.routes.session_manager")
     def test_access_other_team_session_denied(self, mock_sess_mgr, mock_get_db, mock_key_mgr, client, mock_api_key_user):
         """Test that team cannot access another team's session"""
         # Mock valid key for team 100
@@ -188,7 +196,8 @@ class TestTeamIsolationV1:
         other_team_session.team_id = 200  # Different team
         other_team_session.platform = "internal"
 
-        mock_sess_mgr.get_session.return_value = other_team_session
+        # Mock session lookup - the route iterates through sessions.values()
+        mock_sess_mgr.sessions = {"some_key": other_team_session}
 
         response = client.get(
             "/api/v1/session/team200_session",
@@ -209,12 +218,16 @@ class TestMessageEndpointV1:
         """Test successful message processing"""
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
-        mock_processor.process_message.return_value = {
-            "success": True,
-            "response": "Hello! How can I help?",
-            "session_id": "test_session_123",
-            "model": "gpt-4"
-        }
+        # Mock message processor response with AsyncMock
+        from app.models.schemas import BotResponse
+        mock_processor.process_message = AsyncMock(return_value=BotResponse(
+            success=True,
+            response="Hello! How can I help?",
+            data={
+                "session_id": "test_session_123",
+                "model": "gpt-4"
+            }
+        ))
 
         response = client.post(
             "/api/v1/message",
@@ -233,7 +246,7 @@ class TestMessageEndpointV1:
         data = response.json()
         assert data["success"] is True
         assert data["response"] == "Hello! How can I help?"
-        assert data["session_id"] == "test_session_123"
+        assert data["data"]["session_id"] == "test_session_123"
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")

@@ -3,11 +3,12 @@ Chat session model
 """
 from typing import Dict, Any, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ChatSession(BaseModel):
     """Chat session model with team isolation"""
+
     session_id: str
     platform: str
     platform_config: Dict[str, Any]
@@ -25,11 +26,6 @@ class ChatSession(BaseModel):
     team_id: int | None = None  # Team that owns this session
     api_key_id: int | None = None  # API key used to create this session
     api_key_prefix: str | None = None  # For logging/debugging (first 8 chars)
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
     
     def add_message(self, role: str, content: str):
         """Add message to history"""

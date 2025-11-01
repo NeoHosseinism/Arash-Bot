@@ -79,9 +79,16 @@ class SessionManager:
         return self.sessions[key]
     
     def get_session(self, platform: str, chat_id: str, team_id: int | None = None) -> ChatSession:
-        """Get existing session"""
+        """Get existing session by platform, chat_id, and team_id"""
         key = self.get_session_key(platform, chat_id, team_id)
         return self.sessions.get(key)
+
+    def get_session_by_id(self, session_id: str) -> ChatSession | None:
+        """Get existing session by session_id"""
+        for session in self.sessions.values():
+            if session.session_id == session_id:
+                return session
+        return None
 
     def delete_session(self, platform: str, chat_id: str, team_id: int | None = None) -> bool:
         """Delete a session"""
