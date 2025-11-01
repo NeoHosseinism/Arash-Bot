@@ -1,9 +1,10 @@
 """
 Platform configuration manager
 """
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.core.config import settings
 from app.core.constants import Platform, PlatformType
+from app.core.name_mapping import get_friendly_model_name, get_technical_model_name
 import logging
 
 logger = logging.getLogger(__name__)
@@ -76,8 +77,7 @@ class PlatformManager:
             model=settings.INTERNAL_DEFAULT_MODEL,
             available_models=settings.internal_models_list,
             rate_limit=settings.INTERNAL_RATE_LIMIT,
-            commands=["start", "help", "status", "clear", "model", "models", 
-                     "settings", "summarize", "translate"],
+            commands=["start", "help", "status", "clear", "model", "models", "settings"],
             allow_model_switch=True,
             requires_auth=True,
             api_key=settings.INTERNAL_API_KEY,
@@ -159,6 +159,74 @@ class PlatformManager:
         """Check if model is available for platform"""
         available_models = self.get_available_models(platform)
         return model in available_models
+
+    def get_available_models_friendly(self, platform: str) -> List[str]:
+        """
+        Get available models as friendly display names.
+
+        Args:
+            platform: Platform name
+
+        Returns:
+            List of friendly model names (e.g., ["Gemini 2.0 Flash", "GPT-4o Mini"])
+        """
+        technical_models = self.get_available_models(platform)
+        return [get_friendly_model_name(m) for m in technical_models]
+
+    def get_default_model_friendly(self, platform: str) -> str:
+        """
+        Get default model as friendly display name.
+
+        Args:
+            platform: Platform name
+
+        Returns:
+            Friendly model name (e.g., "Gemini 2.0 Flash")
+        """
+        technical = self.get_default_model(platform)
+        return get_friendly_model_name(technical)
+
+    def resolve_model_name(self, model_input: str, platform: str) -> Optional[str]:
+        """
+        Convert any model name format (friendly, alias, or technical) to technical ID.
+        Validates that the model is available on the specified platform.
+
+        Args:
+            model_input: User input - can be friendly name, alias, or technical ID
+            platform: Platform name
+
+        Returns:
+            Technical model ID if valid and available, None otherwise
+
+        Examples:
+            resolve_model_name("Gemini 2.0 Flash", "telegram") -> "google/gemini-2.0-flash-001"
+            resolve_model_name("gemini", "telegram") -> "google/gemini-2.5-flash"
+            resolve_model_name("google/gemini-2.0-flash-001", "telegram") -> "google/gemini-2.0-flash-001"
+        """
+        # Normalize input
+        model_input = model_input.strip()
+
+        # Check if already technical ID and available
+        if self.is_model_available(platform, model_input):
+            return model_input
+
+        # Try as friendly name -> technical
+        technical = get_technical_model_name(model_input)
+        if self.is_model_available(platform, technical):
+            return technical
+
+        # Try as alias -> friendly -> technical
+        from app.core.constants import MODEL_ALIASES, TELEGRAM_MODEL_ALIASES
+        aliases = TELEGRAM_MODEL_ALIASES if platform == "telegram" else MODEL_ALIASES
+
+        model_lower = model_input.lower()
+        if model_lower in aliases:
+            friendly = aliases[model_lower]
+            technical = get_technical_model_name(friendly)
+            if self.is_model_available(platform, technical):
+                return technical
+
+        return None
 
 
 # Global instance

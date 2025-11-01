@@ -1,6 +1,6 @@
 # Tests
 
-Test suite for Arash Messenger Bot.
+Test suite for Arash External API Service.
 
 ## 📁 Structure
 
@@ -8,7 +8,7 @@ Test suite for Arash Messenger Bot.
 tests/
 ├── __init__.py
 ├── conftest.py              # Shared fixtures
-├── test_openrouter.py       # OpenRouter integration tests
+├── test_ai_service.py       # AI service integration tests
 ├── test_api.py             # API endpoint tests (TODO)
 ├── test_commands.py        # Command processor tests (TODO)
 └── README.md               # This file
@@ -32,8 +32,8 @@ pytest --cov=app --cov-report=html
 ### Run Specific Tests
 
 ```bash
-# Run only OpenRouter tests
-pytest tests/test_openrouter.py
+# Run only AI service tests
+pytest tests/test_ai_service.py
 
 # Run only fast tests (skip slow ones)
 pytest -m "not slow"
@@ -42,24 +42,24 @@ pytest -m "not slow"
 pytest -m integration
 
 # Run specific test class
-pytest tests/test_openrouter.py::TestOpenRouterConnectivity
+pytest tests/test_ai_service.py::TestAIServiceConnectivity
 
 # Run specific test method
-pytest tests/test_openrouter.py::TestOpenRouterConnectivity::test_base_url_reachable
+pytest tests/test_ai_service.py::TestAIServiceConnectivity::test_base_url_reachable
 ```
 
 ### Manual Test (No pytest required)
 
 ```bash
-# Run OpenRouter connectivity test directly
-python tests/test_openrouter.py
+# Run AI service connectivity test directly
+python tests/test_ai_service.py
 ```
 
 This will run a detailed diagnostic test showing:
-- ✓ Connection status
-- ✓ Health check results
-- ✓ Chat endpoint functionality
-- ✓ Detailed error messages
+- Connection status
+- Health check results
+- Chat endpoint functionality
+- Detailed error messages
 
 ## 🏷️ Test Markers
 
@@ -68,7 +68,7 @@ Tests are categorized using pytest markers:
 - `@pytest.mark.slow` - Slow tests (network calls, etc.)
 - `@pytest.mark.integration` - Integration tests
 - `@pytest.mark.unit` - Unit tests
-- `@pytest.mark.openrouter` - Tests requiring OpenRouter service
+- `@pytest.mark.ai_service` - Tests requiring AI service
 
 ### Examples
 
@@ -82,8 +82,8 @@ pytest -m integration
 # Run only unit tests
 pytest -m unit
 
-# Run everything except OpenRouter tests
-pytest -m "not openrouter"
+# Run everything except AI service tests
+pytest -m "not ai_service"
 ```
 
 ## 📊 Test Coverage
@@ -98,23 +98,23 @@ xdg-open htmlcov/index.html  # Linux
 start htmlcov/index.html  # Windows
 ```
 
-## 🔧 OpenRouter Tests
+## 🔧 AI Service Tests
 
-The `test_openrouter.py` file includes:
+The `test_ai_service.py` file includes:
 
 ### Test Classes
 
-1. **TestOpenRouterConnectivity**
+1. **TestAIServiceConnectivity**
    - Tests basic connectivity
    - Health endpoint check
    - Chat endpoint format validation
 
-2. **TestOpenRouterClient**
+2. **TestAIServiceClient**
    - Tests client initialization
    - Health check method
    - Chat request sending
 
-3. **TestOpenRouterConfiguration**
+3. **TestAIServiceConfiguration**
    - Validates configuration
    - URL format checks
    - Model configuration
@@ -122,35 +122,35 @@ The `test_openrouter.py` file includes:
 ### Manual Diagnostic Test
 
 ```bash
-python tests/test_openrouter.py
+python tests/test_ai_service.py
 ```
 
 Output includes:
 ```
 ======================================================================
-                OpenRouter Service Connectivity Test
+                AI Service Connectivity Test
 ======================================================================
 
-Service URL: https://or.lucidfirm.ir
-Telegram Model: google/gemini-2.0-flash-001
+Service URL: https://your-ai-service-url.com
+Telegram Model: Gemini 2.0 Flash
 Internal Models: 11
 
 ----------------------------------------------------------------------
 
 1. Testing Base URL Connectivity...
-   ✓ Status: 200
+   [OK] Status: 200
    Response: ...
 
 2. Testing Health Endpoint...
-   ✓ Status: 200
+   [OK] Status: 200
    Response: ...
 
 3. Testing Chat Endpoint...
-   ✓ Status: 200
+   [OK] Status: 200
    Response: ...
 
 4. Testing Client Health Check Method...
-   ✓ Service is healthy
+   [OK] Service is healthy
 
 ======================================================================
                               Test Complete
@@ -162,14 +162,14 @@ Internal Models: 11
 ### Tests Fail with Connection Error
 
 ```bash
-# Check if OpenRouter URL is correct
-grep OPENROUTER_SERVICE_URL .env
+# Check if AI service URL is correct
+grep AI_SERVICE_URL .env
 
 # Test connectivity manually
-curl -v https://or.lucidfirm.ir/health
+curl -v https://your-ai-service-url.com/health
 
 # Run diagnostic
-python tests/test_openrouter.py
+python tests/test_ai_service.py
 ```
 
 ### Import Errors

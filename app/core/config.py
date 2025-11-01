@@ -12,10 +12,10 @@ class Settings(BaseSettings):
     """Application settings with validation - Pydantic V2"""
     
     # Core Configuration
-    ENVIRONMENT: str = "development"
-    OPENROUTER_SERVICE_URL: str
+    ENVIRONMENT: str = "dev"  # dev, stage, prod - Controls database selection and optimizations
+    AI_SERVICE_URL: str
     SESSION_TIMEOUT_MINUTES: int = 30
-    
+
     # Telegram Configuration
     TELEGRAM_BOT_TOKEN: str
     TELEGRAM_DEFAULT_MODEL: str = "google/gemini-2.0-flash-001"
@@ -25,10 +25,10 @@ class Settings(BaseSettings):
     )
     TELEGRAM_RATE_LIMIT: int = 20
     TELEGRAM_MAX_HISTORY: int = 10
-    TELEGRAM_COMMANDS: str = "start,help,status,translate,model,models"
+    TELEGRAM_COMMANDS: str = "start,help,status,clear,model,models"
     TELEGRAM_ADMIN_USERS: str = ""
     TELEGRAM_WEBHOOK_URL: Optional[str] = None
-    
+
     # Internal Configuration
     INTERNAL_DEFAULT_MODEL: str = "openai/gpt-5-chat"
     INTERNAL_MODELS: str
@@ -37,24 +37,39 @@ class Settings(BaseSettings):
     INTERNAL_API_KEY: str
     INTERNAL_WEBHOOK_SECRET: Optional[str] = None
     INTERNAL_ADMIN_USERS: str = ""
-    
-    # Logging
-    LOG_LEVEL: str = "INFO"
-    LOG_FILE: str = "logs/arash_bot_service.log"
-    
-    # Features
+
+    # Logging Configuration (Generic - set by DevOps per deployment)
+    LOG_LEVEL: str = "DEBUG"  # DevOps sets: DEBUG for dev, INFO for stage, WARNING for prod
+    LOG_FILE: str = "logs/arash_api_service.log"
+
+    # Features Configuration
     ENABLE_IMAGE_PROCESSING: bool = True
     MAX_IMAGE_SIZE_MB: int = 20
-    
-    # Database (Optional)
+
+    # API Docs (Generic - set by DevOps per deployment)
+    ENABLE_API_DOCS: bool = True  # DevOps sets: true for dev/stage, false for prod
+
+    # Database Configuration (Generic - set by DevOps per deployment)
+    # DevOps sets these in K8s ConfigMap/Secret for each environment
+    # Each deployment only has the credentials it needs (security)
+    DB_HOST: str = "localhost"
+    DB_PORT: int = 5432
+    DB_USER: str = "arash_user"
+    DB_PASSWORD: str = "change_me_in_production"
+    DB_NAME: str = "arash_db"
+
+    # Redis Configuration (Generic - set by DevOps per deployment)
     REDIS_URL: Optional[str] = None
-    DATABASE_URL: Optional[str] = None
-    
+
+    # CORS Configuration (Generic - set by DevOps per deployment)
+    CORS_ORIGINS: str = "*"  # DevOps sets: "*" for dev/stage, specific domain for prod
+
     # API Server
     API_HOST: str = "0.0.0.0"
-    API_PORT: int = 8001
-    ENABLE_API_DOCS: bool = True
-    CORS_ORIGINS: str = "*"
+    API_PORT: int = 3000  # Changed from 8001 to 3000 for K8s
+
+    # Telegram Bot Integration
+    RUN_TELEGRAM_BOT: bool = True
     
     # Pydantic V2 model configuration
     model_config = SettingsConfigDict(
@@ -163,14 +178,41 @@ class Settings(BaseSettings):
         return self.MAX_IMAGE_SIZE_MB * 1024 * 1024
     
     @property
+    def database_url(self) -> str:
+        """Build async database URL for SQLAlchemy from generic parameters"""
+        return (
+            f"postgresql+asyncpg://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
+    @property
+    def sync_database_url(self) -> str:
+        """Build synchronous database URL for Alembic migrations from generic parameters"""
+        return (
+            f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+
+
+    @property
     def is_production(self) -> bool:
-        """Check if running in production"""
-        return self.ENVIRONMENT.lower() == "production"
-    
+        """Check if running in production environment"""
+        return self.ENVIRONMENT.lower() in ("prod", "production")
+
     @property
     def is_development(self) -> bool:
-        """Check if running in development"""
-        return self.ENVIRONMENT.lower() == "development"
+        """Check if running in development environment"""
+        return self.ENVIRONMENT.lower() in ("dev", "development")
+
+    @property
+    def is_staging(self) -> bool:
+        """Check if running in staging environment"""
+        return self.ENVIRONMENT.lower() in ("stage", "staging")
+
+    @property
+    def enable_debug_features(self) -> bool:
+        """Enable debug features in development"""
+        return self.is_development
 
 
 # Global settings instance

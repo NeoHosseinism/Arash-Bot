@@ -2,21 +2,11 @@
 Pytest configuration and shared fixtures
 """
 import pytest
-import asyncio
-from typing import Generator
 import sys
 from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-
-
-@pytest.fixture(scope="session")
-def event_loop():
-    """Create event loop for async tests"""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest.fixture
@@ -45,8 +35,8 @@ def sample_session_data():
 
 
 @pytest.fixture
-def mock_openrouter_response():
-    """Mock OpenRouter API response"""
+def mock_ai_service_response():
+    """Mock AI service API response"""
     return {
         "Response": "این یک پاسخ تستی است",
         "SessionId": "test_session",
@@ -66,7 +56,7 @@ def pytest_configure(config):
         "markers", "unit: marks tests as unit tests"
     )
     config.addinivalue_line(
-        "markers", "openrouter: marks tests that require OpenRouter service"
+        "markers", "ai_service: marks tests that require AI service"
     )
 
 
@@ -78,5 +68,5 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
         if "unit" in item.nodeid:
             item.add_marker(pytest.mark.unit)
-        if "openrouter" in item.nodeid:
-            item.add_marker(pytest.mark.openrouter)
+        if "ai_service" in item.nodeid:
+            item.add_marker(pytest.mark.ai_service)

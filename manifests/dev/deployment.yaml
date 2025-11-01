@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arash-external-api-dev
+  namespace: arash
+spec:
+  selector:
+    matchLabels:
+      app: arash-external-api-dev
+  template:
+    metadata:
+      labels:
+        app: arash-external-api-dev
+    spec:
+      containers:
+      - env:
+        - name: TZ
+          value: Asia/Tehran
+        image: repo3.lucidfirm.ir/primebot/arash-external-api:dev-latest
+        imagePullPolicy: Always
+        name: arash-external-api-dev
+        resources:
+          limits:
+            cpu: "2"
+            memory: 2Gi
+      imagePullSecrets:
+      - name: regcred
+      restartPolicy: Always

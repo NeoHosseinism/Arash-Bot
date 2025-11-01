@@ -11,6 +11,7 @@ import logging
 from app.models.session import ChatSession
 from app.services.platform_manager import platform_manager
 from app.core.config import settings
+from app.core.name_mapping import get_friendly_platform_name, mask_session_id
 
 logger = logging.getLogger(__name__)
 
@@ -22,18 +23,37 @@ class SessionManager:
         self.sessions: Dict[str, ChatSession] = {}
         self.rate_limits: Dict[str, List[float]] = defaultdict(list)
     
-    def get_session_key(self, platform: str, chat_id: str) -> str:
-        """Generate unique session key"""
+    def get_session_key(self, platform: str, chat_id: str, team_id: int | None = None) -> str:
+        """
+        Generate unique session key with team isolation
+
+        SECURITY: Includes team_id to prevent session collision between teams.
+        If Team A and Team B both use chat_id="user123", they get DIFFERENT sessions.
+
+        For Telegram bot (no team_id), uses platform:chat_id
+        For internal API (has team_id), uses platform:team_id:chat_id
+        """
+        if team_id is not None:
+            return f"{platform}:{team_id}:{chat_id}"
         return f"{platform}:{chat_id}"
     
-    def get_or_create_session(self, platform: str, user_id: str, chat_id: str) -> ChatSession:
-        """Get existing session or create new one with platform-specific config"""
-        key = self.get_session_key(platform, chat_id)
-        
+    def get_or_create_session(
+        self,
+        platform: str,
+        user_id: str,
+        chat_id: str,
+        team_id: int | None = None,
+        api_key_id: int | None = None,
+        api_key_prefix: str | None = None
+    ) -> ChatSession:
+        """Get existing session or create new one with platform-specific config and team isolation"""
+        # SECURITY: Include team_id in key to prevent session collision
+        key = self.get_session_key(platform, chat_id, team_id)
+
         if key not in self.sessions:
             # Get platform configuration
             config = platform_manager.get_config(platform)
-            
+
             self.sessions[key] = ChatSession(
                 session_id=hashlib.md5(key.encode()).hexdigest(),
                 platform=platform,
@@ -41,24 +61,31 @@ class SessionManager:
                 user_id=user_id,
                 chat_id=chat_id,
                 current_model=config.model,
-                is_admin=platform_manager.is_admin(platform, user_id)
+                is_admin=platform_manager.is_admin(platform, user_id),
+                # Team isolation - CRITICAL for security
+                team_id=team_id,
+                api_key_id=api_key_id,
+                api_key_prefix=api_key_prefix
             )
-            
-            logger.info(f"Created new session for {platform}:{chat_id}")
+
+            friendly_platform = get_friendly_platform_name(platform)
+            masked_id = mask_session_id(self.sessions[key].session_id)
+            team_info = f" (team: {team_id}, key: {api_key_prefix})" if team_id else ""
+            logger.info(f"Created new session for {friendly_platform} (session: {masked_id}){team_info}")
         else:
             # Update last activity
             self.sessions[key].update_activity()
-        
+
         return self.sessions[key]
     
-    def get_session(self, platform: str, chat_id: str) -> ChatSession:
+    def get_session(self, platform: str, chat_id: str, team_id: int | None = None) -> ChatSession:
         """Get existing session"""
-        key = self.get_session_key(platform, chat_id)
+        key = self.get_session_key(platform, chat_id, team_id)
         return self.sessions.get(key)
-    
-    def delete_session(self, platform: str, chat_id: str) -> bool:
+
+    def delete_session(self, platform: str, chat_id: str, team_id: int | None = None) -> bool:
         """Delete a session"""
-        key = self.get_session_key(platform, chat_id)
+        key = self.get_session_key(platform, chat_id, team_id)
         if key in self.sessions:
             del self.sessions[key]
             logger.info(f"Deleted session: {key}")
@@ -156,6 +183,17 @@ class SessionManager:
             s for s in self.sessions.values()
             if s.last_activity > threshold
         ])
+
+    def get_sessions_by_team(self, team_id: int) -> List[ChatSession]:
+        """Get all sessions for a specific team (for team isolation)"""
+        return [
+            session for session in self.sessions.values()
+            if session.team_id == team_id
+        ]
+
+    def get_session_count_by_team(self, team_id: int) -> int:
+        """Get count of sessions for a specific team"""
+        return len(self.get_sessions_by_team(team_id))
 
 
 # Global instance

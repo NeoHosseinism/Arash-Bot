@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 
 class ChatSession(BaseModel):
-    """Chat session model"""
+    """Chat session model with team isolation"""
     session_id: str
     platform: str
     platform_config: Dict[str, Any]
@@ -20,6 +20,11 @@ class ChatSession(BaseModel):
     last_activity: datetime = Field(default_factory=datetime.utcnow)
     message_count: int = 0
     is_admin: bool = False
+
+    # Team isolation fields - CRITICAL for security
+    team_id: int | None = None  # Team that owns this session
+    api_key_id: int | None = None  # API key used to create this session
+    api_key_prefix: str | None = None  # For logging/debugging (first 8 chars)
     
     class Config:
         json_encoders = {
@@ -57,3 +62,14 @@ class ChatSession(BaseModel):
         from datetime import timedelta
         timeout = datetime.now() - timedelta(minutes=timeout_minutes)
         return self.last_activity < timeout
+
+    @property
+    def current_model_friendly(self) -> str:
+        """
+        Get current model as friendly display name.
+
+        Returns:
+            Friendly model name (e.g., "Gemini 2.0 Flash" instead of "google/gemini-2.0-flash-001")
+        """
+        from app.core.name_mapping import get_friendly_model_name
+        return get_friendly_model_name(self.current_model)

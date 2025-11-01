@@ -1,6 +1,10 @@
 """
 Run FastAPI Service
 """
+# Load environment variables first (before importing settings)
+from dotenv import load_dotenv
+load_dotenv()
+
 import uvicorn
 from app.core.config import settings
 

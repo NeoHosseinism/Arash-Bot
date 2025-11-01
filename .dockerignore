@@ -1,0 +1,139 @@
+# ===========================
+# Git & Version Control
+# ===========================
+.git
+.gitignore
+.gitattributes
+.github
+
+# ===========================
+# Python
+# ===========================
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ===========================
+# Virtual Environments
+# ===========================
+venv/
+ENV/
+env/
+.venv
+.env/
+virtualenv/
+
+# ===========================
+# Testing & Coverage
+# ===========================
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+pytest.ini
+tests/
+test_*.py
+*_test.py
+
+# ===========================
+# IDE & Editors
+# ===========================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+*.sublime-*
+
+# ===========================
+# OS Files
+# ===========================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ===========================
+# Documentation
+# ===========================
+*.md
+!README.md
+docs/
+ARCHITECTURE.md
+MODEL_MAPPING_FIX.md
+
+# ===========================
+# Environment & Secrets
+# ===========================
+.env
+.env.*
+!.env.example
+.env.local
+.env.*.local
+
+# ===========================
+# Logs & Database
+# ===========================
+# Note: Don't exclude logs/ directory - it's created at runtime
+# Only exclude log files themselves
+logs/*.log
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# ===========================
+# Development Tools
+# ===========================
+Makefile
+TODO.md
+.editorconfig
+
+# ===========================
+# Docker (don't copy into container)
+# ===========================
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# ===========================
+# CI/CD
+# ===========================
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+Jenkinsfile
+
+# ===========================
+# Temporary & Cache
+# ===========================
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+temp/
