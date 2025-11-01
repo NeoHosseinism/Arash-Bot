@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.models.database import AccessLevel, get_db_session
 from app.models.schemas import HealthCheckResponse, StatsResponse
@@ -49,10 +49,14 @@ class TeamUpdate(BaseModel):
     monthly_quota: Optional[int] = None
     daily_quota: Optional[int] = None
     is_active: Optional[bool] = None
+    webhook_url: Optional[str] = None
+    webhook_secret: Optional[str] = None
+    webhook_enabled: Optional[bool] = None
 
 
 class TeamResponse(BaseModel):
     """Response model for team"""
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     name: str
@@ -60,11 +64,10 @@ class TeamResponse(BaseModel):
     monthly_quota: Optional[int]
     daily_quota: Optional[int]
     is_active: bool
+    webhook_url: Optional[str]
+    webhook_enabled: bool
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class APIKeyCreate(BaseModel):
@@ -81,6 +84,7 @@ class APIKeyCreate(BaseModel):
 
 class APIKeyResponse(BaseModel):
     """Response model for API key (without the actual key)"""
+    model_config = ConfigDict(from_attributes=True)
 
     id: int
     key_prefix: str
@@ -96,9 +100,6 @@ class APIKeyResponse(BaseModel):
     created_at: datetime
     last_used_at: Optional[datetime]
     expires_at: Optional[datetime]
-
-    class Config:
-        from_attributes = True
 
 
 class APIKeyCreateResponse(BaseModel):
@@ -763,4 +764,146 @@ async def get_recent_usage(
             }
             for log in logs
         ]
+    }
+
+
+# ===========================
+# Webhook Management Endpoints
+# ===========================
+
+
+class WebhookConfig(BaseModel):
+    """Request model for configuring team webhook"""
+
+    webhook_url: Optional[str] = None
+    webhook_secret: Optional[str] = None
+    webhook_enabled: bool = False
+
+
+@router.put("/{team_id}/webhook", dependencies=[Depends(require_admin_access)])
+async def configure_team_webhook(
+    team_id: int,
+    webhook_config: WebhookConfig,
+    db=Depends(get_db_session)
+):
+    """
+    Configure webhook for a team (admin only)
+
+    Args:
+        team_id: Team ID
+        webhook_config: Webhook configuration
+
+    Returns:
+        Updated team info
+    """
+    from app.models.database import Team
+
+    # Get team
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    # Validate webhook URL if provided
+    if webhook_config.webhook_url:
+        if not webhook_config.webhook_url.startswith(('http://', 'https://')):
+            raise HTTPException(
+                status_code=400,
+                detail="Webhook URL must start with http:// or https://"
+            )
+
+    # Update webhook configuration
+    if webhook_config.webhook_url is not None:
+        team.webhook_url = webhook_config.webhook_url
+    if webhook_config.webhook_secret is not None:
+        team.webhook_secret = webhook_config.webhook_secret
+    team.webhook_enabled = webhook_config.webhook_enabled
+
+    # Disable webhook if URL is empty
+    if not team.webhook_url:
+        team.webhook_enabled = False
+
+    db.commit()
+    db.refresh(team)
+
+    logger.info(f"Webhook configured for team {team_id} ({team.name})")
+
+    return TeamResponse.model_validate(team)
+
+
+@router.post("/{team_id}/webhook/test", dependencies=[Depends(require_admin_access)])
+async def test_team_webhook(
+    team_id: int,
+    db=Depends(get_db_session)
+):
+    """
+    Send a test webhook to verify configuration (admin only)
+
+    Args:
+        team_id: Team ID
+
+    Returns:
+        Test result
+    """
+    from app.models.database import Team
+    from app.services.webhook_client import webhook_client
+
+    # Get team
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    if not team.webhook_url:
+        raise HTTPException(
+            status_code=400,
+            detail="No webhook URL configured for this team"
+        )
+
+    # Send test webhook
+    result = await webhook_client.test_webhook(team)
+
+    return {
+        "team_id": team_id,
+        "team_name": team.name,
+        "webhook_url": team.webhook_url,
+        "test_result": result
+    }
+
+
+@router.get("/{team_id}/webhook", dependencies=[Depends(require_team_lead_access)])
+async def get_team_webhook_config(
+    team_id: int,
+    api_key=Depends(require_team_lead_access),
+    db=Depends(get_db_session)
+):
+    """
+    Get webhook configuration for a team (team lead or admin)
+
+    Note: webhook_secret is masked for security
+
+    Args:
+        team_id: Team ID
+
+    Returns:
+        Webhook configuration
+    """
+    from app.models.database import Team
+
+    # Verify team access
+    if api_key.team_id != team_id and api_key.access_level != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied: You can only view your own team's webhook"
+        )
+
+    # Get team
+    team = db.query(Team).filter(Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+
+    return {
+        "team_id": team.id,
+        "team_name": team.name,
+        "webhook_url": team.webhook_url,
+        "webhook_secret_configured": bool(team.webhook_secret),
+        "webhook_enabled": team.webhook_enabled
     }
