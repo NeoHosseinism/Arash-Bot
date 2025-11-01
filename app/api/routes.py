@@ -1,35 +1,27 @@
 """
-API routes with team isolation and security
+Public API routes for external teams
 
-SECURITY NOTE: All endpoints that access sessions or stats MUST enforce team isolation.
-Teams can ONLY see their own sessions and statistics.
+SECURITY MODEL:
+- External teams should think they're using a simple chatbot API
+- NO exposure of: sessions, teams, access levels, or other teams
+- Complete transparency: teams don't know about our internal architecture
 """
 
-from typing import Optional, Dict, Any
+from typing import Optional
 from datetime import datetime
-from collections import defaultdict
 import logging
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Query, Header
-from fastapi.security import HTTPAuthorizationCredentials
+from fastapi import APIRouter, HTTPException, Depends
 
 from app.models.schemas import (
     IncomingMessage,
     BotResponse,
-    SessionListResponse,
     HealthCheckResponse,
 )
 from app.models.database import APIKey
 from app.services.message_processor import message_processor
-from app.services.session_manager import session_manager
-from app.services.platform_manager import platform_manager
 from app.services.ai_client import ai_client
-from app.api.dependencies import (
-    get_auth,
-    verify_api_key,
-    require_admin_access,
-)
-from app.core.config import settings
+from app.api.dependencies import require_team_access
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +32,9 @@ router = APIRouter()
 @router.get("/health")
 async def health_check():
     """
-    Public health check endpoint (no auth required)
+    Public health check endpoint (no authentication required)
 
-    SECURITY: Does NOT expose platform details or Telegram info
+    SECURITY: Does NOT expose any internal details
     """
     ai_service_healthy = await ai_client.health_check()
 
@@ -50,26 +42,33 @@ async def health_check():
         "status": "healthy" if ai_service_healthy else "degraded",
         "service": "Arash External API Service",
         "version": "1.1.0",
-        "components": {
-            "api": "healthy",
-            "ai_service": "healthy" if ai_service_healthy else "unhealthy",
-        },
         "timestamp": datetime.now().isoformat(),
     }
 
 
-@router.post("/message", response_model=BotResponse)
-async def process_message_endpoint(
+@router.post("/chat", response_model=BotResponse)
+async def chat(
     message: IncomingMessage,
-    api_key: APIKey = Depends(verify_api_key),
+    api_key: APIKey = Depends(require_team_access),
 ):
     """
-    Process message with REQUIRED authentication
+    Process a chat message
 
     SECURITY:
-    - API key authentication is REQUIRED
-    - Team isolation enforced - session is tagged with team_id
-    - Each team can only access their own sessions
+    - Requires valid API key (any team)
+    - Team isolation enforced internally via session tagging
+    - External teams don't see team_id or internal metadata
+    - Simple chatbot interface - no exposure of architecture
+
+    External teams only see:
+    - Input: message content
+    - Output: bot response
+
+    They DON'T see:
+    - Session management
+    - Team isolation
+    - Access levels
+    - Other teams
     """
     # Only allow 'internal' platform for API-based access
     if message.platform != "internal":
@@ -78,134 +77,13 @@ async def process_message_endpoint(
             detail="Invalid platform. Use 'internal' for API access."
         )
 
-    # Extract team info from validated API key
+    # SECURITY: Tag session with team info for isolation (transparent to external teams)
     team_id = api_key.team_id
     api_key_id = api_key.id
     api_key_prefix = api_key.key_prefix
 
-    # SECURITY: Tag session with team info for isolation
     message.metadata["team_id"] = team_id
     message.metadata["api_key_id"] = api_key_id
     message.metadata["api_key_prefix"] = api_key_prefix
 
     return await message_processor.process_message(message)
-
-
-@router.get("/sessions", response_model=SessionListResponse)
-async def get_sessions(
-    api_key: APIKey = Depends(verify_api_key),
-):
-    """
-    Get active sessions for the authenticated team ONLY
-
-    SECURITY:
-    - REQUIRES authentication
-    - Returns ONLY sessions belonging to the authenticated team
-    - Complete team isolation enforced
-    """
-    if not api_key:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required"
-        )
-
-    team_id = api_key.team_id
-
-    # SECURITY: Only get sessions for THIS team
-    team_sessions = session_manager.get_sessions_by_team(team_id)
-
-    sessions = []
-    for session in team_sessions:
-        from app.core.name_mapping import get_friendly_model_name
-
-        session_info = {
-            "session_id": session.session_id,
-            "platform": session.platform,
-            "current_model": get_friendly_model_name(session.current_model),
-            "message_count": session.message_count,
-            "last_activity": session.last_activity.isoformat(),
-            "user_id": session.user_id,
-            "chat_id": session.chat_id,
-            "history_length": len(session.history),
-        }
-
-        sessions.append(session_info)
-
-    return SessionListResponse(
-        total=len(sessions),
-        authenticated=True,
-        sessions=sessions
-    )
-
-
-@router.get("/session/{session_id}")
-async def get_session(
-    session_id: str,
-    api_key: APIKey = Depends(verify_api_key),
-):
-    """
-    Get specific session details
-
-    SECURITY:
-    - REQUIRES authentication
-    - Only allows access to sessions owned by the authenticated team
-    """
-    if not api_key:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    team_id = api_key.team_id
-
-    # Find the session
-    for session in session_manager.sessions.values():
-        if session.session_id == session_id:
-            # SECURITY: Check team ownership
-            if session.team_id != team_id:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Access denied: This session belongs to another team"
-                )
-
-            return {
-                "session": {
-                    **session.dict(exclude={"history"}),
-                    "uptime_seconds": session.get_uptime_seconds(),
-                },
-                "history_length": len(session.history),
-                "platform_config": session.platform_config,
-            }
-
-    raise HTTPException(status_code=404, detail="Session not found")
-
-
-@router.delete("/session/{session_id}")
-async def delete_session(
-    session_id: str,
-    api_key: APIKey = Depends(verify_api_key),
-):
-    """
-    Delete a session
-
-    SECURITY:
-    - REQUIRES authentication
-    - Only allows deletion of sessions owned by the authenticated team
-    """
-    if not api_key:
-        raise HTTPException(status_code=401, detail="Authentication required")
-
-    team_id = api_key.team_id
-
-    # Find and delete the session
-    for key, session in list(session_manager.sessions.items()):
-        if session.session_id == session_id:
-            # SECURITY: Check team ownership
-            if session.team_id != team_id:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Access denied: This session belongs to another team"
-                )
-
-            del session_manager.sessions[key]
-            logger.info(f"Session {session_id} deleted by team {team_id}")
-            return {"success": True, "message": "Session deleted"}
-
-    raise HTTPException(status_code=404, detail="Session not found")
