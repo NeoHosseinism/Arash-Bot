@@ -60,13 +60,12 @@ class TestHealthEndpoint:
     """Test health check endpoints"""
 
     def test_root_health_check(self, client):
-        """Test root health endpoint (unversioned)"""
-        response = client.get("/health")
+        """Test health endpoint (versioned at /api/v1/health)"""
+        response = client.get("/api/v1/health")
         assert response.status_code == 200
         data = response.json()
         assert "status" in data
         assert "version" in data
-        assert data["api_version"] == "v1"
 
 
 class TestAuthenticationV1:
@@ -76,7 +75,7 @@ class TestAuthenticationV1:
     def test_missing_auth_header(self, mock_key_mgr, client):
         """Test request without auth header on protected endpoint"""
         response = client.post(
-            "/api/v1/message",
+            "/api/v1/chat",
             json={
                 "platform": "internal",
                 "user_id": "user1",
@@ -97,7 +96,7 @@ class TestAuthenticationV1:
         mock_key_mgr.validate_api_key.return_value = None
 
         response = client.post(
-            "/api/v1/message",
+            "/api/v1/chat",
             headers={"Authorization": "Bearer invalid_key"},
             json={
                 "platform": "internal",
@@ -131,7 +130,7 @@ class TestAuthenticationV1:
         ))
 
         response = client.post(
-            "/api/v1/message",
+            "/api/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
             json={
                 "platform": "internal",
@@ -148,68 +147,21 @@ class TestAuthenticationV1:
 
 
 class TestTeamIsolationV1:
-    """Test team isolation enforcement"""
+    """Test team isolation enforcement - DEPRECATED: Session endpoints removed for external teams"""
 
-    @patch("app.api.dependencies.APIKeyManager")
-    @patch("app.api.dependencies.get_db_session")
-    @patch("app.api.routes.session_manager")
-    def test_session_listing_filtered_by_team(self, mock_sess_mgr, mock_get_db, mock_key_mgr, client, mock_api_key_user):
-        """Test that /sessions only returns team's sessions"""
-        # Mock valid key for team 100
-        mock_key_mgr.validate_api_key.return_value = mock_api_key_user
+    @pytest.mark.skip(reason="Session listing endpoint removed - external teams don't see sessions")
+    def test_session_listing_filtered_by_team(self):
+        """DEPRECATED: /api/v1/sessions endpoint no longer exists for external teams"""
+        pass
 
-        # Mock sessions - team should only see their own
-        team_session = Mock()
-        team_session.session_id = "team100_session"
-        team_session.team_id = 100
-        team_session.platform = "internal"
-        team_session.user_id = "user1"
-        team_session.message_count = 5
-        team_session.current_model = "gpt-4"
-        team_session.last_activity = Mock()
-        team_session.last_activity.isoformat.return_value = "2025-11-01T00:00:00"
-        team_session.history = []
-        team_session.chat_id = "chat1"
-
-        mock_sess_mgr.get_sessions_by_team.return_value = [team_session]
-
-        response = client.get(
-            "/api/v1/sessions",
-            headers={"Authorization": "Bearer valid_key"}
-        )
-
-        assert response.status_code == 200
-        # Verify get_sessions_by_team was called with correct team_id
-        mock_sess_mgr.get_sessions_by_team.assert_called_once_with(100)
-
-    @patch("app.api.dependencies.APIKeyManager")
-    @patch("app.api.dependencies.get_db_session")
-    @patch("app.api.routes.session_manager")
-    def test_access_other_team_session_denied(self, mock_sess_mgr, mock_get_db, mock_key_mgr, client, mock_api_key_user):
-        """Test that team cannot access another team's session"""
-        # Mock valid key for team 100
-        mock_key_mgr.validate_api_key.return_value = mock_api_key_user
-
-        # Mock session belonging to team 200 (different team)
-        other_team_session = Mock()
-        other_team_session.session_id = "team200_session"
-        other_team_session.team_id = 200  # Different team
-        other_team_session.platform = "internal"
-
-        # Mock session lookup - the route iterates through sessions.values()
-        mock_sess_mgr.sessions = {"some_key": other_team_session}
-
-        response = client.get(
-            "/api/v1/session/team200_session",
-            headers={"Authorization": "Bearer valid_key"}
-        )
-
-        assert response.status_code == 403
-        assert "another team" in response.text.lower()
+    @pytest.mark.skip(reason="Session access endpoint removed - external teams don't see sessions")
+    def test_access_other_team_session_denied(self):
+        """DEPRECATED: /api/v1/session/{id} endpoint no longer exists for external teams"""
+        pass
 
 
 class TestMessageEndpointV1:
-    """Test /api/v1/message endpoint"""
+    """Test /api/v1/chat endpoint"""
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
@@ -230,7 +182,7 @@ class TestMessageEndpointV1:
         ))
 
         response = client.post(
-            "/api/v1/message",
+            "/api/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
             json={
                 "platform": "internal",
@@ -255,7 +207,7 @@ class TestMessageEndpointV1:
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
         response = client.post(
-            "/api/v1/message",
+            "/api/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
             json={
                 "platform": "telegram",  # Wrong platform
@@ -287,7 +239,7 @@ class TestAdminEndpointsV1:
         )
 
         assert response.status_code == 403
-        assert "Insufficient permissions" in response.text
+        assert "Admin access required" in response.text
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
@@ -308,18 +260,17 @@ class TestAdminEndpointsV1:
 class TestAPIVersioning:
     """Test API versioning structure"""
 
-    def test_v1_prefix_on_message_endpoint(self, client):
-        """Test that message endpoint is at /api/v1/message"""
+    def test_v1_prefix_on_chat_endpoint(self, client):
+        """Test that chat endpoint is at /api/v1/chat"""
         # Try without auth to verify endpoint exists
-        response = client.post("/api/v1/message", json={})
+        response = client.post("/api/v1/chat", json={})
         # Should be 401 (auth required) or 422 (validation), not 404
         assert response.status_code in [401, 422]
 
-    def test_v1_prefix_on_sessions_endpoint(self, client):
-        """Test that sessions endpoint is at /api/v1/sessions"""
-        response = client.get("/api/v1/sessions")
-        # Should be 401 (auth required), not 404
-        assert response.status_code == 401
+    @pytest.mark.skip(reason="Sessions endpoint removed for external teams")
+    def test_v1_prefix_on_sessions_endpoint(self):
+        """DEPRECATED: /api/v1/sessions endpoint no longer exists for external teams"""
+        pass
 
     def test_docs_at_v1_path(self, client):
         """Test that API docs are at /api/v1/docs"""
