@@ -222,16 +222,21 @@ async def global_exception_handler(request, exc):
 app.include_router(router, prefix="/api/v1", tags=["v1"])
 app.include_router(admin_router, prefix="/api/v1")
 
-# Root health check (unversioned for backward compatibility)
+
+# Unversioned health check endpoint (for monitoring systems)
 @app.get("/health")
-async def root_health_check():
-    """Root health check endpoint (unversioned)"""
+async def health_check():
+    """
+    Health check endpoint (unversioned for monitoring compatibility)
+
+    SECURITY: Does NOT expose any internal details
+    """
     ai_service_healthy = await ai_client.health_check()
+
     return {
         "status": "healthy" if ai_service_healthy else "degraded",
         "service": "Arash External API Service",
         "version": "1.1.0",
-        "api_version": "v1",
         "timestamp": datetime.now().isoformat(),
     }
 

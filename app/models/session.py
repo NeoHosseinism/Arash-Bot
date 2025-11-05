@@ -3,11 +3,12 @@ Chat session model
 """
 from typing import Dict, Any, List
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class ChatSession(BaseModel):
     """Chat session model with team isolation"""
+
     session_id: str
     platform: str
     platform_config: Dict[str, Any]
@@ -26,11 +27,6 @@ class ChatSession(BaseModel):
     api_key_id: int | None = None  # API key used to create this session
     api_key_prefix: str | None = None  # For logging/debugging (first 8 chars)
     
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-    
     def add_message(self, role: str, content: str):
         """Add message to history"""
         self.history.append({
@@ -38,7 +34,7 @@ class ChatSession(BaseModel):
             "content": content
         })
         self.message_count += 1
-        self.last_activity = datetime.now()
+        self.last_activity = datetime.utcnow()
     
     def clear_history(self):
         """Clear conversation history"""
@@ -51,16 +47,16 @@ class ChatSession(BaseModel):
     
     def update_activity(self):
         """Update last activity timestamp"""
-        self.last_activity = datetime.now()
-    
+        self.last_activity = datetime.utcnow()
+
     def get_uptime_seconds(self) -> float:
         """Get session uptime in seconds"""
-        return (datetime.now() - self.created_at).total_seconds()
-    
+        return (datetime.utcnow() - self.created_at).total_seconds()
+
     def is_expired(self, timeout_minutes: int) -> bool:
         """Check if session is expired"""
         from datetime import timedelta
-        timeout = datetime.now() - timedelta(minutes=timeout_minutes)
+        timeout = datetime.utcnow() - timedelta(minutes=timeout_minutes)
         return self.last_activity < timeout
 
     @property

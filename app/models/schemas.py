@@ -3,7 +3,7 @@ Pydantic models for request/response schemas
 """
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 from app.core.constants import MessageType, Platform
 
 
@@ -15,8 +15,9 @@ class MessageAttachment(BaseModel):
     mime_type: Optional[str] = None
     file_size: Optional[int] = None
     data: Optional[str] = None  # Base64 encoded data
-    
-    @validator("data")
+
+    @field_validator("data")
+    @classmethod
     def validate_base64(cls, v):
         """Validate base64 data format"""
         if v and not v.replace("+", "").replace("/", "").replace("=", "").isalnum():

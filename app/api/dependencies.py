@@ -1,7 +1,13 @@
 """
 API dependencies for authentication and validation
+
+SECURITY MODEL:
+- Admin Access: Only for service owner team (access_level = ADMIN)
+- Team Access: For external teams using the API (any valid API key)
+- External teams should NOT know about access levels or other teams
 """
 from typing import Optional
+import logging
 from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -9,34 +15,30 @@ from app.core.config import settings
 from app.models.database import APIKey, AccessLevel, get_db_session
 from app.services.api_key_manager import APIKeyManager
 
+logger = logging.getLogger(__name__)
+
 # Security scheme
 security = HTTPBearer(auto_error=False)
 
 
-def get_auth(
+def require_admin_access(
     authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
-) -> Optional[HTTPAuthorizationCredentials]:
-    """Get authorization credentials (optional)"""
-    return authorization
-
-
-def verify_api_key(
-    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security),
-    min_access_level: AccessLevel = AccessLevel.USER,
 ) -> APIKey:
     """
-    Verify API key and check access level.
-    Returns the validated API key object.
+    Require ADMIN access - only for service owner team
 
-    SECURITY: Only database-based API keys are supported for team isolation.
+    SECURITY:
+    - Validates API key from database
+    - Checks access_level == ADMIN
+    - Returns validated API key object
+    - Used for: team management, API key creation, webhook configuration, etc.
     """
     if not authorization:
         raise HTTPException(
             status_code=401,
-            detail="Authentication required. Please provide a valid API key."
+            detail="Authentication required"
         )
 
-    # Validate database-based API key
     db = get_db_session()
     try:
         api_key = APIKeyManager.validate_api_key(db, authorization.credentials)
@@ -47,19 +49,11 @@ def verify_api_key(
                 detail="Invalid API key"
             )
 
-        # Check access level
-        key_level = AccessLevel(api_key.access_level)
-        level_hierarchy = {
-            AccessLevel.USER: 1,
-            AccessLevel.TEAM_LEAD: 2,
-            AccessLevel.ADMIN: 3,
-        }
-
-        if level_hierarchy[key_level] < level_hierarchy[min_access_level]:
+        # Check if admin
+        if AccessLevel(api_key.access_level) != AccessLevel.ADMIN:
             raise HTTPException(
                 status_code=403,
-                detail=f"Insufficient permissions. Required: {min_access_level.value}, "
-                f"Your level: {key_level.value}"
+                detail="Admin access required"
             )
 
         return api_key
@@ -67,30 +61,49 @@ def verify_api_key(
     except HTTPException:
         raise
     except Exception as e:
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error validating API key: {e}")
+        logger.error(f"Error validating admin API key: {e}")
         raise HTTPException(
             status_code=500,
-            detail="Error validating API key. Please try again."
+            detail="Error validating API key"
         )
 
 
-def require_admin_access(
+def require_team_access(
     authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> APIKey:
     """
-    Require admin-level access.
-    Returns the validated API key object.
-    """
-    return verify_api_key(authorization, AccessLevel.ADMIN)
+    Require valid team API key - for external teams using the API
 
+    SECURITY:
+    - Validates any valid API key from database
+    - Does NOT expose access levels or team information
+    - External teams think they're using a simple chatbot API
+    - Returns validated API key object (contains team_id for isolation)
+    - Used for: /chat endpoint (message processing)
+    """
+    if not authorization:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required"
+        )
 
-def require_team_lead_access(
-    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
-) -> APIKey:
-    """
-    Require team-lead or admin-level access.
-    Returns the validated API key object.
-    """
-    return verify_api_key(authorization, AccessLevel.TEAM_LEAD)
+    db = get_db_session()
+    try:
+        api_key = APIKeyManager.validate_api_key(db, authorization.credentials)
+
+        if not api_key:
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid API key"
+            )
+
+        return api_key
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating team API key: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error validating API key"
+        )

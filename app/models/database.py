@@ -23,8 +23,7 @@ from sqlalchemy import (
     inspect,
     text,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 logger = logging.getLogger(__name__)
@@ -51,6 +50,12 @@ class Team(Base):
     monthly_quota = Column(Integer, nullable=True)  # Requests per month, None = unlimited
     daily_quota = Column(Integer, nullable=True)  # Requests per day, None = unlimited
     is_active = Column(Boolean, default=True, nullable=False)
+
+    # Webhook configuration for each team
+    webhook_url = Column(String(2048), nullable=True)  # URL to send callbacks to
+    webhook_secret = Column(String(255), nullable=True)  # Secret for HMAC signing
+    webhook_enabled = Column(Boolean, default=False, nullable=False)  # Enable/disable webhook
+
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
