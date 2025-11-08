@@ -1,32 +1,35 @@
 """
 API dependencies for authentication and validation
 
-TWO-TIER ACCESS CONTROL SYSTEM:
+TWO-PATH AUTHENTICATION SYSTEM:
 
-1. SUPER ADMINS (Internal Team):
-   - Access Level: ADMIN
+1. SUPER ADMINS (Infrastructure Level):
+   - Authentication: Environment variable SUPER_ADMIN_API_KEYS
+   - NOT stored in database
    - Can access: ALL /api/v1/admin/* endpoints
-   - Purpose: Service owners who manage teams, API keys, and monitor usage
-   - These are YOUR internal team members
+   - Purpose: Internal team managing the service infrastructure
+   - Completely separate from client database
 
-2. TEAM API KEYS (External Clients):
-   - Access Level: TEAM
+2. TEAM API KEYS (Application Level):
+   - Authentication: Database-backed API keys
+   - Stored in api_keys table
    - Can access: ONLY /api/v1/chat endpoint
-   - Purpose: External teams using your chatbot service
-   - These are your CLIENTS
+   - Purpose: External clients using the chatbot service
+   - No admin access whatsoever
 
 SECURITY:
-- External teams (TEAM level) cannot access admin endpoints
-- External teams don't know about access levels or other teams
-- Complete isolation between teams via session tagging
+- Complete separation: Admin auth (env vars) vs Team auth (database)
+- External teams cannot access admin endpoints (no way to get super admin keys)
+- External teams don't know about super admins or access levels
+- Team isolation via session tagging
 """
-from typing import Optional
+from typing import Optional, Union
 import logging
 from fastapi import HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.core.config import settings
-from app.models.database import APIKey, AccessLevel, get_db_session
+from app.models.database import APIKey, get_db_session
 from app.services.api_key_manager import APIKeyManager
 
 logger = logging.getLogger(__name__)
@@ -37,28 +40,38 @@ security = HTTPBearer(auto_error=False)
 
 def require_admin_access(
     authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
-) -> APIKey:
+) -> str:
     """
-    Require ADMIN access - ONLY for super admins (internal team)
+    Require SUPER ADMIN access - infrastructure level (environment-based authentication)
 
     This dependency protects ALL /api/v1/admin/* endpoints.
-    Only API keys with access_level=ADMIN can access these endpoints.
+    Authentication via SUPER_ADMIN_API_KEYS environment variable (NOT database).
+
+    AUTHENTICATION:
+    - Checks Authorization header against SUPER_ADMIN_API_KEYS environment variable
+    - NO database lookup
+    - Completely separate from team API keys
 
     USAGE:
     - Used by: All admin endpoints (/api/v1/admin/*)
-    - Required access level: ADMIN (super admins only)
-    - Returns: Validated APIKey object
+    - Authentication: Environment variable (infrastructure level)
+    - Returns: The validated super admin API key string
 
     ENDPOINTS PROTECTED:
     - Team management (create, list, update, delete teams)
-    - API key management (create, list, revoke API keys)
-    - Usage statistics (view all team usage)
+    - API key management (create, list, revoke API keys for clients)
+    - Usage statistics (view ALL teams' usage)
     - Platform information (Telegram + Internal config)
-    - System administration (clear sessions, etc.)
+    - System administration (clear sessions, webhooks, etc.)
 
     ERROR RESPONSES:
-    - 401: No authorization header provided
-    - 403: Invalid API key OR valid key but not ADMIN level
+    - 401: No authorization header provided OR super admin keys not configured
+    - 403: Invalid super admin API key
+
+    SECURITY:
+    - Super admin keys set via SUPER_ADMIN_API_KEYS environment variable
+    - External teams have no way to obtain these keys
+    - Complete separation from client database
     """
     if not authorization:
         raise HTTPException(
@@ -66,70 +79,73 @@ def require_admin_access(
             detail="Authentication required"
         )
 
-    db = get_db_session()
-    try:
-        api_key = APIKeyManager.validate_api_key(db, authorization.credentials)
-
-        if not api_key:
-            raise HTTPException(
-                status_code=403,
-                detail="Invalid API key"
-            )
-
-        # Check if admin (super admin access required)
-        if AccessLevel(api_key.access_level) != AccessLevel.ADMIN:
-            raise HTTPException(
-                status_code=403,
-                detail="Admin access required. This endpoint is only accessible to super admins (internal team)."
-            )
-
-        logger.info(f"Admin access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})")
-        return api_key
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error validating admin API key: {e}")
+    # Check if super admin keys are configured
+    super_admin_keys = settings.super_admin_keys_set
+    if not super_admin_keys:
+        logger.error("SUPER_ADMIN_API_KEYS not configured - admin endpoints unavailable")
         raise HTTPException(
-            status_code=500,
-            detail="Error validating API key"
+            status_code=401,
+            detail="Super admin authentication not configured"
         )
+
+    # Validate against environment-based super admin keys
+    provided_key = authorization.credentials
+    if provided_key not in super_admin_keys:
+        logger.warning(f"Invalid super admin API key attempted: {provided_key[:12]}...")
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid super admin API key"
+        )
+
+    logger.info(f"Super admin access granted (key: {provided_key[:12]}...)")
+    return provided_key
 
 
 def require_team_access(
     authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> APIKey:
     """
-    Require valid team API key - for external teams (clients) using the chatbot
+    Require valid TEAM API key - application level (database-based authentication)
 
     This dependency protects the /api/v1/chat endpoint.
-    Any valid API key (TEAM or ADMIN level) can access this endpoint.
+    Authentication via database-backed API keys (api_keys table).
+
+    AUTHENTICATION:
+    - Checks Authorization header against database (api_keys table)
+    - Validates key hash, expiration, active status
+    - Returns APIKey object with team_id for isolation
 
     USAGE:
     - Used by: /api/v1/chat endpoint
-    - Required access level: Any valid API key (TEAM or ADMIN)
-    - Returns: Validated APIKey object (includes team_id for isolation)
+    - Authentication: Database lookup (application level)
+    - Returns: Validated APIKey object (includes team_id for session isolation)
 
     SECURITY & TRANSPARENCY:
-    - Accepts any valid API key (both TEAM and ADMIN levels)
-    - External teams (TEAM level) don't know about access levels
     - External teams think they're using a simple chatbot API
+    - No exposure of super admins or admin endpoints
     - Complete team isolation via session tagging (transparent to clients)
-    - No exposure of internal architecture or other teams
+    - No way to access admin functionality
 
     WHAT EXTERNAL TEAMS SEE:
     - Input: Message content
     - Output: Bot response
+    - Simple API, no complexity
 
     WHAT THEY DON'T SEE:
-    - Access levels
-    - Other teams
+    - Super admin authentication
+    - Other teams or their usage
     - Session management internals
-    - Admin functionality
+    - Admin endpoints existence
+    - Platform configuration
 
     ERROR RESPONSES:
     - 401: No authorization header provided
     - 403: Invalid API key (doesn't exist, inactive, or expired)
+
+    SECURITY:
+    - Database API keys are ONLY for external teams
+    - Cannot access /api/v1/admin/* endpoints (requires super admin key)
+    - Team isolation enforced via team_id in sessions
     """
     if not authorization:
         raise HTTPException(

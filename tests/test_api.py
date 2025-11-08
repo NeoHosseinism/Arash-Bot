@@ -17,7 +17,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.main import app
-from app.models.database import AccessLevel
 
 
 @pytest.fixture
@@ -33,28 +32,34 @@ def mock_db_session():
 
 
 @pytest.fixture
-def mock_api_key_user():
-    """Mock TEAM level API key (external team/client)"""
+def mock_api_key_team():
+    """
+    Mock team API key (external client)
+
+    TWO-PATH AUTHENTICATION:
+    - This is for external teams using /api/v1/chat endpoint
+    - All database API keys have equal access (no access_level field)
+    """
     key = Mock()
     key.id = 1
     key.team_id = 100
     key.key_prefix = "sk_test_"
-    key.access_level = AccessLevel.TEAM.value
     key.is_active = True
+    key.team = Mock(name="External Team")
     return key
 
 
 @pytest.fixture
-def mock_api_key_admin():
-    """Mock ADMIN level API key (super admin/internal team)"""
-    key = Mock()
-    key.id = 2
-    key.team_id = 200
-    key.key_prefix = "sk_admin_"
-    key.access_level = AccessLevel.ADMIN.value
-    key.is_active = True
-    key.team = Mock(name="Internal Team")
-    return key
+def mock_super_admin_key():
+    """
+    Mock super admin API key (infrastructure level)
+
+    TWO-PATH AUTHENTICATION:
+    - This is for super admins accessing /api/v1/admin/* endpoints
+    - NOT in database, verified via SUPER_ADMIN_API_KEYS environment variable
+    - Returns just the key string (not a database object)
+    """
+    return "test_super_admin_key_12345"
 
 
 class TestHealthEndpoint:

@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models.database import APIKey, AccessLevel, Team, UsageLog
+from app.models.database import APIKey, Team, UsageLog
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,6 @@ class APIKeyManager:
         db: Session,
         team_id: int,
         name: str,
-        access_level: AccessLevel = AccessLevel.TEAM,
         created_by: Optional[str] = None,
         description: Optional[str] = None,
         monthly_quota: Optional[int] = None,
@@ -101,13 +100,15 @@ class APIKeyManager:
         expires_in_days: Optional[int] = None,
     ) -> Tuple[str, APIKey]:
         """
-        Create a new API key for a team.
+        Create a new API key for an external team (client).
+
+        NOTE: This creates API keys for external teams only (chat service access).
+        Super admin authentication is handled separately via SUPER_ADMIN_API_KEYS environment variable.
 
         Args:
             db: Database session
             team_id: Team ID
             name: Friendly name for the key
-            access_level: Access level for the key
             created_by: User who created the key
             description: Description of the key
             monthly_quota: Monthly quota override (None = use team quota)
@@ -133,7 +134,6 @@ class APIKeyManager:
             key_prefix=key_prefix,
             name=name,
             team_id=team_id,
-            access_level=access_level.value,
             monthly_quota=monthly_quota,
             daily_quota=daily_quota,
             created_by=created_by,
@@ -145,8 +145,7 @@ class APIKeyManager:
         db.refresh(api_key)
 
         logger.info(
-            f"Created API key: {name} (prefix: {key_prefix}) for team ID {team_id} "
-            f"with access level {access_level.value}"
+            f"Created API key: {name} (prefix: {key_prefix}) for team ID {team_id}"
         )
 
         return api_key_string, api_key

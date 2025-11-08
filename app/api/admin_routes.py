@@ -1,9 +1,9 @@
 """
 Admin API routes for team and API key management
 
-TWO-TIER ACCESS CONTROL:
+TWO-PATH AUTHENTICATION:
 These endpoints are ONLY accessible to SUPER ADMINS (internal team).
-API keys with access_level=TEAM cannot access these endpoints.
+Authentication via SUPER_ADMIN_API_KEYS environment variable (NOT database).
 
 ADMIN ENDPOINTS (SUPER ADMINS ONLY):
 - Team management (create, list, update, delete teams)
@@ -25,7 +25,7 @@ from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Header
 from pydantic import BaseModel, ConfigDict
 
-from app.models.database import AccessLevel, get_db_session
+from app.models.database import get_db_session
 from app.models.schemas import HealthCheckResponse, StatsResponse
 from app.services.api_key_manager import APIKeyManager
 from app.services.usage_tracker import UsageTracker
@@ -84,11 +84,15 @@ class TeamResponse(BaseModel):
 
 
 class APIKeyCreate(BaseModel):
-    """Request model for creating an API key"""
+    """
+    Request model for creating an API key (for external teams only)
+
+    NOTE: This creates API keys for external teams (clients) using the chat service.
+    Super admin authentication is handled separately via SUPER_ADMIN_API_KEYS environment variable.
+    """
 
     team_id: int
     name: str
-    access_level: AccessLevel = AccessLevel.TEAM
     description: Optional[str] = None
     monthly_quota: Optional[int] = None
     daily_quota: Optional[int] = None
@@ -96,7 +100,12 @@ class APIKeyCreate(BaseModel):
 
 
 class APIKeyResponse(BaseModel):
-    """Response model for API key (without the actual key)"""
+    """
+    Response model for API key (without the actual key)
+
+    NOTE: All API keys in database are for external teams (clients).
+    No access_level field - all database keys have equal access (chat service only).
+    """
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -104,7 +113,6 @@ class APIKeyResponse(BaseModel):
     name: str
     team_id: int
     team_name: str  # Team name for better UX
-    access_level: str
     monthly_quota: Optional[int]
     daily_quota: Optional[int]
     is_active: bool
@@ -450,12 +458,11 @@ async def create_api_key(
         db=db,
         team_id=key_data.team_id,
         name=key_data.name,
-        access_level=key_data.access_level,
         description=key_data.description,
         monthly_quota=key_data.monthly_quota,
         daily_quota=key_data.daily_quota,
         expires_in_days=key_data.expires_in_days,
-        created_by=api_key.key_prefix if api_key else "system",
+        created_by=f"super_admin_{api_key[:12]}" if api_key else "system",
     )
 
     # Construct response with team name
@@ -465,9 +472,8 @@ async def create_api_key(
         name=api_key_obj.name,
         team_id=api_key_obj.team_id,
         team_name=team.name,
-        access_level=api_key_obj.access_level,
-        monthly_quota=api_key_obj.monthly_quota_override,
-        daily_quota=api_key_obj.daily_quota_override,
+        monthly_quota=api_key_obj.monthly_quota,
+        daily_quota=api_key_obj.daily_quota,
         is_active=api_key_obj.is_active,
         created_by=api_key_obj.created_by,
         description=api_key_obj.description,
@@ -514,9 +520,8 @@ async def list_api_keys(
                 name=key.name,
                 team_id=key.team_id,
                 team_name=team_name,
-                access_level=key.access_level,
-                monthly_quota=key.monthly_quota_override,
-                daily_quota=key.daily_quota_override,
+                monthly_quota=key.monthly_quota,
+                daily_quota=key.daily_quota,
                 is_active=key.is_active,
                 created_by=key.created_by,
                 description=key.description,

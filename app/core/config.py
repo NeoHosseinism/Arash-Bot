@@ -53,6 +53,12 @@ class Settings(BaseSettings):
     # API Docs (Generic - set by DevOps per deployment)
     ENABLE_API_DOCS: bool = True  # DevOps sets: true for dev/stage, false for prod
 
+    # Super Admin Authentication (Infrastructure Level)
+    # These API keys are for internal team only - NOT stored in database
+    # Comma-separated list of API keys for super admin access
+    # Example: "key1,key2,key3"
+    SUPER_ADMIN_API_KEYS: str = ""  # Set in production via environment/secrets
+
     # Database Configuration (Generic - set by DevOps per deployment)
     # DevOps sets these in K8s ConfigMap/Secret for each environment
     # Each deployment only has the credentials it needs (security)
@@ -168,7 +174,19 @@ class Settings(BaseSettings):
     def internal_admin_users_set(self) -> set:
         """Get internal admin users as set"""
         return {user.strip() for user in self.INTERNAL_ADMIN_USERS.split(",") if user.strip()}
-    
+
+    @property
+    def super_admin_keys_set(self) -> set:
+        """
+        Get super admin API keys as set for fast validation
+
+        These are infrastructure-level admin keys (NOT in database).
+        Used to authenticate internal team for /api/v1/admin/* endpoints.
+        """
+        if not self.SUPER_ADMIN_API_KEYS:
+            return set()
+        return {key.strip() for key in self.SUPER_ADMIN_API_KEYS.split(",") if key.strip()}
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Get CORS origins as list"""

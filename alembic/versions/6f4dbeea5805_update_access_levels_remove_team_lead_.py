@@ -20,47 +20,33 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """
-    Update access levels to new two-tier system:
-    - Rename 'user' to 'team' (external teams)
-    - Rename 'team_lead' to 'team' (consolidate into single level)
-    - Keep 'admin' as-is (super admins)
+    Remove access_level column - TWO-PATH AUTHENTICATION
 
-    TWO-TIER SYSTEM:
-    - ADMIN: Super admins (internal team) - full access to admin endpoints
-    - TEAM: External teams (clients) - can only use chat service
+    BEFORE: Database stored access levels (user, team_lead, admin)
+    AFTER: No access_level column - all database keys are for external teams
+
+    TWO-PATH AUTHENTICATION:
+    - Super Admins: Environment variable (SUPER_ADMIN_API_KEYS) - NOT in database
+    - Teams: Database API keys (this table) - all equal access (chat service only)
+
+    This migration:
+    1. Drops the access_level column from api_keys table
+    2. All database keys are now for external teams (clients)
+    3. Super admin authentication completely separate (environment-based)
     """
-    # Update existing 'user' access level to 'team'
-    op.execute(
-        """
-        UPDATE api_keys
-        SET access_level = 'team'
-        WHERE access_level = 'user'
-        """
-    )
-
-    # Update existing 'team_lead' access level to 'team'
-    op.execute(
-        """
-        UPDATE api_keys
-        SET access_level = 'team'
-        WHERE access_level = 'team_lead'
-        """
-    )
+    # Drop access_level column - no longer needed
+    op.drop_column('api_keys', 'access_level')
 
 
 def downgrade() -> None:
     """
-    Rollback to old access levels:
-    - Rename 'team' back to 'user' (cannot distinguish from old team_lead)
+    Rollback: Re-add access_level column
 
-    NOTE: This is a lossy downgrade - we cannot distinguish between
-    old 'user' and 'team_lead' levels, so everything becomes 'user'.
+    NOTE: This is a lossy downgrade - we cannot recover the original access levels.
+    All keys will be set to 'team' (external teams).
     """
-    # Rename 'team' back to 'user' (lossy - cannot recover team_lead distinction)
-    op.execute(
-        """
-        UPDATE api_keys
-        SET access_level = 'user'
-        WHERE access_level = 'team'
-        """
+    # Re-add access_level column with default 'team'
+    op.add_column(
+        'api_keys',
+        sa.Column('access_level', sa.String(50), nullable=False, server_default='team')
     )

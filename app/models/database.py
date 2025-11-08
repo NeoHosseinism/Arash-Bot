@@ -31,25 +31,6 @@ logger = logging.getLogger(__name__)
 Base = declarative_base()
 
 
-class AccessLevel(str, Enum):
-    """
-    Access levels for API keys - Two-tier system
-
-    ADMIN: Super admins (internal team developers)
-        - Full access to ALL /api/v1/admin/* endpoints
-        - Can create teams, API keys, view all usage, etc.
-        - These are the service owners
-
-    TEAM: External teams (clients using the service)
-        - Can ONLY access /api/v1/chat endpoint
-        - Cannot access ANY admin endpoints
-        - These are the clients using the chatbot service
-    """
-
-    ADMIN = "admin"  # Super admins (internal team) - full access to admin endpoints
-    TEAM = "team"    # External teams (clients) - can only use chat service
-
-
 class Team(Base):
     """Team model for organizing users and tracking usage"""
 
@@ -79,7 +60,13 @@ class Team(Base):
 
 
 class APIKey(Base):
-    """API Key model for authentication and authorization"""
+    """
+    API Key model for external teams (clients) only
+
+    NOTE: Super admin authentication is handled via environment variables (SUPER_ADMIN_API_KEYS).
+    This table ONLY stores API keys for external teams using the chat service.
+    All keys in this table have equal access (chat service only, NO admin access).
+    """
 
     __tablename__ = "api_keys"
 
@@ -88,7 +75,6 @@ class APIKey(Base):
     key_prefix = Column(String(16), nullable=False)  # First 8 chars for identification
     name = Column(String(255), nullable=False)  # Friendly name for the key
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
-    access_level = Column(String(50), nullable=False, default=AccessLevel.TEAM.value)
 
     # Quota management
     monthly_quota = Column(Integer, nullable=True)  # Overrides team quota if set

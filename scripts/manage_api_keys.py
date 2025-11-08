@@ -17,7 +17,7 @@ import argparse
 from datetime import datetime
 from tabulate import tabulate
 
-from app.models.database import get_database, AccessLevel
+from app.models.database import get_database
 from app.services.api_key_manager import APIKeyManager
 from app.services.usage_tracker import UsageTracker
 
@@ -121,24 +121,27 @@ def delete_team(team_id: int, force: bool = False):
 def create_api_key(
     team_id: int,
     name: str,
-    access_level: str = "team",
     description: str = None,
     expires_in_days: int = None,
 ):
     """
-    Create a new API key
+    Create a new API key for external teams (clients)
 
-    TWO-TIER ACCESS LEVELS:
-    - admin: Super admins (internal team) - full access to admin endpoints
-    - team: External teams (clients) - can only use chat service [DEFAULT]
+    TWO-PATH AUTHENTICATION:
+    - This creates API keys for EXTERNAL TEAMS (clients using chat service)
+    - Super admin access is via SUPER_ADMIN_API_KEYS environment variable (NOT database)
+
+    All database API keys have EQUAL access:
+    - Can access: /api/v1/chat endpoint only
+    - Cannot access: /api/v1/admin/* endpoints (super admin only)
+
+    For super admin access, set SUPER_ADMIN_API_KEYS in environment:
+    export SUPER_ADMIN_API_KEYS="your_secret_key_1,your_secret_key_2"
     """
     db = get_database()
     session = next(db.get_session())
 
     try:
-        # Validate access level
-        access_level_enum = AccessLevel(access_level)
-
         # Verify team exists
         team = APIKeyManager.get_team_by_id(session, team_id)
         if not team:
@@ -149,13 +152,12 @@ def create_api_key(
             db=session,
             team_id=team_id,
             name=name,
-            access_level=access_level_enum,
             description=description,
             expires_in_days=expires_in_days,
-            created_by="cli-admin",
+            created_by="cli-script",
         )
 
-        print("[OK] API Key created successfully!")
+        print("[OK] Team API Key created successfully!")
         print()
         print("=" * 60)
         print("IMPORTANT: Save this API key securely!")
@@ -169,20 +171,13 @@ def create_api_key(
         print(f"  Key Prefix: {api_key_obj.key_prefix}")
         print(f"  Name: {api_key_obj.name}")
         print(f"  Team: {team.name} (ID: {team_id})")
-        print(f"  Access Level: {api_key_obj.access_level}")
         print(f"  Expires: {api_key_obj.expires_at or 'Never'}")
         print()
-        if api_key_obj.access_level == "admin":
-            print("  ⚠️  ADMIN KEY: Full access to all admin endpoints")
-        else:
-            print("  ℹ️  TEAM KEY: Can only access /api/v1/chat endpoint")
+        print("  ℹ️  ACCESS: /api/v1/chat endpoint only (external team)")
+        print("  ℹ️  Cannot access /api/v1/admin/* endpoints")
+        print()
+        print("  NOTE: Super admin access is via SUPER_ADMIN_API_KEYS environment variable")
 
-    except ValueError as e:
-        print(f"[ERROR] Invalid access level: {access_level}")
-        print(f"  Valid values: team, admin")
-        print(f"  - team: External teams (clients) - chat service only [DEFAULT]")
-        print(f"  - admin: Super admins (internal team) - full admin access")
-        sys.exit(1)
     except Exception as e:
         print(f"[ERROR] Error creating API key: {e}")
         sys.exit(1)
@@ -213,14 +208,16 @@ def list_api_keys(team_id: int = None):
             key.key_prefix,
             key.name,
             key.team.name,
-            key.access_level,
             "active" if key.is_active else "inactive",
             key.last_used_at.strftime("%Y-%m-%d %H:%M") if key.last_used_at else "Never",
             key.expires_at.strftime("%Y-%m-%d") if key.expires_at else "Never",
         ])
 
-    headers = ["ID", "Prefix", "Name", "Team", "Level", "Active", "Last Used", "Expires"]
+    headers = ["ID", "Prefix", "Name", "Team", "Active", "Last Used", "Expires"]
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
+    print()
+    print("NOTE: All database API keys are for external teams (chat service only)")
+    print("      Super admin access is via SUPER_ADMIN_API_KEYS environment variable")
 
 
 def revoke_api_key(key_id: int, permanent: bool = False):
