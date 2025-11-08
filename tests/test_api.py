@@ -34,25 +34,26 @@ def mock_db_session():
 
 @pytest.fixture
 def mock_api_key_user():
-    """Mock USER level API key"""
+    """Mock TEAM level API key (external team/client)"""
     key = Mock()
     key.id = 1
     key.team_id = 100
     key.key_prefix = "sk_test_"
-    key.access_level = AccessLevel.USER.value
+    key.access_level = AccessLevel.TEAM.value
     key.is_active = True
     return key
 
 
 @pytest.fixture
 def mock_api_key_admin():
-    """Mock ADMIN level API key"""
+    """Mock ADMIN level API key (super admin/internal team)"""
     key = Mock()
     key.id = 2
     key.team_id = 200
     key.key_prefix = "sk_admin_"
     key.access_level = AccessLevel.ADMIN.value
     key.is_active = True
+    key.team = Mock(name="Internal Team")
     return key
 
 

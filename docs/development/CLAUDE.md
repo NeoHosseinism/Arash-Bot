@@ -127,7 +127,7 @@ make db-keys
 **Team-Based Isolation:**
 - Session keys include team_id to prevent collision: `platform:team_id:chat_id`
 - All database queries filter by team_id for complete data isolation
-- API keys are team-scoped with hierarchical access levels (User, Team Lead, Admin)
+- API keys are team-scoped with two-tier access control (TEAM for external clients, ADMIN for super admins)
 
 **Platform-Specific Configuration:**
 - Telegram (Public): Gemini 2.0 Flash default, 20 msg/min, 10 msg history

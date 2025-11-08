@@ -204,7 +204,7 @@ erDiagram
         int team_id FK
         string key_hash UK "SHA256"
         string key_prefix "First 12 chars"
-        string access_level "USER|TEAM_LEAD|ADMIN"
+        string access_level "TEAM|ADMIN"
         int daily_quota_override
         int monthly_quota_override
         datetime expires_at
@@ -282,8 +282,7 @@ classDiagram
 
     class AccessLevel {
         <<enumeration>>
-        USER
-        TEAM_LEAD
+        TEAM
         ADMIN
         +compare(other) bool
     }

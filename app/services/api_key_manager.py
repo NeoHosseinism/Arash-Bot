@@ -93,7 +93,7 @@ class APIKeyManager:
         db: Session,
         team_id: int,
         name: str,
-        access_level: AccessLevel = AccessLevel.USER,
+        access_level: AccessLevel = AccessLevel.TEAM,
         created_by: Optional[str] = None,
         description: Optional[str] = None,
         monthly_quota: Optional[int] = None,

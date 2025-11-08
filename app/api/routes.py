@@ -1,10 +1,29 @@
 """
-Public API routes for external teams
+Public API routes for external teams (clients)
+
+TWO-TIER ACCESS CONTROL:
+These endpoints are accessible to ALL valid API keys (both TEAM and ADMIN levels).
+However, they are designed for external teams (clients) using the chatbot service.
+
+PUBLIC ENDPOINTS (ALL VALID API KEYS):
+- /api/v1/chat - Process chat messages
 
 SECURITY MODEL:
-- External teams should think they're using a simple chatbot API
+- External teams (TEAM level) think they're using a simple chatbot API
 - NO exposure of: sessions, teams, access levels, or other teams
 - Complete transparency: teams don't know about our internal architecture
+- Team isolation enforced via session tagging (transparent to clients)
+
+WHAT EXTERNAL TEAMS SEE:
+- Simple chatbot API with message in, response out
+- No complexity, no admin features, no multi-tenancy visibility
+
+WHAT THEY DON'T SEE:
+- Access levels (ADMIN vs TEAM)
+- Other teams or their usage
+- Session management internals
+- Platform configuration
+- Admin endpoints
 """
 
 from typing import Optional

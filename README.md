@@ -476,7 +476,7 @@ kubectl apply -f manifests/prod/
 - **API Key Hashing**: SHA256, never stored in plain text
 - **Team Isolation**: Complete session and data isolation between teams
 - **Session Key Isolation**: Team ID included in session keys to prevent collision
-- **Access Levels**: Hierarchical permissions (User → Team Lead → Admin)
+- **Two-Tier Access Control**: ADMIN (super admins - full access) and TEAM (external clients - chat only)
 - **Rate Limiting**: Per-user and per-team quota enforcement
 - **Input Validation**: Pydantic models for all inputs
 - **API Versioning**: All endpoints at `/api/v1/` for future compatibility

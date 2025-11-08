@@ -1,8 +1,21 @@
 """
 Admin API routes for team and API key management
 
-ADMIN ENDPOINTS: These endpoints expose platform details including Telegram.
-Only accessible with admin API keys.
+TWO-TIER ACCESS CONTROL:
+These endpoints are ONLY accessible to SUPER ADMINS (internal team).
+API keys with access_level=TEAM cannot access these endpoints.
+
+ADMIN ENDPOINTS (SUPER ADMINS ONLY):
+- Team management (create, list, update, delete teams)
+- API key management (create, list, revoke API keys for any team)
+- Usage statistics (view ALL teams' usage)
+- Platform information (Telegram + Internal platform config)
+- System administration (clear sessions, webhook config, etc.)
+
+SECURITY:
+- All endpoints protected by require_admin_access dependency
+- Exposes platform details including Telegram (admin-only information)
+- External teams (TEAM level) have NO ACCESS to these endpoints
 """
 
 import logging
@@ -75,7 +88,7 @@ class APIKeyCreate(BaseModel):
 
     team_id: int
     name: str
-    access_level: AccessLevel = AccessLevel.USER
+    access_level: AccessLevel = AccessLevel.TEAM
     description: Optional[str] = None
     monthly_quota: Optional[int] = None
     daily_quota: Optional[int] = None

@@ -135,7 +135,10 @@ curl -X POST http://localhost:3000/api/v1/chat \
 
 Base URL: `/api/v1/admin/`
 
-All admin endpoints require `access_level=admin` API key.
+**SUPER ADMIN ONLY** - All admin endpoints require `access_level=admin` API key.
+
+These endpoints are only accessible to super admins (internal team).
+External teams (with `access_level=team`) cannot access these endpoints.
 
 ---
 
@@ -505,8 +508,8 @@ curl -X POST "http://localhost:3000/api/v1/admin/clear-sessions?platform=telegra
 {
   "team_id": 1,
   "name": "Production API Key",
-  "access_level": "user",
-  "description": "Production environment key",
+  "access_level": "team",
+  "description": "Production environment key for external client",
   "monthly_quota": null,
   "daily_quota": null,
   "expires_in_days": 365
@@ -516,7 +519,9 @@ curl -X POST "http://localhost:3000/api/v1/admin/clear-sessions?platform=telegra
 **Request Fields:**
 - `team_id` (int, required): Team ID
 - `name` (string, required): API key friendly name
-- `access_level` (string, optional, default="user"): Access level ("user", "team_lead", "admin")
+- `access_level` (string, optional, default="team"): Access level:
+  - `"team"` - External teams (clients) - can only use chat service [DEFAULT]
+  - `"admin"` - Super admins (internal team) - full access to admin endpoints
 - `description` (string, optional): Key description
 - `monthly_quota` (int, optional): Override team monthly quota (null = use team quota)
 - `daily_quota` (int, optional): Override team daily quota (null = use team quota)

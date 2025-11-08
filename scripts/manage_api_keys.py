@@ -121,11 +121,17 @@ def delete_team(team_id: int, force: bool = False):
 def create_api_key(
     team_id: int,
     name: str,
-    access_level: str = "user",
+    access_level: str = "team",
     description: str = None,
     expires_in_days: int = None,
 ):
-    """Create a new API key"""
+    """
+    Create a new API key
+
+    TWO-TIER ACCESS LEVELS:
+    - admin: Super admins (internal team) - full access to admin endpoints
+    - team: External teams (clients) - can only use chat service [DEFAULT]
+    """
     db = get_database()
     session = next(db.get_session())
 
@@ -165,10 +171,17 @@ def create_api_key(
         print(f"  Team: {team.name} (ID: {team_id})")
         print(f"  Access Level: {api_key_obj.access_level}")
         print(f"  Expires: {api_key_obj.expires_at or 'Never'}")
+        print()
+        if api_key_obj.access_level == "admin":
+            print("  ⚠️  ADMIN KEY: Full access to all admin endpoints")
+        else:
+            print("  ℹ️  TEAM KEY: Can only access /api/v1/chat endpoint")
 
     except ValueError as e:
         print(f"[ERROR] Invalid access level: {access_level}")
-        print(f"  Valid values: user, team_lead, admin")
+        print(f"  Valid values: team, admin")
+        print(f"  - team: External teams (clients) - chat service only [DEFAULT]")
+        print(f"  - admin: Super admins (internal team) - full admin access")
         sys.exit(1)
     except Exception as e:
         print(f"[ERROR] Error creating API key: {e}")
