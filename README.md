@@ -1,4 +1,4 @@
-# Arash External API Service v1.1
+# Arash External API Service v1.0
 
 Enterprise-ready AI chatbot service with integrated Telegram bot, team-based access control, and multi-platform support.
 
@@ -13,14 +13,20 @@ Enterprise-ready AI chatbot service with integrated Telegram bot, team-based acc
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Install Poetry and Dependencies
 
 ```bash
-# Install Poetry (if not installed)
-make install-poetry
+# Install Poetry (Python dependency manager)
+curl -sSL https://install.python-poetry.org | python3 -
+
+# Add Poetry to PATH
+export PATH="$HOME/.local/bin:$PATH"
+
+# Configure Poetry to use Python 3.11+
+poetry env use python3.11
 
 # Install project dependencies
-make install
+poetry install
 ```
 
 ### 2. Configure Environment
@@ -43,26 +49,24 @@ nano .env
 
 ```bash
 # Apply all pending migrations
-make migrate-up
-
-# Check migration status
-make migrate-status
+poetry run alembic upgrade head
 ```
 
 ### 4. Start the Service
 
 ```bash
 # Run with auto-reload (development)
-make run-dev
-
-# Run in production mode
 make run
+
+# Or run directly with Poetry
+poetry run uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload
 ```
 
 The service will be available at:
-- API: `http://localhost:3000/api/v1/`
-- Docs: `http://localhost:3000/api/v1/docs`
-- Health: `http://localhost:3000/health`
+- **API**: `http://localhost:3000/api/v1/`
+- **Docs** (Swagger UI): `http://localhost:3000/docs`
+- **ReDoc**: `http://localhost:3000/redoc`
+- **Health Check**: `http://localhost:3000/health`
 
 ## Project Structure
 
@@ -125,12 +129,10 @@ make db-keys
 
 ```bash
 # Install dependencies
-make install                    # Install dependencies
-make install-dev                # Install with dev dependencies
+make install                    # Install dependencies with Poetry
 
 # Run application
 make run                        # Run on port 3000
-make run-dev                    # Run with auto-reload
 
 # Code quality
 make test                       # Run pytest tests
@@ -138,15 +140,16 @@ make lint                       # Check code with ruff
 make format                     # Format code with black
 make clean                      # Remove cache files
 
+# Database
+make migrate-up                 # Apply migrations
+make db-teams                   # List teams
+make db-keys                    # List API keys
+make db-team-create             # Create new team
+make db-key-create              # Create new API key
+
 # Docker
 make docker-build               # Build Docker image
 make docker-run                 # Run Docker container
-make docker-push                # Push to registry
-
-# Kubernetes deployment
-make k8s-deploy-dev             # Deploy to dev
-make k8s-deploy-stage           # Deploy to staging
-make k8s-deploy-prod            # Deploy to production
 ```
 
 ## API Documentation
@@ -184,7 +187,10 @@ All API endpoints are prefixed with `/api/v1/` for versioning support.
 - `GET /api/v1/admin/usage/team/{id}` - Team usage stats (Team Lead+)
 - `GET /api/v1/admin/usage/api-key/{id}` - Key usage stats (Team Lead+)
 
-Full API documentation available at `http://localhost:3000/api/v1/docs`
+Full API documentation available at:
+- Swagger UI: `http://localhost:3000/docs`
+- ReDoc: `http://localhost:3000/redoc`
+- OpenAPI JSON: `http://localhost:3000/openapi.json`
 
 ## Telegram Bot Commands
 
@@ -194,6 +200,52 @@ Full API documentation available at `http://localhost:3000/api/v1/docs`
 - `/clear` - Clear conversation history
 - `/model` - Switch AI model
 - `/models` - List available models
+
+## Logging Configuration
+
+The service uses a comprehensive logging system with dual timestamp support (UTC + Iranian/Jalali calendar), color-coded output, and structured key-value logging.
+
+### Quick Configuration
+
+```bash
+# In your .env file:
+LOG_LEVEL=DEBUG                # DEBUG | INFO | WARNING | ERROR | CRITICAL
+LOG_TIMESTAMP=both             # utc | ir | both
+LOG_COLOR=auto                 # auto | true | false
+LOG_TIMESTAMP_PRECISION=6      # 3 (ms) | 6 (μs)
+```
+
+### Timestamp Modes
+
+**UTC Only (`LOG_TIMESTAMP=utc`):**
+```
+[2025-11-08 11:04:40.401000 UTC][info] server_started port=8080
+```
+
+**Iranian Only (`LOG_TIMESTAMP=ir`):**
+```
+[1404-08-17 14:34:40.403000 IR][info] server_started port=8080
+```
+
+**Both (`LOG_TIMESTAMP=both`):**
+```
+[2025-11-08 11:04:40.404000 UTC][1404-08-17 14:34:40.404000 IR][info] server_started port=8080
+```
+
+### Demo and Testing
+
+```bash
+# Run interactive timestamp mode demo
+python3 demo_timestamp_modes.py
+
+# Run comprehensive logging tests
+python3 tests/test_logging.py
+
+# Or use make command
+make demo-logging
+```
+
+For complete logging documentation, see [LOGGING.md](LOGGING.md)
 
 ## Configuration
 

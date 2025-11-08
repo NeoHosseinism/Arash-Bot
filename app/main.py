@@ -38,7 +38,7 @@ async def lifespan(app: FastAPI):
 
     # Startup
     logger.info("=" * 60)
-    logger.info("Starting Arash External API Service v1.1")
+    logger.info("Starting Arash External API Service v1.0")
     logger.info("=" * 60)
 
     app.state.start_time = datetime.now()
@@ -184,11 +184,11 @@ async def periodic_cleanup():
 # Create FastAPI app
 app = FastAPI(
     title="Arash External API Service",
-    version="1.1.0",
+    version="1.0.0",
     description="External API service supporting Telegram (public) and Internal (private) platforms with enterprise features",
-    docs_url="/api/v1/docs" if settings.ENABLE_API_DOCS else None,
-    redoc_url="/api/v1/redoc" if settings.ENABLE_API_DOCS else None,
-    openapi_url="/api/v1/openapi.json" if settings.ENABLE_API_DOCS else None,
+    docs_url="/docs" if settings.ENABLE_API_DOCS else None,
+    redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,
+    openapi_url="/openapi.json" if settings.ENABLE_API_DOCS else None,
     lifespan=lifespan
 )
 
@@ -236,7 +236,7 @@ async def health_check():
     return {
         "status": "healthy" if ai_service_healthy else "degraded",
         "service": "Arash External API Service",
-        "version": "1.1.0",
+        "version": "1.0.0",
         "timestamp": datetime.now().isoformat(),
     }
 

@@ -144,7 +144,7 @@ async def admin_root(
 
     return HealthCheckResponse(
         service="Arash External API Service",
-        version="1.1.0",
+        version="1.0.0",
         status="healthy",
         platforms={
             "telegram": {

@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     # Logging Configuration (Generic - set by DevOps per deployment)
     LOG_LEVEL: str = "DEBUG"  # DevOps sets: DEBUG for dev, INFO for stage, WARNING for prod
     LOG_FILE: str = "logs/arash_api_service.log"
+    LOG_TIMESTAMP: str = "both"  # utc | ir | both
+    LOG_COLOR: str = "auto"  # auto | true | false
+    LOG_TIMESTAMP_PRECISION: int = 6  # 3=ms, 6=μs
+    NO_COLOR: str = "0"  # 1=force disable colors
 
     # Features Configuration
     ENABLE_IMAGE_PROCESSING: bool = True

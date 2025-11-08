@@ -1,9 +1,9 @@
 # Arash External API Service - Makefile
 # Essential commands for development and deployment
 
-.PHONY: help check-poetry install run test lint format clean \
-        docker-build docker-run migrate-up \
-        db-teams db-keys db-team-create db-key-create
+.PHONY: help check-poetry install run run-dev test lint format clean \
+        docker-build docker-run migrate-up migrate-down migrate-status migrate-create \
+        db-teams db-keys db-team-create db-key-create demo-logging show-config
 
 # Detect poetry location (allow override with POETRY=/path/to/poetry)
 POETRY ?= $(shell which poetry 2>/dev/null || echo "$$HOME/.local/bin/poetry")
@@ -24,29 +24,41 @@ check-poetry:
 # Default target
 help:
 	@echo "========================================================================"
-	@echo "Arash External API Service - Essential Commands"
+	@echo "Arash External API Service v1.0 - Essential Commands"
 	@echo "========================================================================"
 	@echo ""
-	@echo "NOTE: Requires Poetry (detected at: $(POETRY))"
+	@echo "Poetry: $(POETRY)"
 	@echo ""
 	@echo "[Development]"
-	@echo "  make install     Install dependencies"
-	@echo "  make run         Run application (port 3000)"
-	@echo "  make test        Run test suite"
-	@echo "  make lint        Check code quality"
-	@echo "  make format      Format code"
-	@echo "  make clean       Remove cache files"
+	@echo "  make install        Install dependencies"
+	@echo "  make run            Run application (port 3000)"
+	@echo "  make run-dev        Run with auto-reload (development)"
+	@echo "  make test           Run test suite"
+	@echo "  make lint           Check code quality (ruff)"
+	@echo "  make format         Format code (black)"
+	@echo "  make clean          Remove cache files"
+	@echo "  make show-config    Show current configuration"
+	@echo ""
+	@echo "[Database Migrations]"
+	@echo "  make migrate-up        Apply pending migrations"
+	@echo "  make migrate-down      Rollback last migration"
+	@echo "  make migrate-status    Show migration status"
+	@echo "  make migrate-create    Create new migration"
+	@echo ""
+	@echo "[Team & API Key Management]"
+	@echo "  make db-teams          List all teams"
+	@echo "  make db-keys           List all API keys"
+	@echo "  make db-team-create    Create team: NAME=\"Team\" [DAILY=100] [MONTHLY=3000]"
+	@echo "  make db-key-create     Create API key: TEAM=<id> NAME=\"Key\" [LEVEL=user]"
+	@echo ""
+	@echo "[Logging]"
+	@echo "  make demo-logging   Run logging demo (timestamp modes)"
 	@echo ""
 	@echo "[Docker]"
 	@echo "  make docker-build   Build Docker image"
 	@echo "  make docker-run     Run Docker container"
 	@echo ""
-	@echo "[Database]"
-	@echo "  make migrate-up     Apply migrations"
-	@echo "  make db-teams       List teams"
-	@echo "  make db-keys        List API keys"
-	@echo "  make db-team-create NAME=\"Team\" [DAILY=100] [MONTHLY=3000]"
-	@echo "  make db-key-create  TEAM=<id> NAME=\"Key\" [LEVEL=user]"
+	@echo "For full documentation, see README.md"
 	@echo ""
 
 # ============================================================================
@@ -60,7 +72,15 @@ install: check-poetry
 run: check-poetry
 	@echo "[Starting Arash API Service...]"
 	@echo "API: http://localhost:3000"
+	@echo "Docs: http://localhost:3000/docs"
 	$(POETRY) run uvicorn app.main:app --host 0.0.0.0 --port 3000
+
+run-dev: check-poetry
+	@echo "[Starting Arash API Service (Development Mode)...]"
+	@echo "API: http://localhost:3000"
+	@echo "Docs: http://localhost:3000/docs"
+	@echo "Auto-reload: Enabled"
+	$(POETRY) run uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload
 
 test: check-poetry
 	@echo "[Running tests...]"
@@ -78,7 +98,22 @@ clean:
 	@echo "[Cleaning cache...]"
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 	find . -type d -name ".pytest_cache" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name ".ruff_cache" -exec rm -rf {} + 2>/dev/null || true
 	find . -type f -name "*.pyc" -delete
+	@echo "[OK] Cache cleaned"
+
+show-config: check-poetry
+	@echo "[Current Configuration]"
+	@echo "Environment: $$(grep '^ENVIRONMENT=' .env | cut -d'=' -f2)"
+	@echo "Log Level: $$(grep '^LOG_LEVEL=' .env | cut -d'=' -f2)"
+	@echo "Log Timestamp: $$(grep '^LOG_TIMESTAMP=' .env | cut -d'=' -f2)"
+	@echo "API Docs: $$(grep '^ENABLE_API_DOCS=' .env | cut -d'=' -f2)"
+	@echo "Database: $$(grep '^DB_NAME=' .env | cut -d'=' -f2)"
+	@echo "DB Host: $$(grep '^DB_HOST=' .env | cut -d'=' -f2)"
+
+demo-logging:
+	@echo "[Running Logging Demo...]"
+	python3 demo_timestamp_modes.py
 
 # ============================================================================
 # Docker
@@ -93,12 +128,39 @@ docker-run:
 	docker run --rm --env-file .env -p 3000:3000 arash-external-api:latest
 
 # ============================================================================
-# Database
+# Database Migrations
 # ============================================================================
 
 migrate-up: check-poetry
 	@echo "[Applying migrations...]"
 	$(POETRY) run alembic upgrade head
+	@echo "[OK] Migrations applied"
+
+migrate-down: check-poetry
+	@echo "[Rolling back last migration...]"
+	$(POETRY) run alembic downgrade -1
+	@echo "[OK] Migration rolled back"
+
+migrate-status: check-poetry
+	@echo "[Migration Status]"
+	@$(POETRY) run alembic current
+	@echo ""
+	@echo "[Migration History]"
+	@$(POETRY) run alembic history
+
+migrate-create: check-poetry
+ifndef MSG
+	@echo "[ERROR] MSG is required"
+	@echo "Usage: make migrate-create MSG=\"Description of migration\""
+	@exit 1
+endif
+	@echo "[Creating new migration: $(MSG)]"
+	$(POETRY) run alembic revision --autogenerate -m "$(MSG)"
+	@echo "[OK] Migration created"
+
+# ============================================================================
+# Team & API Key Management
+# ============================================================================
 
 db-teams: check-poetry
 	@$(POETRY) run python scripts/manage_api_keys.py team list
