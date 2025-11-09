@@ -46,41 +46,69 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 
 
 class TeamCreate(BaseModel):
-    """Request model for creating a team"""
+    """
+    Request model for creating a team.
 
-    name: str
-    description: Optional[str] = None
+    Changes:
+    - Uses platform_name instead of name/description (e.g., "Internal-BI", "External-Telegram")
+    - Removed webhooks (not supported)
+    - Auto-generates API key on creation
+    """
+
+    platform_name: str  # e.g., "Internal-BI", "External-Telegram"
     monthly_quota: Optional[int] = None
     daily_quota: Optional[int] = None
 
 
 class TeamUpdate(BaseModel):
-    """Request model for updating a team"""
+    """
+    Request model for updating a team.
 
-    name: Optional[str] = None
-    description: Optional[str] = None
+    Changes:
+    - Uses platform_name instead of name/description
+    - Removed webhooks (not supported)
+    """
+
+    platform_name: Optional[str] = None
     monthly_quota: Optional[int] = None
     daily_quota: Optional[int] = None
     is_active: Optional[bool] = None
-    webhook_url: Optional[str] = None
-    webhook_secret: Optional[str] = None
-    webhook_enabled: Optional[bool] = None
 
 
 class TeamResponse(BaseModel):
-    """Response model for team"""
+    """
+    Response model for team.
+
+    Includes API key prefix (one key per team).
+    """
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    name: str
-    description: Optional[str]
+    platform_name: str  # e.g., "Internal-BI"
     monthly_quota: Optional[int]
     daily_quota: Optional[int]
     is_active: bool
-    webhook_url: Optional[str]
-    webhook_enabled: bool
+    api_key_prefix: Optional[str] = None  # Prefix of the team's API key
+    api_key_last_used: Optional[datetime] = None  # When API key was last used
     created_at: datetime
     updated_at: datetime
+
+
+class TeamCreateResponse(BaseModel):
+    """
+    Response model when creating a team (includes the generated API key).
+
+    The API key is shown ONLY ONCE during creation.
+    """
+
+    id: int
+    platform_name: str
+    monthly_quota: Optional[int]
+    daily_quota: Optional[int]
+    is_active: bool
+    created_at: datetime
+    api_key: str  # Full API key - shown only once!
+    warning: str = "Save this API key securely. It will not be shown again."
 
 
 class APIKeyCreate(BaseModel):

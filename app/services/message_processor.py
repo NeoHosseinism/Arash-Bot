@@ -100,6 +100,122 @@ class MessageProcessor:
                 response=MESSAGES_FA["error_processing"]
             )
 
+    async def process_message_simple(
+        self,
+        platform_name: str,
+        team_id: int,
+        api_key_id: int,
+        api_key_prefix: str,
+        user_id: str,
+        chat_id: str,
+        message_id: str,
+        text: str,
+    ) -> BotResponse:
+        """
+        Process message with simplified interface (text-only, no webhooks).
+
+        Args:
+            platform_name: Team's platform name (e.g., "Internal-BI")
+            team_id: Team ID
+            api_key_id: API key ID
+            api_key_prefix: API key prefix
+            user_id: User ID
+            chat_id: Chat ID (auto-generated if not provided by client)
+            message_id: Message ID (auto-generated)
+            text: Message text
+
+        Returns:
+            BotResponse with chat_id for continuation
+        """
+        try:
+            # Get or create session with platform_name
+            session = session_manager.get_or_create_session(
+                platform=platform_name,  # Now using platform_name instead of "internal"
+                user_id=user_id,
+                chat_id=chat_id,
+                team_id=team_id,
+                api_key_id=api_key_id,
+                api_key_prefix=api_key_prefix
+            )
+
+            # Check rate limit (use platform_name for rate limiting)
+            if not session_manager.check_rate_limit(platform_name, user_id):
+                # Get rate limit for this platform from session config
+                rate_limit = session.platform_config.get("rate_limit", 60)
+                return BotResponse(
+                    success=False,
+                    error="rate_limit_exceeded",
+                    response=f"Rate limit exceeded. Please wait before sending more messages. Limit: {rate_limit} messages/minute.",
+                    chat_id=chat_id,
+                    session_id=session.session_id,
+                )
+
+            # Process command or message
+            if text and command_processor.is_command(text):
+                response_text = await self._handle_command(session, text)
+            else:
+                response_text = await self._handle_chat_simple(session, text)
+
+            # Update session
+            session.message_count += 1
+            session.update_activity()
+
+            # Return simplified response with chat_id
+            return BotResponse(
+                success=True,
+                response=response_text,
+                chat_id=chat_id,  # Include chat_id for continuation
+                session_id=session.session_id,
+                model=session.current_model,
+                message_count=session.message_count,
+            )
+
+        except Exception as e:
+            logger.error(f"Error processing message: {e}", exc_info=True)
+            return BotResponse(
+                success=False,
+                error="processing_error",
+                response="Sorry, an error occurred while processing your message. Please try again.",
+                chat_id=chat_id,
+            )
+
+    async def _handle_chat_simple(self, session: ChatSession, text: str) -> str:
+        """Handle chat message (simplified, text-only)"""
+        try:
+            # Get max history for platform
+            max_history = platform_manager.get_max_history(session.platform)
+
+            # Send to AI service with session's current model
+            try:
+                response = await ai_client.send_chat_request(
+                    session_id=session.session_id,
+                    query=text,
+                    history=session.get_recent_history(max_history),
+                    pipeline=session.current_model,
+                    files=[],  # No files in simplified version
+                )
+
+                # Update history
+                session.add_message("user", text)
+                session.add_message("assistant", response["Response"])
+
+                # Trim history if exceeds platform limit
+                if len(session.history) > max_history * 2:
+                    session.history = session.history[-max_history * 2:]
+
+                return response["Response"]
+
+            except Exception as ai_service_error:
+                logger.error(f"AI service error: {ai_service_error}")
+                return (
+                    "Sorry, the AI service is currently unavailable. "
+                    "Please try again in a few moments or contact support."
+                )
+
+        except Exception as e:
+            logger.error(f"Error processing chat: {e}", exc_info=True)
+            return "An error occurred while processing your message."
+
     async def _send_webhook(
         self,
         team_id: int,

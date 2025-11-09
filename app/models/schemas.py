@@ -26,25 +26,34 @@ class MessageAttachment(BaseModel):
 
 
 class IncomingMessage(BaseModel):
-    """Incoming message from messenger platform"""
-    platform: str  # Allow string for flexibility
-    user_id: str
-    chat_id: str
-    message_id: str
-    text: Optional[str] = None
-    type: MessageType = MessageType.TEXT
-    attachments: List[MessageAttachment] = Field(default_factory=list)
-    reply_to_message_id: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
-    auth_token: Optional[str] = None  # For internal platform authentication
+    """
+    Simplified incoming message for chat endpoint.
+
+    Changes from previous version:
+    - Removed platform (auto-detected from API key's team.platform_name)
+    - Removed message_id (auto-generated internally)
+    - Removed type (text-only in this version)
+    - Removed attachments (text-only in this version)
+    - Removed metadata (not needed)
+    - Made chat_id optional (auto-generated if not provided for new conversations)
+    """
+    user_id: str = Field(..., description="Unique user identifier")
+    text: str = Field(..., description="Message text content")
+    chat_id: Optional[str] = Field(None, description="Chat ID for continuing conversation (auto-generated if not provided)")
 
 
 class BotResponse(BaseModel):
-    """Bot response model"""
+    """
+    Bot response model for chat endpoint.
+
+    Includes chat_id so clients can continue conversation.
+    """
     success: bool
     response: Optional[str] = None
-    data: Optional[Dict[str, Any]] = None
+    chat_id: Optional[str] = None  # Chat ID for continuing conversation
+    session_id: Optional[str] = None  # Internal session ID (platform:team:chat)
+    model: Optional[str] = None  # AI model used
+    message_count: Optional[int] = None  # Total messages in session
     error: Optional[str] = None
 
 
