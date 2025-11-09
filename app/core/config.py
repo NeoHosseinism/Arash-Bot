@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     TELEGRAM_MAX_HISTORY: int = 10
     TELEGRAM_COMMANDS: str = "start,help,status,clear,model,models"
     TELEGRAM_ADMIN_USERS: str = ""
-    TELEGRAM_WEBHOOK_URL: Optional[str] = None
 
     # Internal Configuration
     INTERNAL_DEFAULT_MODEL: str = "openai/gpt-5-chat"
@@ -35,7 +34,6 @@ class Settings(BaseSettings):
     INTERNAL_RATE_LIMIT: int = 60
     INTERNAL_MAX_HISTORY: int = 30
     INTERNAL_API_KEY: str
-    INTERNAL_WEBHOOK_SECRET: Optional[str] = None
     INTERNAL_ADMIN_USERS: str = ""
 
     # Logging Configuration (Generic - set by DevOps per deployment)
@@ -69,7 +67,11 @@ class Settings(BaseSettings):
     DB_NAME: str = "arash_db"
 
     # Redis Configuration (Generic - set by DevOps per deployment)
-    REDIS_URL: Optional[str] = None
+    # Separate params like PostgreSQL for better flexibility
+    REDIS_HOST: Optional[str] = None
+    REDIS_PORT: Optional[int] = 6379
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_DB: int = 0
 
     # CORS Configuration (Generic - set by DevOps per deployment)
     CORS_ORIGINS: str = "*"  # DevOps sets: "*" for dev/stage, specific domain for prod

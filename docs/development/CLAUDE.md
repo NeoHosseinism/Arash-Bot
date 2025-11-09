@@ -243,7 +243,7 @@ All configuration uses generic variables set by DevOps per deployment:
 
 **Infrastructure:**
 - `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`
-- `REDIS_URL` (optional)
+- `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB` (optional, for session storage)
 - `AI_SERVICE_URL`
 - `TELEGRAM_BOT_TOKEN`, `INTERNAL_API_KEY`
 

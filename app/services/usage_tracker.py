@@ -351,16 +351,14 @@ class UsageTracker:
     def get_recent_usage(
         db: Session,
         team_id: Optional[int] = None,
-        api_key_id: Optional[int] = None,
         limit: int = 100,
     ) -> List[UsageLog]:
         """
-        Get recent usage logs.
+        Get recent usage logs (team-based tracking only).
 
         Args:
             db: Database session
             team_id: Filter by team ID (optional)
-            api_key_id: Filter by API key ID (optional)
             limit: Maximum number of logs to return
 
         Returns:
@@ -370,8 +368,5 @@ class UsageTracker:
 
         if team_id is not None:
             query = query.filter(UsageLog.team_id == team_id)
-
-        if api_key_id is not None:
-            query = query.filter(UsageLog.api_key_id == api_key_id)
 
         return query.order_by(UsageLog.timestamp.desc()).limit(limit).all()

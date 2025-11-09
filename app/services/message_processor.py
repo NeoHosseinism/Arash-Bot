@@ -12,7 +12,6 @@ from app.services.session_manager import session_manager
 from app.services.platform_manager import platform_manager
 from app.services.command_processor import command_processor
 from app.services.ai_client import ai_client
-from app.services.webhook_client import webhook_client
 from app.core.constants import MESSAGES_FA, MessageType
 
 logger = logging.getLogger(__name__)
@@ -81,14 +80,6 @@ class MessageProcessor:
                     "message_count": session.message_count
                 }
             )
-
-            # Send webhook asynchronously (don't block response)
-            if team_id:
-                asyncio.create_task(self._send_webhook(
-                    team_id=team_id,
-                    message=message,
-                    response=bot_response
-                ))
 
             return bot_response
 
@@ -216,58 +207,6 @@ class MessageProcessor:
             logger.error(f"Error processing chat: {e}", exc_info=True)
             return "An error occurred while processing your message."
 
-    async def _send_webhook(
-        self,
-        team_id: int,
-        message: IncomingMessage,
-        response: BotResponse
-    ) -> None:
-        """
-        Send webhook callback to team (runs in background)
-
-        Args:
-            team_id: Team ID
-            message: Original incoming message
-            response: Bot response
-        """
-        try:
-            # Get team from database
-            db = get_db_session()
-            team = db.query(Team).filter(Team.id == team_id).first()
-
-            if not team:
-                logger.warning(f"Team {team_id} not found for webhook")
-                return
-
-            # Prepare message data for webhook
-            message_data = {
-                "platform": message.platform,
-                "user_id": message.user_id,
-                "chat_id": message.chat_id,
-                "message_id": message.message_id,
-                "text": message.text,
-                "type": message.type.value if hasattr(message.type, 'value') else str(message.type),
-                "timestamp": message.timestamp.isoformat() if message.timestamp else None
-            }
-
-            # Prepare response data for webhook
-            response_data = {
-                "success": response.success,
-                "response": response.response,
-                "data": response.data,
-                "error": response.error
-            }
-
-            # Send webhook
-            await webhook_client.send_message_callback(
-                team=team,
-                message_data=message_data,
-                response_data=response_data
-            )
-
-        except Exception as e:
-            logger.error(f"Error sending webhook for team {team_id}: {e}", exc_info=True)
-    
     async def _handle_command(self, session: ChatSession, text: str) -> str:
         """Handle command"""
         return await command_processor.process_command(session, text)
