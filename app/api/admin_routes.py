@@ -385,31 +385,43 @@ async def clear_sessions(
 # ===========================
 
 
-@router.post("/teams", response_model=TeamResponse)
+@router.post("/teams", response_model=TeamCreateResponse)
 async def create_team(
     team_data: TeamCreate,
     api_key=Depends(require_admin_access),
 ):
-    """Create a new team (Admin only)"""
+    """
+    Create a new team with auto-generated API key (Admin only).
+
+    The API key is shown ONLY ONCE in the response. Save it securely!
+    """
     db = get_db_session()
 
-    # Check if team name already exists
-    existing_team = APIKeyManager.get_team_by_name(db, team_data.name)
+    # Check if platform_name already exists
+    existing_team = APIKeyManager.get_team_by_platform_name(db, team_data.platform_name)
     if existing_team:
         raise HTTPException(
             status_code=400,
-            detail=f"Team with name '{team_data.name}' already exists"
+            detail=f"Team with platform name '{team_data.platform_name}' already exists"
         )
 
-    team = APIKeyManager.create_team(
+    # Create team with auto-generated API key
+    team, api_key_string = APIKeyManager.create_team_with_key(
         db=db,
-        name=team_data.name,
-        description=team_data.description,
+        platform_name=team_data.platform_name,
         monthly_quota=team_data.monthly_quota,
         daily_quota=team_data.daily_quota,
     )
 
-    return TeamResponse.from_orm(team)
+    return TeamCreateResponse(
+        id=team.id,
+        platform_name=team.platform_name,
+        monthly_quota=team.monthly_quota,
+        daily_quota=team.daily_quota,
+        is_active=team.is_active,
+        created_at=team.created_at,
+        api_key=api_key_string,
+    )
 
 
 @router.get("/teams", response_model=List[TeamResponse])
@@ -417,10 +429,29 @@ async def list_teams(
     active_only: bool = True,
     api_key=Depends(require_admin_access),
 ):
-    """List all teams (Admin only)"""
+    """List all teams (Admin only) with API key prefix"""
     db = get_db_session()
     teams = APIKeyManager.list_all_teams(db, active_only=active_only)
-    return [TeamResponse.from_orm(team) for team in teams]
+
+    # Build response with API key prefix for each team
+    responses = []
+    for team in teams:
+        # Get the team's API key (one per team)
+        api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
+
+        responses.append(TeamResponse(
+            id=team.id,
+            platform_name=team.platform_name,
+            monthly_quota=team.monthly_quota,
+            daily_quota=team.daily_quota,
+            is_active=team.is_active,
+            api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
+            api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
+            created_at=team.created_at,
+            updated_at=team.updated_at,
+        ))
+
+    return responses
 
 
 @router.get("/teams/{team_id}", response_model=TeamResponse)
@@ -428,14 +459,27 @@ async def get_team(
     team_id: int,
     api_key=Depends(require_admin_access),
 ):
-    """Get team details (Admin only)"""
+    """Get team details (Admin only) with API key prefix"""
     db = get_db_session()
     team = APIKeyManager.get_team_by_id(db, team_id)
 
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    return TeamResponse.from_orm(team)
+    # Get the team's API key
+    api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
+
+    return TeamResponse(
+        id=team.id,
+        platform_name=team.platform_name,
+        monthly_quota=team.monthly_quota,
+        daily_quota=team.daily_quota,
+        is_active=team.is_active,
+        api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
+        api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
+        created_at=team.created_at,
+        updated_at=team.updated_at,
+    )
 
 
 @router.patch("/teams/{team_id}", response_model=TeamResponse)
@@ -450,8 +494,7 @@ async def update_team(
     team = APIKeyManager.update_team(
         db=db,
         team_id=team_id,
-        name=team_data.name,
-        description=team_data.description,
+        platform_name=team_data.platform_name,
         monthly_quota=team_data.monthly_quota,
         daily_quota=team_data.daily_quota,
         is_active=team_data.is_active,
@@ -460,7 +503,20 @@ async def update_team(
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
 
-    return TeamResponse.from_orm(team)
+    # Get the team's API key
+    api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
+
+    return TeamResponse(
+        id=team.id,
+        platform_name=team.platform_name,
+        monthly_quota=team.monthly_quota,
+        daily_quota=team.daily_quota,
+        is_active=team.is_active,
+        api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
+        api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
+        created_at=team.created_at,
+        updated_at=team.updated_at,
+    )
 
 
 # ===========================
