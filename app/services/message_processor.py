@@ -136,7 +136,7 @@ class MessageProcessor:
                 return BotResponse(
                     success=False,
                     error="rate_limit_exceeded",
-                    response=f"Rate limit exceeded. Please wait before sending more messages. Limit: {rate_limit} messages/minute.",
+                    response=f"⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: {rate_limit} پیام در دقیقه",
                     chat_id=chat_id,
                     session_id=session.session_id,
                 )
@@ -166,7 +166,7 @@ class MessageProcessor:
             return BotResponse(
                 success=False,
                 error="processing_error",
-                response="Sorry, an error occurred while processing your message. Please try again.",
+                response="❌ متأسفم، خطایی در پردازش پیام شما رخ داد. لطفاً دوباره تلاش کنید.",
                 chat_id=chat_id,
             )
 

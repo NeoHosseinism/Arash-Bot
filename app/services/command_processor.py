@@ -130,18 +130,14 @@ class CommandProcessor:
     async def handle_status(self, session: ChatSession, args: List[str]) -> str:
         """Handle /status command"""
         config = platform_manager.get_config(session.platform)
-        uptime = session.get_uptime_seconds()
         friendly_model = session.current_model_friendly  # ✓ Show friendly name
 
         status_text = (
             f"📊 **وضعیت نشست:**\n\n"
             f"• پلتفرم: {session.platform.title()}\n"
             f"• نوع: {'خصوصی (داخلی)' if config.type == 'private' else 'عمومی'}\n"
-            f"• شناسه نشست: {session.session_id[:8]}...\n"
             f"• مدل فعلی: {friendly_model}\n"  # ✓ Show friendly name
             f"• تعداد پیام‌ها: {session.message_count}\n"
-            f"• تاریخچه: {len(session.history)}/{config.max_history}\n"
-            f"• مدت فعالیت: {uptime:.0f} ثانیه\n"
             f"• محدودیت سرعت: {config.rate_limit}/دقیقه\n"
         )
 
