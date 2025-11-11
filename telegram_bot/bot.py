@@ -20,11 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramBot:
-    """Telegram bot manager"""
-    
+    """Telegram bot manager - Polling mode only"""
+
     def __init__(self, service_url: str = "http://localhost:8001"):
         self.token = settings.TELEGRAM_BOT_TOKEN
-        self.webhook_url = settings.TELEGRAM_WEBHOOK_URL
         self.bot_client = BotServiceClient(service_url)
         self.handlers = TelegramHandlers(self.bot_client)
         self.application = None
@@ -76,28 +75,18 @@ class TelegramBot:
         logger.info("Telegram bot setup complete")
     
     def run(self):
-        """Run the bot"""
+        """Run the bot in polling mode"""
         if not self.application:
             self.setup()
-        
-        if self.webhook_url:
-            # Use webhook mode
-            logger.info(f"Starting bot in webhook mode: {self.webhook_url}")
-            self.application.run_webhook(
-                listen="0.0.0.0",
-                port=8443,
-                url_path=self.token,
-                webhook_url=f"{self.webhook_url}/{self.token}"
-            )
-        else:
-            # Use polling mode
-            logger.info("Starting bot in polling mode...")
-            logger.info(f"Bot service URL: {self.bot_client.service_url}")
-            logger.info(f"Default Model: {settings.TELEGRAM_DEFAULT_MODEL}")
-            logger.info(f"Available Models: {len(settings.telegram_models_list)}")
-            logger.info(f"Rate limit: {settings.TELEGRAM_RATE_LIMIT}/min")
-            logger.info("=" * 60)
-            self.application.run_polling(drop_pending_updates=True)
+
+        # Use polling mode
+        logger.info("Starting bot in polling mode...")
+        logger.info(f"Bot service URL: {self.bot_client.service_url}")
+        logger.info(f"Default Model: {settings.TELEGRAM_DEFAULT_MODEL}")
+        logger.info(f"Available Models: {len(settings.telegram_models_list)}")
+        logger.info(f"Rate limit: {settings.TELEGRAM_RATE_LIMIT}/min")
+        logger.info("=" * 60)
+        self.application.run_polling(drop_pending_updates=True)
 
 
 def main():

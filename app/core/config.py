@@ -18,7 +18,6 @@ class Settings(BaseSettings):
 
     # Telegram Configuration
     TELEGRAM_BOT_TOKEN: str
-    TELEGRAM_WEBHOOK_URL: Optional[str] = None  # Optional webhook URL (if not set, uses polling)
     TELEGRAM_DEFAULT_MODEL: str = "google/gemini-2.0-flash-001"
     TELEGRAM_MODELS: str = (
         "google/gemini-2.0-flash-001,google/gemini-2.5-flash,"
