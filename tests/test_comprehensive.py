@@ -229,10 +229,12 @@ class TestAdminTeamEndpoints:
         assert isinstance(data, list)
 
     @patch("app.api.dependencies.settings")
+    @patch("app.services.api_key_manager.APIKeyManager.get_team_by_platform_name")
     @patch("app.services.api_key_manager.APIKeyManager.create_team_with_key")
-    def test_create_team(self, mock_create, mock_settings, mock_team, client):
+    def test_create_team(self, mock_create, mock_get_by_name, mock_settings, mock_team, client):
         """Admin can create new team"""
         mock_settings.super_admin_keys_set = {"admin_key"}
+        mock_get_by_name.return_value = None  # No existing team with this name
         mock_create.return_value = (mock_team, "ark_generated_key_12345")
 
         response = client.post(
