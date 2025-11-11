@@ -61,7 +61,6 @@ def run_migrations() -> bool:
         # Get project root directory
         project_root = Path(__file__).parent.parent.parent
 
-        print("[Migration] Running Alembic migrations...")
         logger.info("Running Alembic migrations")
 
         # Run alembic upgrade head
@@ -74,27 +73,22 @@ def run_migrations() -> bool:
         )
 
         if result.returncode == 0:
-            print("[OK] Migrations completed successfully")
             logger.info("Migrations completed successfully")
             if result.stdout:
                 for line in result.stdout.strip().split('\n'):
                     logger.info(f"Migration: {line}")
             return True
         else:
-            print(f"[ERROR] Migration failed: {result.stderr}")
             logger.error(f"Migration failed: {result.stderr}")
             return False
 
     except subprocess.TimeoutExpired:
-        print("[ERROR] Migration timeout")
         logger.error("Migration timeout after 60 seconds")
         return False
     except FileNotFoundError:
-        print("[ERROR] Alembic not found. Install with: pip install alembic")
         logger.error("Alembic command not found")
         return False
     except Exception as e:
-        print(f"[ERROR] Migration error: {e}")
         logger.error(f"Migration error: {e}")
         return False
 
@@ -115,45 +109,39 @@ def initialize_database() -> bool:
         True if database initialized successfully, False otherwise
     """
     try:
-        print("=" * 60)
-        print(f"Database Initialization - Environment: {settings.ENVIRONMENT.upper()}")
-        print("=" * 60)
+        logger.info("=" * 60)
+        logger.info(f"Database Initialization - Environment: {settings.ENVIRONMENT.upper()}")
+        logger.info("=" * 60)
 
-        # Test database connection
+        # Get database connection (connection test handled internally)
         from app.models.database import get_database
         db = get_database()
-
-        if not db.test_connection():
-            print("[ERROR] Database connection failed")
-            return False
 
         # Check if Alembic history exists
         has_history = check_alembic_history()
 
         if not has_history:
-            print("[INFO] No migration history found - running initial migration...")
             logger.info("No Alembic history found, running initial migration")
 
             # Run initial migration
             if not run_migrations():
-                print("[ERROR] Initial migration failed")
+                logger.error("Initial migration failed")
                 return False
 
-            print("[OK] Initial migration completed")
+            logger.info("Initial migration completed")
 
         else:
             # Check current revision
             current_rev = get_current_revision()
-            print(f"[INFO] Current migration revision: {current_rev or 'none'}")
             logger.info(f"Current migration revision: {current_rev or 'none'}")
 
             # Run any pending migrations
-            print("[INFO] Checking for pending migrations...")
+            logger.info("Checking for pending migrations")
             if not run_migrations():
-                print("[WARNING] Migration check completed with warnings")
+                logger.warning("Migration check completed with warnings")
                 # Don't fail on warnings - database might already be up-to-date
             else:
-                print("[OK] Database schema is up-to-date")
+                logger.info("Database schema is up-to-date")
 
         # Verify tables exist
         inspector = inspect(db.engine)
@@ -162,19 +150,16 @@ def initialize_database() -> bool:
 
         missing_tables = expected_tables - set(tables)
         if missing_tables:
-            print(f"[WARNING] Missing tables: {', '.join(missing_tables)}")
             logger.warning(f"Missing tables: {', '.join(missing_tables)}")
         else:
-            print(f"[OK] All required tables present: {', '.join(sorted(tables))}")
             logger.info(f"All required tables present: {', '.join(sorted(tables))}")
 
-        print("=" * 60)
+        logger.info("=" * 60)
         return True
 
     except Exception as e:
-        print(f"[ERROR] Database initialization failed: {e}")
         logger.error(f"Database initialization failed: {e}")
-        print("=" * 60)
+        logger.info("=" * 60)
         return False
 
 
@@ -189,11 +174,9 @@ def create_logs_directory():
 
         if not log_dir.exists():
             log_dir.mkdir(parents=True, exist_ok=True)
-            print(f"[OK] Created logs directory: {log_dir}")
             logger.info(f"Created logs directory: {log_dir}")
 
         return True
     except Exception as e:
-        print(f"[WARNING] Could not create logs directory: {e}")
         logger.warning(f"Could not create logs directory: {e}")
         return False
