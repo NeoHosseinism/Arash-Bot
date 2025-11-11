@@ -46,7 +46,7 @@ class TelegramBot:
             CommandHandler("status", self.handlers.handle_text_message)
         )
         self.application.add_handler(
-            CommandHandler("translate", self.handlers.handle_text_message)
+            CommandHandler("clear", self.handlers.handle_text_message)
         )
         self.application.add_handler(
             CommandHandler("model", self.handlers.handle_text_message)
