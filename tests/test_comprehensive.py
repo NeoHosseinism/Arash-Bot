@@ -29,6 +29,8 @@ def mock_team():
     team.monthly_quota = 100000
     team.daily_quota = 5000
     team.is_active = True
+    team.created_at = datetime(2025, 1, 1, 12, 0, 0)
+    team.updated_at = datetime(2025, 1, 1, 12, 0, 0)
     return team
 
 
@@ -227,7 +229,7 @@ class TestAdminTeamEndpoints:
         assert isinstance(data, list)
 
     @patch("app.api.dependencies.settings")
-    @patch("app.services.api_key_manager.APIKeyManager.create_team")
+    @patch("app.services.api_key_manager.APIKeyManager.create_team_with_key")
     def test_create_team(self, mock_create, mock_settings, mock_team, client):
         """Admin can create new team"""
         mock_settings.super_admin_keys_set = {"admin_key"}
