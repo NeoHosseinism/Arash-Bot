@@ -55,7 +55,7 @@ class TestHealthAndBasics:
         assert data["service"] == "Arash External API Service"
         assert "version" in data
         assert "status" in data
-        assert "platforms" in data
+        assert "timestamp" in data
 
     def test_openapi_docs_available(self, client):
         """OpenAPI docs are available"""
@@ -110,7 +110,7 @@ class TestAuthentication:
         response = client.get("/v1/admin/teams")
         assert response.status_code == 401
 
-    @patch("app.core.config.settings")
+    @patch("app.api.dependencies.settings")
     def test_admin_endpoint_with_super_admin_key(self, mock_settings, client):
         """Admin endpoint with valid super admin key"""
         mock_settings.super_admin_keys_set = {"test_admin_key"}
@@ -211,7 +211,7 @@ class TestCommandsEndpoint:
 class TestAdminTeamEndpoints:
     """Test admin team management endpoints"""
 
-    @patch("app.core.config.settings")
+    @patch("app.api.dependencies.settings")
     @patch("app.services.api_key_manager.APIKeyManager.list_all_teams")
     def test_list_teams(self, mock_list, mock_settings, mock_team, client):
         """Admin can list all teams"""
@@ -226,7 +226,7 @@ class TestAdminTeamEndpoints:
         data = response.json()
         assert isinstance(data, list)
 
-    @patch("app.core.config.settings")
+    @patch("app.api.dependencies.settings")
     @patch("app.services.api_key_manager.APIKeyManager.create_team")
     def test_create_team(self, mock_create, mock_settings, mock_team, client):
         """Admin can create new team"""
@@ -247,7 +247,7 @@ class TestAdminTeamEndpoints:
         assert "api_key" in data
         assert "warning" in data
 
-    @patch("app.core.config.settings")
+    @patch("app.api.dependencies.settings")
     @patch("app.services.api_key_manager.APIKeyManager.get_team_by_id")
     def test_get_team_details(self, mock_get, mock_settings, mock_team, client):
         """Admin can get team details"""
@@ -263,7 +263,7 @@ class TestAdminTeamEndpoints:
         assert data["id"] == 1
         assert data["platform_name"] == "Internal-BI"
 
-    @patch("app.core.config.settings")
+    @patch("app.api.dependencies.settings")
     def test_get_team_not_found(self, mock_settings, client):
         """Admin gets 404 for non-existent team"""
         mock_settings.super_admin_keys_set = {"admin_key"}
@@ -278,7 +278,7 @@ class TestAdminTeamEndpoints:
 class TestAdminStatsEndpoints:
     """Test admin statistics endpoints"""
 
-    @patch("app.core.config.settings")
+    @patch("app.api.dependencies.settings")
     @patch("app.services.session_manager.session_manager")
     def test_get_platform_stats(self, mock_session_mgr, mock_settings, client):
         """Admin can get platform statistics"""
@@ -301,9 +301,9 @@ class TestAdminStatsEndpoints:
 class TestSessionManagement:
     """Test session management functionality"""
 
+    @patch("app.api.dependencies.settings")
     @patch("app.services.session_manager.session_manager")
-    @patch("app.core.config.settings")
-    def test_clear_sessions(self, mock_settings, mock_session_mgr, client):
+    def test_clear_sessions(self, mock_session_mgr, mock_settings, client):
         """Admin can clear sessions"""
         mock_settings.super_admin_keys_set = {"admin_key"}
         mock_session_mgr.sessions = {"test_key": Mock()}
