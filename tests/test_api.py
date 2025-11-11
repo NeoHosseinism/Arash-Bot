@@ -62,6 +62,67 @@ def mock_super_admin_key():
     return "test_super_admin_key_12345"
 
 
+@pytest.fixture
+def mock_api_key_user():
+    """
+    Mock user API key (regular team user)
+
+    This is an alias for mock_api_key_team for backward compatibility
+    """
+    key = Mock()
+    key.id = 1
+    key.team_id = 100
+    key.key_prefix = "sk_user_"
+    key.is_active = True
+    key.team = Mock(name="User Team", platform_name="internal")
+    return key
+
+
+@pytest.fixture
+def mock_api_key_internal():
+    """
+    Mock internal platform API key
+    """
+    key = Mock()
+    key.id = 2
+    key.team_id = 101
+    key.key_prefix = "sk_internal_"
+    key.is_active = True
+    key.team = Mock(name="Internal Team", platform_name="internal")
+    return key
+
+
+@pytest.fixture
+def mock_api_key_external():
+    """
+    Mock external platform API key
+    """
+    key = Mock()
+    key.id = 3
+    key.team_id = 102
+    key.key_prefix = "sk_external_"
+    key.is_active = True
+    key.team = Mock(name="External Team", platform_name="telegram")
+    return key
+
+
+@pytest.fixture
+def mock_api_key_admin():
+    """
+    Mock admin API key
+
+    Note: In the current architecture, admin access is checked via super_admin_keys
+    This fixture exists for test compatibility
+    """
+    key = Mock()
+    key.id = 4
+    key.team_id = 103
+    key.key_prefix = "sk_admin_"
+    key.is_active = True
+    key.team = Mock(name="Admin Team", platform_name="internal")
+    return key
+
+
 class TestHealthEndpoint:
     """Test health check endpoints"""
 
@@ -77,22 +138,31 @@ class TestHealthEndpoint:
 class TestAuthenticationV1:
     """Test API v1 authentication"""
 
-    @patch("app.api.dependencies.APIKeyManager")
-    def test_missing_auth_header(self, mock_key_mgr, client):
-        """Test request without auth header on protected endpoint"""
+    @patch("app.api.routes.message_processor")
+    def test_missing_auth_header(self, mock_processor, client):
+        """Test request without auth header - should work in public mode"""
+        # Mock message processor response for public Telegram mode
+        from app.models.schemas import BotResponse
+        mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
+            success=True,
+            response="Hello from Telegram bot!",
+            data={
+                "session_id": "telegram:test_session",
+                "model": "test-model"
+            }
+        ))
+
         response = client.post(
-            "/api/v1/chat",
+            "/v1/chat",
             json={
-                "platform": "internal",
                 "user_id": "user1",
-                "chat_id": "chat1",
-                "message_id": "msg1",
-                "text": "Hello",
-                "type": "text"
+                "text": "Hello"
             }
         )
-        assert response.status_code == 401
-        assert "Authentication required" in response.text
+        # Should succeed in public mode (200)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
@@ -102,7 +172,7 @@ class TestAuthenticationV1:
         mock_key_mgr.validate_api_key.return_value = None
 
         response = client.post(
-            "/api/v1/chat",
+            "/v1/chat",
             headers={"Authorization": "Bearer invalid_key"},
             json={
                 "platform": "internal",
@@ -124,9 +194,9 @@ class TestAuthenticationV1:
         # Mock valid key
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
-        # Mock message processor response with AsyncMock
+        # Mock message processor response with AsyncMock - use process_message_simple
         from app.models.schemas import BotResponse
-        mock_processor.process_message = AsyncMock(return_value=BotResponse(
+        mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
             success=True,
             response="Test response",
             data={
@@ -136,34 +206,16 @@ class TestAuthenticationV1:
         ))
 
         response = client.post(
-            "/api/v1/chat",
+            "/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
             json={
-                "platform": "internal",
                 "user_id": "user1",
-                "chat_id": "chat1",
-                "message_id": "msg1",
-                "text": "Hello",
-                "type": "text"
+                "text": "Hello"
             }
         )
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
-
-
-class TestTeamIsolationV1:
-    """Test team isolation enforcement - DEPRECATED: Session endpoints removed for external teams"""
-
-    @pytest.mark.skip(reason="Session listing endpoint removed - external teams don't see sessions")
-    def test_session_listing_filtered_by_team(self):
-        """DEPRECATED: /api/v1/sessions endpoint no longer exists for external teams"""
-        pass
-
-    @pytest.mark.skip(reason="Session access endpoint removed - external teams don't see sessions")
-    def test_access_other_team_session_denied(self):
-        """DEPRECATED: /api/v1/session/{id} endpoint no longer exists for external teams"""
-        pass
 
 
 class TestMessageEndpointV1:
@@ -176,27 +228,23 @@ class TestMessageEndpointV1:
         """Test successful message processing"""
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
-        # Mock message processor response with AsyncMock
+        # Mock message processor response with AsyncMock - use process_message_simple
         from app.models.schemas import BotResponse
-        mock_processor.process_message = AsyncMock(return_value=BotResponse(
+        mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
             success=True,
             response="Hello! How can I help?",
-            data={
-                "session_id": "test_session_123",
-                "model": "gpt-4"
-            }
+            session_id="test_session_123",
+            model="gpt-4",
+            chat_id="chat1"
         ))
 
         response = client.post(
-            "/api/v1/chat",
+            "/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
             json={
-                "platform": "internal",
                 "user_id": "user1",
                 "chat_id": "chat1",
-                "message_id": "msg1",
-                "text": "Hello",
-                "type": "text"
+                "text": "Hello"
             }
         )
 
@@ -204,59 +252,68 @@ class TestMessageEndpointV1:
         data = response.json()
         assert data["success"] is True
         assert data["response"] == "Hello! How can I help?"
-        assert data["data"]["session_id"] == "test_session_123"
+        assert data["session_id"] == "test_session_123"
+        assert data["model"] == "gpt-4"
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
-    def test_message_endpoint_requires_internal_platform(self, mock_get_db, mock_key_mgr, client, mock_api_key_user):
-        """Test that API endpoint requires platform=internal"""
+    @patch("app.api.routes.message_processor")
+    def test_message_endpoint_requires_internal_platform(self, mock_processor, mock_get_db, mock_key_mgr, client, mock_api_key_user):
+        """Test that API endpoint uses platform from API key"""
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
+        # Mock message processor
+        from app.models.schemas import BotResponse
+        mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
+            success=True,
+            response="Platform determined from API key",
+            data={
+                "session_id": "test_session",
+                "model": "test-model"
+            }
+        ))
+
         response = client.post(
-            "/api/v1/chat",
+            "/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
             json={
-                "platform": "telegram",  # Wrong platform
                 "user_id": "user1",
-                "chat_id": "chat1",
-                "message_id": "msg1",
-                "text": "Hello",
-                "type": "text"
+                "text": "Hello"
             }
         )
 
-        assert response.status_code == 400
-        assert "internal" in response.text.lower()
+        # Should succeed - platform is determined from API key's team.platform_name
+        assert response.status_code == 200
+
+        # Verify process_message_simple was called with platform from API key
+        mock_processor.process_message_simple.assert_called_once()
+        call_kwargs = mock_processor.process_message_simple.call_args[1]
+        assert call_kwargs["platform_name"] == "internal"  # From mock_api_key_user
 
 
 class TestAdminEndpointsV1:
     """Test admin-only endpoints"""
 
-    @patch("app.api.dependencies.APIKeyManager")
-    @patch("app.api.dependencies.get_db_session")
-    def test_admin_endpoint_requires_admin_access(self, mock_get_db, mock_key_mgr, client, mock_api_key_user):
-        """Test that admin endpoints reject non-admin users"""
-        # USER level key
-        mock_key_mgr.validate_api_key.return_value = mock_api_key_user
-
+    def test_admin_endpoint_requires_admin_access(self, client):
+        """Test that admin endpoints reject non-super-admin keys"""
+        # Regular API key (not in super admin list)
         response = client.get(
-            "/api/v1/admin/",
-            headers={"Authorization": "Bearer user_key"}
+            "/v1/admin/",
+            headers={"Authorization": "Bearer user_key_12345"}
         )
 
         assert response.status_code == 403
-        assert "Admin access required" in response.text
+        assert "Invalid super admin API key" in response.text
 
-    @patch("app.api.dependencies.APIKeyManager")
-    @patch("app.api.dependencies.get_db_session")
-    def test_admin_endpoint_allows_admin(self, mock_get_db, mock_key_mgr, client, mock_api_key_admin):
-        """Test that admin endpoints allow admin users"""
-        # ADMIN level key
-        mock_key_mgr.validate_api_key.return_value = mock_api_key_admin
+    @patch("app.api.dependencies.settings")
+    def test_admin_endpoint_allows_admin(self, mock_settings, client):
+        """Test that admin endpoints allow super admin keys"""
+        # Mock super admin keys set
+        mock_settings.super_admin_keys_set = {"test_super_admin_key_12345"}
 
         response = client.get(
-            "/api/v1/admin/",
-            headers={"Authorization": "Bearer admin_key"}
+            "/v1/admin/",
+            headers={"Authorization": "Bearer test_super_admin_key_12345"}
         )
 
         # Should succeed (200) or have different error if endpoint not fully mocked
@@ -267,26 +324,21 @@ class TestAPIVersioning:
     """Test API versioning structure"""
 
     def test_v1_prefix_on_chat_endpoint(self, client):
-        """Test that chat endpoint is at /api/v1/chat"""
+        """Test that chat endpoint is at /v1/chat"""
         # Try without auth to verify endpoint exists
-        response = client.post("/api/v1/chat", json={})
+        response = client.post("/v1/chat", json={})
         # Should be 401 (auth required) or 422 (validation), not 404
         assert response.status_code in [401, 422]
 
-    @pytest.mark.skip(reason="Sessions endpoint removed for external teams")
-    def test_v1_prefix_on_sessions_endpoint(self):
-        """DEPRECATED: /api/v1/sessions endpoint no longer exists for external teams"""
-        pass
-
     def test_docs_at_v1_path(self, client):
-        """Test that API docs are at /api/v1/docs"""
-        response = client.get("/api/v1/docs")
+        """Test that API docs are at /v1/docs"""
+        response = client.get("/v1/docs")
         # Docs might be disabled in production, but path should exist
         assert response.status_code in [200, 404]  # 404 if ENABLE_API_DOCS=false
 
     def test_openapi_at_v1_path(self, client):
-        """Test that OpenAPI spec is at /api/v1/openapi.json"""
-        response = client.get("/api/v1/openapi.json")
+        """Test that OpenAPI spec is at /v1/openapi.json"""
+        response = client.get("/v1/openapi.json")
         # Should exist or be disabled, not 404 for wrong path
         assert response.status_code in [200, 404]  # 404 if ENABLE_API_DOCS=false
 
