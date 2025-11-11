@@ -6,7 +6,7 @@ These endpoints are accessible to ALL valid API keys (both TEAM and ADMIN levels
 However, they are designed for external teams (clients) using the chatbot service.
 
 PUBLIC ENDPOINTS (ALL VALID API KEYS):
-- /api/v1/chat - Process chat messages
+- /v1/chat - Process chat messages
 
 SECURITY MODEL:
 - External teams (TEAM level) think they're using a simple chatbot API

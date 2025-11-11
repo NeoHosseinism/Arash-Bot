@@ -110,7 +110,7 @@ class CommandProcessor:
 
         help_text += "\n💡 **دستورات آماده (کپی کنید):**\n"
         for cmd in allowed_commands:
-            help_text += f"`/{cmd}` "
+            help_text += f"/{cmd}  "
         help_text += "\n"
 
         help_text += "\n📊 **اطلاعات پلتفرم:**\n"
@@ -177,16 +177,16 @@ class CommandProcessor:
 
             # Add copiable commands based on platform
             if session.platform == "telegram":
-                models_text += "• `/model gemini` - Gemini Flash\n"
-                models_text += "• `/model deepseek` - DeepSeek v3\n"
-                models_text += "• `/model mini` - GPT-4o Mini\n"
-                models_text += "• `/model gemma` - Gemma 3\n"
+                models_text += "• /model gemini - Gemini Flash\n"
+                models_text += "• /model deepseek - DeepSeek v3\n"
+                models_text += "• /model mini - GPT-4o Mini\n"
+                models_text += "• /model gemma - Gemma 3\n"
             else:
-                models_text += "• `/model claude` - Claude Sonnet 4\n"
-                models_text += "• `/model gpt5` - GPT-5\n"
-                models_text += "• `/model gpt4` - GPT-4.1\n"
-                models_text += "• `/model mini` - GPT-4o Mini\n"
-                models_text += "• `/model grok` - Grok 4\n"
+                models_text += "• /model claude - Claude Sonnet 4\n"
+                models_text += "• /model gpt5 - GPT-5\n"
+                models_text += "• /model gpt4 - GPT-4.1\n"
+                models_text += "• /model mini - GPT-4o Mini\n"
+                models_text += "• /model grok - Grok 4\n"
 
             return models_text
 
@@ -205,9 +205,9 @@ class CommandProcessor:
 
             error_text += f"\n\n💡 **دستورات آماده (کپی کنید):**\n"
             if session.platform == "telegram":
-                error_text += "• `/model gemini`\n• `/model deepseek`\n• `/model mini`\n• `/model gemma`"
+                error_text += "• /model gemini\n• /model deepseek\n• /model mini\n• /model gemma"
             else:
-                error_text += "• `/model claude`\n• `/model gpt5`\n• `/model gpt4`\n• `/model mini`"
+                error_text += "• /model claude\n• /model gpt5\n• /model gpt4\n• /model mini"
 
             return error_text
 
@@ -236,21 +236,21 @@ class CommandProcessor:
 
         # Add copiable commands based on platform
         if session.platform == "telegram":
-            models_text += "• `/model gemini` - Gemini Flash\n"
-            models_text += "• `/model flash-2.5` - Gemini 2.5 Flash\n"
-            models_text += "• `/model deepseek` - DeepSeek v3\n"
-            models_text += "• `/model mini` - GPT-4o Mini\n"
-            models_text += "• `/model gemma` - Gemma 3 1B\n"
+            models_text += "• /model gemini - Gemini Flash\n"
+            models_text += "• /model flash-2.5 - Gemini 2.5 Flash\n"
+            models_text += "• /model deepseek - DeepSeek v3\n"
+            models_text += "• /model mini - GPT-4o Mini\n"
+            models_text += "• /model gemma - Gemma 3 1B\n"
         else:
-            models_text += "• `/model claude` - Claude Sonnet 4\n"
-            models_text += "• `/model gpt5` - GPT-5\n"
-            models_text += "• `/model gpt4` - GPT-4.1\n"
-            models_text += "• `/model mini` - GPT-4o Mini\n"
-            models_text += "• `/model search` - GPT-4o Search\n"
-            models_text += "• `/model gemini` - Gemini 2.5 Flash\n"
-            models_text += "• `/model grok` - Grok 4\n"
-            models_text += "• `/model deepseek` - DeepSeek v3\n"
-            models_text += "• `/model llama` - Llama 4 Maverick\n"
+            models_text += "• /model claude - Claude Sonnet 4\n"
+            models_text += "• /model gpt5 - GPT-5\n"
+            models_text += "• /model gpt4 - GPT-4.1\n"
+            models_text += "• /model mini - GPT-4o Mini\n"
+            models_text += "• /model search - GPT-4o Search\n"
+            models_text += "• /model gemini - Gemini 2.5 Flash\n"
+            models_text += "• /model grok - Grok 4\n"
+            models_text += "• /model deepseek - DeepSeek v3\n"
+            models_text += "• /model llama - Llama 4 Maverick\n"
 
         return models_text
 

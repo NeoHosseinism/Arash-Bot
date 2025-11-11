@@ -6,14 +6,14 @@ TWO-PATH AUTHENTICATION SYSTEM:
 1. SUPER ADMINS (Infrastructure Level):
    - Authentication: Environment variable SUPER_ADMIN_API_KEYS
    - NOT stored in database
-   - Can access: ALL /api/v1/admin/* endpoints
+   - Can access: ALL /v1/admin/* endpoints
    - Purpose: Internal team managing the service infrastructure
    - Completely separate from client database
 
 2. TEAM API KEYS (Application Level):
    - Authentication: Database-backed API keys
    - Stored in api_keys table
-   - Can access: ONLY /api/v1/chat endpoint
+   - Can access: ONLY /v1/chat endpoint
    - Purpose: External clients using the chatbot service
    - No admin access whatsoever
 
@@ -44,7 +44,7 @@ def require_admin_access(
     """
     Require SUPER ADMIN access - infrastructure level (environment-based authentication)
 
-    This dependency protects ALL /api/v1/admin/* endpoints.
+    This dependency protects ALL /v1/admin/* endpoints.
     Authentication via SUPER_ADMIN_API_KEYS environment variable (NOT database).
 
     AUTHENTICATION:
@@ -53,7 +53,7 @@ def require_admin_access(
     - Completely separate from team API keys
 
     USAGE:
-    - Used by: All admin endpoints (/api/v1/admin/*)
+    - Used by: All admin endpoints (/v1/admin/*)
     - Authentication: Environment variable (infrastructure level)
     - Returns: The validated super admin API key string
 
@@ -62,7 +62,7 @@ def require_admin_access(
     - API key management (create, list, revoke API keys for clients)
     - Usage statistics (view ALL teams' usage)
     - Platform information (Telegram + Internal config)
-    - System administration (clear sessions, webhooks, etc.)
+    - System administration (clear sessions, etc.)
 
     ERROR RESPONSES:
     - 401: No authorization header provided OR super admin keys not configured
@@ -107,7 +107,7 @@ def require_team_access(
     """
     Require valid TEAM API key - application level (database-based authentication)
 
-    This dependency protects the /api/v1/chat endpoint.
+    This dependency protects the /v1/chat endpoint.
     Authentication via database-backed API keys (api_keys table).
 
     AUTHENTICATION:
@@ -116,7 +116,7 @@ def require_team_access(
     - Returns APIKey object with team_id for isolation
 
     USAGE:
-    - Used by: /api/v1/chat endpoint
+    - Used by: /v1/chat endpoint
     - Authentication: Database lookup (application level)
     - Returns: Validated APIKey object (includes team_id for session isolation)
 
@@ -144,7 +144,7 @@ def require_team_access(
 
     SECURITY:
     - Database API keys are ONLY for external teams
-    - Cannot access /api/v1/admin/* endpoints (requires super admin key)
+    - Cannot access /v1/admin/* endpoints (requires super admin key)
     - Team isolation enforced via team_id in sessions
     """
     if not authorization:
@@ -199,7 +199,7 @@ def optional_team_access(
     - If invalid auth header: Raises 403 error
 
     USAGE:
-    - Used by: Modular /api/v1/chat endpoint
+    - Used by: Modular /v1/chat endpoint
     - Returns: APIKey object (private) OR None (public)
 
     ERROR RESPONSES:

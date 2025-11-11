@@ -33,7 +33,7 @@ class BotServiceClient:
     ) -> dict:
         """Send message to bot service with retry logic"""
 
-        # Simplified payload for /api/v1/chat endpoint (public mode - no auth)
+        # Simplified payload for /v1/chat endpoint (public mode - no auth)
         # Images not supported in simplified version
         if image_data:
             logger.warning("Image attachments not supported in simplified API")
@@ -49,7 +49,7 @@ class BotServiceClient:
         for attempt in range(self.max_retries):
             try:
                 response = await self.client.post(
-                    f"{self.service_url}/api/v1/chat",
+                    f"{self.service_url}/v1/chat",
                     json=payload
                 )
                 response.raise_for_status()
