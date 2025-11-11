@@ -1,3 +1,7 @@
+.claude/
+.claude.*
+.p10k.zsh
+
 # Lightning
 .lightning_studio/
 .vscode-server

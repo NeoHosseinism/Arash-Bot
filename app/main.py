@@ -223,6 +223,24 @@ app.include_router(router, prefix="/api/v1", tags=["v1"])
 app.include_router(admin_router, prefix="/api/v1")
 
 
+# Root endpoint - redirect to docs
+@app.get("/")
+async def root():
+    """Root endpoint - provides service information and links"""
+    from fastapi.responses import RedirectResponse
+    if settings.ENABLE_API_DOCS:
+        return RedirectResponse(url="/docs")
+    return {
+        "service": "Arash External API Service",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "api_v1": "/api/v1/"
+        }
+    }
+
+
 # Unversioned health check endpoint (for monitoring systems)
 @app.get("/health")
 async def health_check():
