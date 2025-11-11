@@ -40,7 +40,9 @@ from app.models.schemas import (
 from app.models.database import APIKey
 from app.services.message_processor import message_processor
 from app.services.ai_client import ai_client
+from app.services.platform_manager import platform_manager
 from app.api.dependencies import require_team_access, optional_team_access
+from app.core.constants import COMMAND_DESCRIPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -144,3 +146,67 @@ async def chat(
         message_id=message_id,
         text=message.text,
     )
+
+
+@router.get("/commands")
+async def get_commands(
+    api_key: Optional[APIKey] = Depends(optional_team_access),
+):
+    """
+    Get available commands with Persian descriptions - supports both public and private access.
+
+    MODES:
+    1. PUBLIC MODE (No authentication):
+       - Returns Telegram commands
+       - Platform: telegram
+
+    2. PRIVATE MODE (Authenticated):
+       - Returns commands for authenticated team's platform
+       - Platform: Based on team.platform_name
+
+    RESPONSE:
+    {
+      "success": true,
+      "platform": "telegram" or "Internal-BI",
+      "commands": [
+        {
+          "command": "start",
+          "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
+          "usage": "/start"
+        },
+        ...
+      ]
+    }
+
+    SECURITY:
+    - Public: Returns Telegram commands only
+    - Private: Returns commands for user's platform
+    """
+    # Determine platform based on authentication
+    if api_key is None:
+        # PUBLIC MODE: Telegram bot
+        platform_name = "telegram"
+        logger.info("[PUBLIC] commands_request platform=telegram")
+    else:
+        # PRIVATE MODE: Authenticated team
+        platform_name = api_key.team.platform_name
+        logger.info(f"[PRIVATE] commands_request platform={platform_name} team_id={api_key.team_id}")
+
+    # Get allowed commands for this platform
+    allowed_commands = platform_manager.get_allowed_commands(platform_name)
+
+    # Build command list with descriptions
+    commands_list = []
+    for cmd in allowed_commands:
+        if cmd in COMMAND_DESCRIPTIONS:
+            commands_list.append({
+                "command": cmd,
+                "description": COMMAND_DESCRIPTIONS[cmd],
+                "usage": f"/{cmd}"
+            })
+
+    return {
+        "success": True,
+        "platform": platform_name,
+        "commands": commands_list
+    }
