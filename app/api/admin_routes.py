@@ -54,10 +54,26 @@ class TeamCreate(BaseModel):
     - Removed webhooks (not supported)
     - Auto-generates API key on creation
     """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "platform_name": "Internal-BI",
+                    "monthly_quota": 100000,
+                    "daily_quota": 5000
+                },
+                {
+                    "platform_name": "External-Marketing",
+                    "monthly_quota": 50000,
+                    "daily_quota": 2000
+                }
+            ]
+        }
+    )
 
-    platform_name: str  # e.g., "Internal-BI", "External-Telegram"
-    monthly_quota: Optional[int] = None
-    daily_quota: Optional[int] = None
+    platform_name: str = Field(..., description="Platform name (e.g., 'Internal-BI', 'External-Marketing')", examples=["Internal-BI", "External-Marketing"])
+    monthly_quota: Optional[int] = Field(None, description="Monthly request quota (None = unlimited)", examples=[100000, None])
+    daily_quota: Optional[int] = Field(None, description="Daily request quota (None = unlimited)", examples=[5000, None])
 
 
 class TeamUpdate(BaseModel):
@@ -68,11 +84,26 @@ class TeamUpdate(BaseModel):
     - Uses platform_name instead of name/description
     - Removed webhooks (not supported)
     """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "platform_name": "Internal-BI-Updated",
+                    "monthly_quota": 150000,
+                    "daily_quota": 7000,
+                    "is_active": True
+                },
+                {
+                    "is_active": False
+                }
+            ]
+        }
+    )
 
-    platform_name: Optional[str] = None
-    monthly_quota: Optional[int] = None
-    daily_quota: Optional[int] = None
-    is_active: Optional[bool] = None
+    platform_name: Optional[str] = Field(None, examples=["Internal-BI-Updated"])
+    monthly_quota: Optional[int] = Field(None, examples=[150000])
+    daily_quota: Optional[int] = Field(None, examples=[7000])
+    is_active: Optional[bool] = Field(None, examples=[True, False])
 
 
 class TeamResponse(BaseModel):
@@ -81,15 +112,32 @@ class TeamResponse(BaseModel):
 
     Includes API key prefix (one key per team).
     """
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": 1,
+                    "platform_name": "Internal-BI",
+                    "monthly_quota": 100000,
+                    "daily_quota": 5000,
+                    "is_active": True,
+                    "api_key_prefix": "ark_1234",
+                    "api_key_last_used": "2025-01-15T14:30:00",
+                    "created_at": "2025-01-01T10:00:00",
+                    "updated_at": "2025-01-15T14:30:00"
+                }
+            ]
+        }
+    )
 
-    id: int
-    platform_name: str  # e.g., "Internal-BI"
-    monthly_quota: Optional[int]
-    daily_quota: Optional[int]
-    is_active: bool
-    api_key_prefix: Optional[str] = None  # Prefix of the team's API key
-    api_key_last_used: Optional[datetime] = None  # When API key was last used
+    id: int = Field(..., examples=[1])
+    platform_name: str = Field(..., examples=["Internal-BI"])
+    monthly_quota: Optional[int] = Field(None, examples=[100000])
+    daily_quota: Optional[int] = Field(None, examples=[5000])
+    is_active: bool = Field(..., examples=[True])
+    api_key_prefix: Optional[str] = Field(None, examples=["ark_1234"])
+    api_key_last_used: Optional[datetime] = Field(None, examples=["2025-01-15T14:30:00"])
     created_at: datetime
     updated_at: datetime
 
@@ -100,22 +148,87 @@ class TeamCreateResponse(BaseModel):
 
     The API key is shown ONLY ONCE during creation.
     """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "id": 1,
+                    "platform_name": "Internal-BI",
+                    "monthly_quota": 100000,
+                    "daily_quota": 5000,
+                    "is_active": True,
+                    "created_at": "2025-01-15T10:00:00",
+                    "api_key": "ark_1234567890abcdef1234567890abcdef12345678",
+                    "warning": "Save this API key securely. It will not be shown again."
+                }
+            ]
+        }
+    )
 
-    id: int
-    platform_name: str
-    monthly_quota: Optional[int]
-    daily_quota: Optional[int]
-    is_active: bool
+    id: int = Field(..., examples=[1])
+    platform_name: str = Field(..., examples=["Internal-BI"])
+    monthly_quota: Optional[int] = Field(None, examples=[100000])
+    daily_quota: Optional[int] = Field(None, examples=[5000])
+    is_active: bool = Field(..., examples=[True])
     created_at: datetime
-    api_key: str  # Full API key - shown only once!
+    api_key: str = Field(..., description="Full API key - shown only once!", examples=["ark_1234567890abcdef1234567890abcdef12345678"])
     warning: str = "Save this API key securely. It will not be shown again."
 
 
 class UsageStatsResponse(BaseModel):
     """Response model for usage statistics (team-based only, no api_key_id)"""
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "team_id": 1,
+                    "team_name": "Internal-BI",
+                    "period": {
+                        "start": "2025-01-01T00:00:00",
+                        "end": "2025-01-31T23:59:59",
+                        "days": 30
+                    },
+                    "requests": {
+                        "total": 15000,
+                        "successful": 14850,
+                        "failed": 150
+                    },
+                    "tokens": {
+                        "total": 1500000,
+                        "average_per_request": 100
+                    },
+                    "cost": {
+                        "total": 15.50,
+                        "currency": "USD"
+                    },
+                    "performance": {
+                        "average_response_time_ms": 850,
+                        "p95_response_time_ms": 1200
+                    },
+                    "models": [
+                        {
+                            "model": "Gemini 2.0 Flash",
+                            "requests": 8000,
+                            "percentage": 53.3
+                        },
+                        {
+                            "model": "GPT-5 Chat",
+                            "requests": 5000,
+                            "percentage": 33.3
+                        },
+                        {
+                            "model": "DeepSeek v3",
+                            "requests": 2000,
+                            "percentage": 13.3
+                        }
+                    ]
+                }
+            ]
+        }
+    )
 
-    team_id: Optional[int]
-    team_name: Optional[str]  # Team name for better admin UX
+    team_id: Optional[int] = Field(None, examples=[1])
+    team_name: Optional[str] = Field(None, examples=["Internal-BI"])
     period: dict
     requests: dict
     tokens: dict
@@ -335,7 +448,49 @@ async def clear_sessions(
 # ===========================
 
 
-@router.post("/teams", response_model=TeamCreateResponse)
+@router.post(
+    "/teams",
+    response_model=TeamCreateResponse,
+    responses={
+        200: {
+            "description": "Team created successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "platform_name": "Internal-BI",
+                        "monthly_quota": 100000,
+                        "daily_quota": 5000,
+                        "is_active": True,
+                        "created_at": "2025-01-15T10:00:00",
+                        "api_key": "ark_1234567890abcdef1234567890abcdef12345678",
+                        "warning": "Save this API key securely. It will not be shown again."
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authentication required"
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Invalid super admin API key",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid super admin API key"
+                    }
+                }
+            }
+        }
+    }
+)
 async def create_team(
     team_data: TeamCreate,
     api_key=Depends(require_admin_access),
@@ -343,7 +498,26 @@ async def create_team(
     """
     Create a new team with auto-generated API key (Admin only).
 
-    The API key is shown ONLY ONCE in the response. Save it securely!
+    ⚠️ **IMPORTANT**: The API key is shown ONLY ONCE in the response. Save it securely!
+
+    ## Request Example
+    ```json
+    {
+      "platform_name": "Internal-BI",
+      "monthly_quota": 100000,
+      "daily_quota": 5000
+    }
+    ```
+
+    ## Response
+    The response includes the full API key. This is the **only time** it will be visible.
+    Store it immediately in a secure location.
+
+    ## Authentication
+    Requires super admin API key in Authorization header:
+    ```http
+    Authorization: Bearer <super-admin-key>
+    ```
     """
     db = get_db_session()
 

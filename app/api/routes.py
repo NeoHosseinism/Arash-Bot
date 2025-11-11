@@ -50,7 +50,68 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/chat", response_model=BotResponse)
+@router.post(
+    "/chat",
+    response_model=BotResponse,
+    responses={
+        200: {
+            "description": "Successful chat response",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "successful_response": {
+                            "summary": "Successful chat response",
+                            "value": {
+                                "success": True,
+                                "response": "سلام! چطور می‌تونم کمکتون کنم؟",
+                                "chat_id": "chat_67890",
+                                "session_id": "internal:1:chat_67890",
+                                "model": "Gemini 2.0 Flash",
+                                "message_count": 1
+                            }
+                        },
+                        "rate_limit_exceeded": {
+                            "summary": "Rate limit exceeded",
+                            "value": {
+                                "success": False,
+                                "error": "rate_limit_exceeded",
+                                "response": "⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: 60 پیام در دقیقه"
+                            }
+                        },
+                        "ai_service_error": {
+                            "summary": "AI service unavailable",
+                            "value": {
+                                "success": False,
+                                "error": "ai_service_unavailable",
+                                "response": "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست. لطفاً چند لحظه دیگر دوباره تلاش کنید یا با پشتیبانی تماس بگیرید."
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Invalid API key",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid API key"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Error validating API key"
+                    }
+                }
+            }
+        }
+    }
+)
 async def chat(
     message: IncomingMessage,
     api_key: Optional[APIKey] = Depends(optional_team_access),
@@ -58,48 +119,47 @@ async def chat(
     """
     Process a chat message - supports both public and private access (modular endpoint).
 
-    MODES:
-    1. PUBLIC MODE (Telegram bot - no authentication):
-       - No Authorization header required
-       - Uses platform="telegram" with no team_id
-       - Session keys: telegram:chat_id (no team isolation)
+    ## Modes
 
-    2. PRIVATE MODE (Authenticated teams):
-       - Requires valid API key in Authorization header
-       - Platform auto-detected from team.platform_name
-       - Session keys: platform_name:team_id:chat_id (team isolation enforced)
+    ### 1. PUBLIC MODE (Telegram bot - no authentication):
+    - No Authorization header required
+    - Uses platform="telegram" with no team_id
+    - Session keys: telegram:chat_id (no team isolation)
 
-    AUTHENTICATION:
-    - Optional: No auth header → Public Telegram bot
-    - Optional: Valid auth header → Private authenticated team
-    - Error: Invalid auth header → 403 Forbidden
+    ### 2. PRIVATE MODE (Authenticated teams):
+    - Requires valid API key in Authorization header
+    - Platform auto-detected from team.platform_name
+    - Session keys: platform_name:team_id:chat_id (team isolation enforced)
 
-    PUBLIC REQUEST (Telegram):
+    ## Authentication
+    - ✅ No auth header → Public Telegram bot
+    - ✅ Valid auth header → Private authenticated team
+    - ❌ Invalid auth header → 403 Forbidden
+
+    ## Examples
+
+    ### PUBLIC REQUEST (Telegram):
+    ```json
     {
       "user_id": "telegram_user_id",
-      "text": "Hello",
+      "text": "سلام",
       "chat_id": "telegram_chat_id"
     }
+    ```
 
-    PRIVATE REQUEST (Authenticated):
-    Authorization: Bearer <your-api-key>
+    ### PRIVATE REQUEST (Authenticated):
+    ```http
+    Authorization: Bearer ark_1234567890abcdef
+    ```
+    ```json
     {
       "user_id": "user123",
-      "text": "Hello",
+      "text": "چطور می‌تونم مدل رو عوض کنم؟",
       "chat_id": "optional-for-continuation"
     }
+    ```
 
-    RESPONSE:
-    {
-      "success": true,
-      "response": "Hi! How can I help?",
-      "chat_id": "chat-id",
-      "session_id": "platform:chat_id OR platform:team_id:chat_id",
-      "model": "Model Name",
-      "message_count": 1
-    }
-
-    SECURITY:
+    ## Security
     - Public: No team isolation (Telegram only)
     - Private: Complete team isolation via session tagging
     - Invalid keys rejected (no fallback to public)
@@ -148,37 +208,125 @@ async def chat(
     )
 
 
-@router.get("/commands")
+@router.get(
+    "/commands",
+    responses={
+        200: {
+            "description": "List of available commands",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "telegram_commands": {
+                            "summary": "Telegram (public) commands",
+                            "value": {
+                                "success": True,
+                                "platform": "telegram",
+                                "commands": [
+                                    {
+                                        "command": "start",
+                                        "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
+                                        "usage": "/start"
+                                    },
+                                    {
+                                        "command": "help",
+                                        "description": "نمایش راهنمای استفاده و دستورات موجود",
+                                        "usage": "/help"
+                                    },
+                                    {
+                                        "command": "clear",
+                                        "description": "پاک کردن تاریخچه گفتگو و شروع مجدد",
+                                        "usage": "/clear"
+                                    }
+                                ]
+                            }
+                        },
+                        "internal_commands": {
+                            "summary": "Internal (private) commands",
+                            "value": {
+                                "success": True,
+                                "platform": "Internal-BI",
+                                "commands": [
+                                    {
+                                        "command": "start",
+                                        "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
+                                        "usage": "/start"
+                                    },
+                                    {
+                                        "command": "help",
+                                        "description": "نمایش راهنمای استفاده و دستورات موجود",
+                                        "usage": "/help"
+                                    },
+                                    {
+                                        "command": "model",
+                                        "description": "تغییر مدل هوش مصنوعی",
+                                        "usage": "/model"
+                                    },
+                                    {
+                                        "command": "models",
+                                        "description": "نمایش لیست تمام مدل‌های موجود",
+                                        "usage": "/models"
+                                    },
+                                    {
+                                        "command": "clear",
+                                        "description": "پاک کردن تاریخچه گفتگو و شروع مجدد",
+                                        "usage": "/clear"
+                                    },
+                                    {
+                                        "command": "status",
+                                        "description": "نمایش وضعیت نشست و اطلاعات جاری",
+                                        "usage": "/status"
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Invalid API key",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid API key"
+                    }
+                }
+            }
+        }
+    }
+)
 async def get_commands(
     api_key: Optional[APIKey] = Depends(optional_team_access),
 ):
     """
     Get available commands with Persian descriptions - supports both public and private access.
 
-    MODES:
-    1. PUBLIC MODE (No authentication):
-       - Returns Telegram commands
-       - Platform: telegram
+    ## Modes
 
-    2. PRIVATE MODE (Authenticated):
-       - Returns commands for authenticated team's platform
-       - Platform: Based on team.platform_name
+    ### 1. PUBLIC MODE (No authentication):
+    - Returns Telegram commands
+    - Platform: telegram
 
-    RESPONSE:
+    ### 2. PRIVATE MODE (Authenticated):
+    - Returns commands for authenticated team's platform
+    - Platform: Based on team.platform_name
+
+    ## Response Format
+    ```json
     {
       "success": true,
-      "platform": "telegram" or "Internal-BI",
+      "platform": "telegram",
       "commands": [
         {
           "command": "start",
           "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
           "usage": "/start"
-        },
-        ...
+        }
       ]
     }
+    ```
 
-    SECURITY:
+    ## Security
     - Public: Returns Telegram commands only
     - Private: Returns commands for user's platform
     """
