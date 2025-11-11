@@ -25,7 +25,7 @@ from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Header
 from pydantic import BaseModel, Field, ConfigDict
 
-from app.models.database import get_db_session
+from app.models.database import get_db_session, APIKey
 from app.models.schemas import HealthCheckResponse, StatsResponse
 from app.services.api_key_manager import APIKeyManager
 from app.services.usage_tracker import UsageTracker
