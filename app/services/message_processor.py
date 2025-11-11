@@ -94,9 +94,9 @@ class MessageProcessor:
     async def process_message_simple(
         self,
         platform_name: str,
-        team_id: int,
-        api_key_id: int,
-        api_key_prefix: str,
+        team_id: Optional[int],
+        api_key_id: Optional[int],
+        api_key_prefix: Optional[str],
         user_id: str,
         chat_id: str,
         message_id: str,
@@ -106,10 +106,10 @@ class MessageProcessor:
         Process message with simplified interface (text-only, no webhooks).
 
         Args:
-            platform_name: Team's platform name (e.g., "Internal-BI")
-            team_id: Team ID
-            api_key_id: API key ID
-            api_key_prefix: API key prefix
+            platform_name: Platform name (e.g., "telegram", "Internal-BI")
+            team_id: Team ID (None for Telegram, required for authenticated platforms)
+            api_key_id: API key ID (None for Telegram)
+            api_key_prefix: API key prefix (None for Telegram)
             user_id: User ID
             chat_id: Chat ID (auto-generated if not provided by client)
             message_id: Message ID (auto-generated)

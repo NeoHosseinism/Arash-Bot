@@ -48,6 +48,60 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+@router.post("/telegram", response_model=BotResponse)
+async def telegram_chat(
+    message: IncomingMessage,
+):
+    """
+    Process a Telegram bot message (public, no authentication required).
+
+    SECURITY:
+    - No API key required (public Telegram bot)
+    - Uses platform="telegram" with no team_id
+    - Session keys: telegram:chat_id (no team isolation)
+
+    Request:
+    {
+      "user_id": "telegram_user_id",
+      "text": "Hello",
+      "chat_id": "telegram_chat_id"
+    }
+
+    Response:
+    {
+      "success": true,
+      "response": "Hi! How can I help?",
+      "chat_id": "telegram_chat_id",
+      "session_id": "telegram:chat_id",
+      "model": "Gemini 2.0 Flash",
+      "message_count": 1
+    }
+    """
+    import uuid
+
+    # Auto-generate chat_id if not provided (new conversation)
+    chat_id = message.chat_id or str(uuid.uuid4())
+
+    # Auto-generate message_id internally
+    message_id = str(uuid.uuid4())
+
+    logger.info(
+        f"telegram_request user_id={message.user_id} chat_id={chat_id}"
+    )
+
+    # Process message for Telegram platform (no team_id, no API key)
+    return await message_processor.process_message_simple(
+        platform_name="telegram",
+        team_id=None,  # Telegram doesn't use teams
+        api_key_id=None,
+        api_key_prefix=None,
+        user_id=message.user_id,
+        chat_id=chat_id,
+        message_id=message_id,
+        text=message.text,
+    )
+
+
 @router.post("/chat", response_model=BotResponse)
 async def chat(
     message: IncomingMessage,
