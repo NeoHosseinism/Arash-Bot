@@ -23,7 +23,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from collections import defaultdict
 from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Header
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict
 
 from app.models.database import get_db_session
 from app.models.schemas import HealthCheckResponse, StatsResponse
