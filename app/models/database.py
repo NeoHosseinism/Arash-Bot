@@ -31,44 +31,42 @@ logger = logging.getLogger(__name__)
 Base = declarative_base()
 
 
-class AccessLevel(str, Enum):
-    """Access levels for API keys"""
-
-    ADMIN = "admin"  # Full access, can manage teams and keys
-    TEAM_LEAD = "team_lead"  # Can manage team members and view usage
-    USER = "user"  # Basic access, can only use the service
-
-
 class Team(Base):
-    """Team model for organizing users and tracking usage"""
+    """
+    Team model for organizing users and tracking usage.
+
+    Each team represents a platform (e.g., "Internal-BI", "External-Telegram")
+    and has exactly ONE API key auto-generated on creation.
+    """
 
     __tablename__ = "teams"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, nullable=False, index=True)
-    description = Column(Text, nullable=True)
+    name = Column(String(255), unique=True, nullable=False, index=True)  # Internal name
+    platform_name = Column(String(255), unique=True, nullable=False, index=True)  # Public platform identifier
     monthly_quota = Column(Integer, nullable=True)  # Requests per month, None = unlimited
     daily_quota = Column(Integer, nullable=True)  # Requests per day, None = unlimited
     is_active = Column(Boolean, default=True, nullable=False)
 
-    # Webhook configuration for each team
-    webhook_url = Column(String(2048), nullable=True)  # URL to send callbacks to
-    webhook_secret = Column(String(255), nullable=True)  # Secret for HMAC signing
-    webhook_enabled = Column(Boolean, default=False, nullable=False)  # Enable/disable webhook
-
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
-    # Relationships
+    # Relationships (one-to-one with APIKey due to unique constraint)
     api_keys = relationship("APIKey", back_populates="team", cascade="all, delete-orphan")
     usage_logs = relationship("UsageLog", back_populates="team", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Team(id={self.id}, name='{self.name}')>"
+        return f"<Team(id={self.id}, platform_name='{self.platform_name}')>"
 
 
 class APIKey(Base):
-    """API Key model for authentication and authorization"""
+    """
+    API Key model for external teams (clients) only
+
+    NOTE: Super admin authentication is handled via environment variables (SUPER_ADMIN_API_KEYS).
+    This table ONLY stores API keys for external teams using the chat service.
+    All keys in this table have equal access (chat service only, NO admin access).
+    """
 
     __tablename__ = "api_keys"
 
@@ -77,7 +75,6 @@ class APIKey(Base):
     key_prefix = Column(String(16), nullable=False)  # First 8 chars for identification
     name = Column(String(255), nullable=False)  # Friendly name for the key
     team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
-    access_level = Column(String(50), nullable=False, default=AccessLevel.USER.value)
 
     # Quota management
     monthly_quota = Column(Integer, nullable=True)  # Overrides team quota if set

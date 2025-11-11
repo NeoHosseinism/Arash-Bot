@@ -27,7 +27,6 @@ class Settings(BaseSettings):
     TELEGRAM_MAX_HISTORY: int = 10
     TELEGRAM_COMMANDS: str = "start,help,status,clear,model,models"
     TELEGRAM_ADMIN_USERS: str = ""
-    TELEGRAM_WEBHOOK_URL: Optional[str] = None
 
     # Internal Configuration
     INTERNAL_DEFAULT_MODEL: str = "openai/gpt-5-chat"
@@ -35,7 +34,6 @@ class Settings(BaseSettings):
     INTERNAL_RATE_LIMIT: int = 60
     INTERNAL_MAX_HISTORY: int = 30
     INTERNAL_API_KEY: str
-    INTERNAL_WEBHOOK_SECRET: Optional[str] = None
     INTERNAL_ADMIN_USERS: str = ""
 
     # Logging Configuration (Generic - set by DevOps per deployment)
@@ -53,6 +51,12 @@ class Settings(BaseSettings):
     # API Docs (Generic - set by DevOps per deployment)
     ENABLE_API_DOCS: bool = True  # DevOps sets: true for dev/stage, false for prod
 
+    # Super Admin Authentication (Infrastructure Level)
+    # These API keys are for internal team only - NOT stored in database
+    # Comma-separated list of API keys for super admin access
+    # Example: "key1,key2,key3"
+    SUPER_ADMIN_API_KEYS: str = ""  # Set in production via environment/secrets
+
     # Database Configuration (Generic - set by DevOps per deployment)
     # DevOps sets these in K8s ConfigMap/Secret for each environment
     # Each deployment only has the credentials it needs (security)
@@ -63,7 +67,11 @@ class Settings(BaseSettings):
     DB_NAME: str = "arash_db"
 
     # Redis Configuration (Generic - set by DevOps per deployment)
-    REDIS_URL: Optional[str] = None
+    # Separate params like PostgreSQL for better flexibility
+    REDIS_HOST: Optional[str] = None
+    REDIS_PORT: Optional[int] = 6379
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_DB: int = 0
 
     # CORS Configuration (Generic - set by DevOps per deployment)
     CORS_ORIGINS: str = "*"  # DevOps sets: "*" for dev/stage, specific domain for prod
@@ -168,7 +176,19 @@ class Settings(BaseSettings):
     def internal_admin_users_set(self) -> set:
         """Get internal admin users as set"""
         return {user.strip() for user in self.INTERNAL_ADMIN_USERS.split(",") if user.strip()}
-    
+
+    @property
+    def super_admin_keys_set(self) -> set:
+        """
+        Get super admin API keys as set for fast validation
+
+        These are infrastructure-level admin keys (NOT in database).
+        Used to authenticate internal team for /api/v1/admin/* endpoints.
+        """
+        if not self.SUPER_ADMIN_API_KEYS:
+            return set()
+        return {key.strip() for key in self.SUPER_ADMIN_API_KEYS.split(",") if key.strip()}
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Get CORS origins as list"""

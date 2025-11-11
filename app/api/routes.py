@@ -1,10 +1,29 @@
 """
-Public API routes for external teams
+Public API routes for external teams (clients)
+
+TWO-TIER ACCESS CONTROL:
+These endpoints are accessible to ALL valid API keys (both TEAM and ADMIN levels).
+However, they are designed for external teams (clients) using the chatbot service.
+
+PUBLIC ENDPOINTS (ALL VALID API KEYS):
+- /api/v1/chat - Process chat messages
 
 SECURITY MODEL:
-- External teams should think they're using a simple chatbot API
+- External teams (TEAM level) think they're using a simple chatbot API
 - NO exposure of: sessions, teams, access levels, or other teams
 - Complete transparency: teams don't know about our internal architecture
+- Team isolation enforced via session tagging (transparent to clients)
+
+WHAT EXTERNAL TEAMS SEE:
+- Simple chatbot API with message in, response out
+- No complexity, no admin features, no multi-tenancy visibility
+
+WHAT THEY DON'T SEE:
+- Access levels (ADMIN vs TEAM)
+- Other teams or their usage
+- Session management internals
+- Platform configuration
+- Admin endpoints
 """
 
 from typing import Optional
@@ -35,38 +54,64 @@ async def chat(
     api_key: APIKey = Depends(require_team_access),
 ):
     """
-    Process a chat message
+    Process a chat message (simplified interface).
+
+    CHANGES FROM PREVIOUS VERSION:
+    - Platform auto-detected from API key's team.platform_name
+    - chat_id auto-generated if not provided (for new conversations)
+    - message_id auto-generated internally
+    - No metadata, type, or attachments (text-only in this version)
 
     SECURITY:
-    - Requires valid API key (any team)
-    - Team isolation enforced internally via session tagging
-    - External teams don't see team_id or internal metadata
-    - Simple chatbot interface - no exposure of architecture
+    - Requires valid API key (team or super admin)
+    - Team isolation enforced via session keys (platform_name:team_id:chat_id)
+    - Each team thinks only they exist
 
-    External teams only see:
-    - Input: message content
-    - Output: bot response
+    Request:
+    {
+      "user_id": "user123",
+      "text": "Hello",
+      "chat_id": "optional-for-continuation"
+    }
 
-    They DON'T see:
-    - Session management
-    - Team isolation
-    - Access levels
-    - Other teams
+    Response:
+    {
+      "success": true,
+      "response": "Hi! How can I help?",
+      "chat_id": "generated-or-provided",
+      "session_id": "Internal-BI:5:chat-id",
+      "model": "GPT-5 Chat",
+      "message_count": 1
+    }
     """
-    # Only allow 'internal' platform for API-based access
-    if message.platform != "internal":
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid platform. Use 'internal' for API access."
-        )
+    import uuid
 
-    # SECURITY: Tag session with team info for isolation (transparent to external teams)
+    # Auto-generate chat_id if not provided (new conversation)
+    chat_id = message.chat_id or str(uuid.uuid4())
+
+    # Auto-generate message_id internally
+    message_id = str(uuid.uuid4())
+
+    # Extract platform from API key's team
+    # This is transparent to the client - they don't know about platforms
+    platform_name = api_key.team.platform_name
     team_id = api_key.team_id
     api_key_id = api_key.id
     api_key_prefix = api_key.key_prefix
 
-    message.metadata["team_id"] = team_id
-    message.metadata["api_key_id"] = api_key_id
-    message.metadata["api_key_prefix"] = api_key_prefix
+    logger.info(
+        f"chat_request platform={platform_name} team_id={team_id} "
+        f"user_id={message.user_id} chat_id={chat_id}"
+    )
 
-    return await message_processor.process_message(message)
+    # Process message with simplified parameters
+    return await message_processor.process_message_simple(
+        platform_name=platform_name,
+        team_id=team_id,
+        api_key_id=api_key_id,
+        api_key_prefix=api_key_prefix,
+        user_id=message.user_id,
+        chat_id=chat_id,
+        message_id=message_id,
+        text=message.text,
+    )

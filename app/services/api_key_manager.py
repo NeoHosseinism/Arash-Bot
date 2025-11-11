@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models.database import APIKey, AccessLevel, Team, UsageLog
+from app.models.database import APIKey, Team, UsageLog
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,6 @@ class APIKeyManager:
         db: Session,
         team_id: int,
         name: str,
-        access_level: AccessLevel = AccessLevel.USER,
         created_by: Optional[str] = None,
         description: Optional[str] = None,
         monthly_quota: Optional[int] = None,
@@ -101,13 +100,15 @@ class APIKeyManager:
         expires_in_days: Optional[int] = None,
     ) -> Tuple[str, APIKey]:
         """
-        Create a new API key for a team.
+        Create a new API key for an external team (client).
+
+        NOTE: This creates API keys for external teams only (chat service access).
+        Super admin authentication is handled separately via SUPER_ADMIN_API_KEYS environment variable.
 
         Args:
             db: Database session
             team_id: Team ID
             name: Friendly name for the key
-            access_level: Access level for the key
             created_by: User who created the key
             description: Description of the key
             monthly_quota: Monthly quota override (None = use team quota)
@@ -133,7 +134,6 @@ class APIKeyManager:
             key_prefix=key_prefix,
             name=name,
             team_id=team_id,
-            access_level=access_level.value,
             monthly_quota=monthly_quota,
             daily_quota=daily_quota,
             created_by=created_by,
@@ -145,8 +145,7 @@ class APIKeyManager:
         db.refresh(api_key)
 
         logger.info(
-            f"Created API key: {name} (prefix: {key_prefix}) for team ID {team_id} "
-            f"with access level {access_level.value}"
+            f"Created API key: {name} (prefix: {key_prefix}) for team ID {team_id}"
         )
 
         return api_key_string, api_key
@@ -262,7 +261,7 @@ class APIKeyManager:
     @staticmethod
     def get_team_by_name(db: Session, name: str) -> Optional[Team]:
         """
-        Get team by name.
+        Get team by name (legacy - use get_team_by_platform_name instead).
 
         Args:
             db: Database session
@@ -272,6 +271,77 @@ class APIKeyManager:
             Team object if found, None otherwise
         """
         return db.query(Team).filter(Team.name == name).first()
+
+    @staticmethod
+    def get_team_by_platform_name(db: Session, platform_name: str) -> Optional[Team]:
+        """
+        Get team by platform name.
+
+        Args:
+            db: Database session
+            platform_name: Platform name (e.g., "Internal-BI", "External-Telegram")
+
+        Returns:
+            Team object if found, None otherwise
+        """
+        return db.query(Team).filter(Team.platform_name == platform_name).first()
+
+    @staticmethod
+    def create_team_with_key(
+        db: Session,
+        platform_name: str,
+        monthly_quota: Optional[int] = None,
+        daily_quota: Optional[int] = None,
+    ) -> Tuple[Team, str]:
+        """
+        Create a new team with auto-generated API key (one key per team).
+
+        This is the new simplified method that creates a team and immediately
+        generates its single API key.
+
+        Args:
+            db: Database session
+            platform_name: Platform name (e.g., "Internal-BI", "External-Telegram")
+            monthly_quota: Monthly request quota (None = unlimited)
+            daily_quota: Daily request quota (None = unlimited)
+
+        Returns:
+            Tuple of (team, api_key_string)
+            - team: Created team object
+            - api_key_string: Full API key (show only once to user)
+        """
+        # Create team (use platform_name as both name and platform_name)
+        team = Team(
+            name=platform_name,  # Internal name same as platform_name
+            platform_name=platform_name,
+            monthly_quota=monthly_quota,
+            daily_quota=daily_quota,
+        )
+        db.add(team)
+        db.flush()  # Flush to get team.id before creating key
+
+        # Auto-generate API key for this team
+        api_key_string, key_hash, key_prefix = APIKeyManager.generate_api_key()
+
+        api_key = APIKey(
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+            name=f"API Key for {platform_name}",  # Auto-generated name
+            team_id=team.id,
+            monthly_quota=None,  # Use team quotas
+            daily_quota=None,    # Use team quotas
+            created_by="system",  # Auto-created by system
+            description=f"Auto-generated key for {platform_name}",
+        )
+        db.add(api_key)
+        db.commit()
+        db.refresh(team)
+
+        logger.info(
+            f"Created team '{platform_name}' (ID: {team.id}) with auto-generated API key (prefix: {key_prefix})"
+        )
+
+        return team, api_key_string
 
     @staticmethod
     def get_team_by_id(db: Session, team_id: int) -> Optional[Team]:
@@ -308,8 +378,7 @@ class APIKeyManager:
     def update_team(
         db: Session,
         team_id: int,
-        name: Optional[str] = None,
-        description: Optional[str] = None,
+        platform_name: Optional[str] = None,
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
         is_active: Optional[bool] = None,
@@ -317,11 +386,14 @@ class APIKeyManager:
         """
         Update team settings.
 
+        Changes:
+        - Uses platform_name instead of name/description
+        - Removed webhook fields
+
         Args:
             db: Database session
             team_id: Team ID
-            name: New name
-            description: New description
+            platform_name: New platform name
             monthly_quota: New monthly quota
             daily_quota: New daily quota
             is_active: Active status
@@ -334,10 +406,9 @@ class APIKeyManager:
         if not team:
             return None
 
-        if name is not None:
-            team.name = name
-        if description is not None:
-            team.description = description
+        if platform_name is not None:
+            team.platform_name = platform_name
+            team.name = platform_name  # Keep name in sync
         if monthly_quota is not None:
             team.monthly_quota = monthly_quota
         if daily_quota is not None:
@@ -349,7 +420,7 @@ class APIKeyManager:
         db.commit()
         db.refresh(team)
 
-        logger.info(f"Updated team: {team.name} (ID: {team.id})")
+        logger.info(f"Updated team: {team.platform_name} (ID: {team.id})")
         return team
 
     @staticmethod
