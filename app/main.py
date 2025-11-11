@@ -85,8 +85,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"    - Commands: {len(internal_config.commands)}")
     logger.info(f"    - Max History: {internal_config.max_history}")
     logger.info(f"    - Authentication: {'Required' if internal_config.requires_auth else 'Not required'}")
-
-    logger.info(f"\nAI Service: {settings.AI_SERVICE_URL}")
+    logger.info(f"AI Service: {settings.AI_SERVICE_URL}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
 
     # Start Telegram bot if enabled
