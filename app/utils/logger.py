@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 import jdatetime
+import pytz
 
 from app.core.config import settings
 
@@ -82,9 +83,14 @@ class ColoredFormatter(logging.Formatter):
         return self._colorize(f"[{timestamp}]", 'utc_timestamp')
 
     def _format_timestamp_ir(self, record: logging.LogRecord) -> str:
-        """Format Iranian (Jalali) timestamp - NO 'J' prefix"""
-        dt = datetime.fromtimestamp(record.created)
-        jdt = jdatetime.datetime.fromgregorian(datetime=dt)
+        """Format Iranian (Jalali) timestamp in Tehran timezone - Server agnostic"""
+        # Convert UTC timestamp to Tehran timezone (Asia/Tehran)
+        tehran_tz = pytz.timezone('Asia/Tehran')
+        utc_dt = datetime.utcfromtimestamp(record.created).replace(tzinfo=pytz.utc)
+        tehran_dt = utc_dt.astimezone(tehran_tz)
+
+        # Convert to Jalali calendar
+        jdt = jdatetime.datetime.fromgregorian(datetime=tehran_dt)
 
         if self.precision == 3:
             microseconds = f"{int(record.msecs):03d}"

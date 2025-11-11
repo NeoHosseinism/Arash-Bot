@@ -76,7 +76,7 @@ def require_admin_access(
     if not authorization:
         raise HTTPException(
             status_code=401,
-            detail="احراز هویت مورد نیاز است"
+            detail="Authentication required"
         )
 
     # Check if super admin keys are configured
@@ -85,7 +85,7 @@ def require_admin_access(
         logger.error("SUPER_ADMIN_API_KEYS not configured - admin endpoints unavailable")
         raise HTTPException(
             status_code=401,
-            detail="احراز هویت مدیر کل پیکربندی نشده است"
+            detail="Super admin authentication not configured"
         )
 
     # Validate against environment-based super admin keys
@@ -94,7 +94,7 @@ def require_admin_access(
         logger.warning(f"Invalid super admin API key attempted: {provided_key[:12]}...")
         raise HTTPException(
             status_code=403,
-            detail="کلید API مدیر کل نامعتبر است"
+            detail="Invalid super admin API key"
         )
 
     logger.info(f"Super admin access granted (key: {provided_key[:12]}...)")
@@ -150,7 +150,7 @@ def require_team_access(
     if not authorization:
         raise HTTPException(
             status_code=401,
-            detail="احراز هویت مورد نیاز است"
+            detail="Authentication required"
         )
 
     db = get_db_session()
@@ -160,7 +160,7 @@ def require_team_access(
         if not api_key:
             raise HTTPException(
                 status_code=403,
-                detail="کلید API نامعتبر است"
+                detail="Invalid API key"
             )
 
         logger.debug(f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})")
@@ -172,7 +172,7 @@ def require_team_access(
         logger.error(f"Error validating team API key: {e}")
         raise HTTPException(
             status_code=500,
-            detail="خطا در اعتبارسنجی کلید API"
+            detail="Error validating API key"
         )
 
 
@@ -224,7 +224,7 @@ def optional_team_access(
         if not api_key:
             raise HTTPException(
                 status_code=403,
-                detail="کلید API نامعتبر است"
+                detail="Invalid API key"
             )
 
         logger.debug(f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})")
@@ -236,5 +236,5 @@ def optional_team_access(
         logger.error(f"Error validating team API key: {e}")
         raise HTTPException(
             status_code=500,
-            detail="خطا در اعتبارسنجی کلید API"
+            detail="Error validating API key"
         )
