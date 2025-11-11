@@ -35,6 +35,14 @@ class AIServiceClient:
 
         # Format history for AI service
         formatted_history = []
+
+        # Always add system prompt for Persian responses at the beginning
+        formatted_history.append({
+            "Role": "system",
+            "Message": "شما یک دستیار هوشمند هستید که همیشه به زبان فارسی پاسخ می‌دهید. تمام پاسخ‌های شما باید به زبان فارسی باشد. از استفاده از زبان انگلیسی یا سایر زبان‌ها خودداری کنید مگر اینکه کاربر به صراحت درخواست کند.",
+            "Files": None
+        })
+
         for msg in history:
             formatted_history.append({
                 "Role": msg.get("role", "user"),

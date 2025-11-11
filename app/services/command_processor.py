@@ -108,6 +108,11 @@ class CommandProcessor:
             if cmd in COMMAND_DESCRIPTIONS:
                 help_text += f"/{cmd} - {COMMAND_DESCRIPTIONS[cmd]}\n"
 
+        help_text += "\n💡 **دستورات آماده (کپی کنید):**\n"
+        for cmd in allowed_commands:
+            help_text += f"/{cmd}  "
+        help_text += "\n"
+
         help_text += "\n📊 **اطلاعات پلتفرم:**\n"
         if session.platform == "internal":
             help_text += f"• پلتفرم: داخلی (خصوصی)\n"
@@ -130,18 +135,14 @@ class CommandProcessor:
     async def handle_status(self, session: ChatSession, args: List[str]) -> str:
         """Handle /status command"""
         config = platform_manager.get_config(session.platform)
-        uptime = session.get_uptime_seconds()
         friendly_model = session.current_model_friendly  # ✓ Show friendly name
 
         status_text = (
             f"📊 **وضعیت نشست:**\n\n"
             f"• پلتفرم: {session.platform.title()}\n"
             f"• نوع: {'خصوصی (داخلی)' if config.type == 'private' else 'عمومی'}\n"
-            f"• شناسه نشست: {session.session_id[:8]}...\n"
             f"• مدل فعلی: {friendly_model}\n"  # ✓ Show friendly name
             f"• تعداد پیام‌ها: {session.message_count}\n"
-            f"• تاریخچه: {len(session.history)}/{config.max_history}\n"
-            f"• مدت فعالیت: {uptime:.0f} ثانیه\n"
             f"• محدودیت سرعت: {config.rate_limit}/دقیقه\n"
         )
 
@@ -172,15 +173,20 @@ class CommandProcessor:
                 else:
                     models_text += f"• {model}\n"
 
-            models_text += f"\nبرای تغییر مدل از `/model [نام]` استفاده کنید"
+            models_text += f"\n💡 **دستورات آماده (کپی کنید):**\n"
 
-            # Add aliases hint
+            # Add copiable commands based on platform
             if session.platform == "telegram":
-                models_text += "\n\n**نام‌های کوتاه:**\n"
-                models_text += "• gemini, flash → Gemini Flash\n"
-                models_text += "• deepseek, deep → DeepSeek\n"
-                models_text += "• mini → GPT-4o Mini\n"
-                models_text += "• gemma → Gemma 3\n"
+                models_text += "• /model gemini - Gemini Flash\n"
+                models_text += "• /model deepseek - DeepSeek v3\n"
+                models_text += "• /model mini - GPT-4o Mini\n"
+                models_text += "• /model gemma - Gemma 3\n"
+            else:
+                models_text += "• /model claude - Claude Sonnet 4\n"
+                models_text += "• /model gpt5 - GPT-5\n"
+                models_text += "• /model gpt4 - GPT-4.1\n"
+                models_text += "• /model mini - GPT-4o Mini\n"
+                models_text += "• /model grok - Grok 4\n"
 
             return models_text
 
@@ -191,13 +197,19 @@ class CommandProcessor:
         technical_model = platform_manager.resolve_model_name(model_input, session.platform)
 
         if not technical_model:
-            # Invalid model - show available friendly names
+            # Invalid model - show available friendly names with copiable commands
             friendly_models = platform_manager.get_available_models_friendly(session.platform)
-            return (
-                MESSAGES_FA["model_invalid"].format(model=model_input) + "\n\n"
-                f"**مدل‌های موجود:**\n" +
-                "\n".join([f"• {m}" for m in friendly_models])  # ✓ Friendly names
-            )
+            error_text = MESSAGES_FA["model_invalid"].format(model=model_input) + "\n\n"
+            error_text += f"**مدل‌های موجود:**\n"
+            error_text += "\n".join([f"• {m}" for m in friendly_models])  # ✓ Friendly names
+
+            error_text += f"\n\n💡 **دستورات آماده (کپی کنید):**\n"
+            if session.platform == "telegram":
+                error_text += "• /model gemini\n• /model deepseek\n• /model mini\n• /model gemma"
+            else:
+                error_text += "• /model claude\n• /model gpt5\n• /model gpt4\n• /model mini"
+
+            return error_text
 
         # Store technical ID internally, show friendly name to user
         session.current_model = technical_model
@@ -220,27 +232,25 @@ class CommandProcessor:
             else:
                 models_text += f"• {model}\n"
 
-        models_text += f"\n💡 از `/model [نام]` برای تغییر استفاده کنید"
+        models_text += f"\n💡 **دستورات آماده (کپی کنید):**\n"
 
-        # Add aliases based on platform
+        # Add copiable commands based on platform
         if session.platform == "telegram":
-            models_text += "\n\n**نام‌های مستعار (کوتاه):**\n"
-            models_text += "• gemini, flash → Gemini Flash\n"
-            models_text += "• gemini-2.5, flash-2.5 → Gemini 2.5 Flash\n"
-            models_text += "• deepseek, deep → DeepSeek v3\n"
-            models_text += "• mini, gpt-mini → GPT-4o Mini\n"
-            models_text += "• gemma → Gemma 3 1B\n"
+            models_text += "• /model gemini - Gemini Flash\n"
+            models_text += "• /model flash-2.5 - Gemini 2.5 Flash\n"
+            models_text += "• /model deepseek - DeepSeek v3\n"
+            models_text += "• /model mini - GPT-4o Mini\n"
+            models_text += "• /model gemma - Gemma 3 1B\n"
         else:
-            models_text += "\n\n**نام‌های مستعار (aliases):**\n"
-            models_text += "• claude, sonnet → Claude Sonnet 4\n"
-            models_text += "• gpt, gpt5 → GPT-5\n"
-            models_text += "• gpt4, gpt-4 → GPT-4.1\n"
-            models_text += "• mini → GPT-4o Mini\n"
-            models_text += "• web, search → GPT-4o Search\n"
-            models_text += "• gemini → Gemini 2.5 Flash\n"
-            models_text += "• grok → Grok 4\n"
-            models_text += "• deepseek → DeepSeek v3\n"
-            models_text += "• llama → Llama 4 Maverick\n"
+            models_text += "• /model claude - Claude Sonnet 4\n"
+            models_text += "• /model gpt5 - GPT-5\n"
+            models_text += "• /model gpt4 - GPT-4.1\n"
+            models_text += "• /model mini - GPT-4o Mini\n"
+            models_text += "• /model search - GPT-4o Search\n"
+            models_text += "• /model gemini - Gemini 2.5 Flash\n"
+            models_text += "• /model grok - Grok 4\n"
+            models_text += "• /model deepseek - DeepSeek v3\n"
+            models_text += "• /model llama - Llama 4 Maverick\n"
 
         return models_text
 

@@ -233,8 +233,6 @@ class Database:
         Args:
             force: Not used (kept for compatibility)
         """
-        print("[WARNING] create_tables() is deprecated - use Alembic migrations")
-        print("[INFO] Run: alembic upgrade head")
         logger.warning("create_tables() is deprecated - use Alembic migrations instead")
         logger.info("To initialize database, use: from app.core.database_init import initialize_database")
 
@@ -249,11 +247,9 @@ class Database:
             with self.engine.connect() as conn:
                 result = conn.execute(text("SELECT version()"))
                 version = result.scalar()
-                print("[OK] PostgreSQL connection successful")
                 logger.info(f"PostgreSQL connection test successful: {version}")
             return True
         except Exception as e:
-            print(f"[ERROR] PostgreSQL connection failed: {e}")
             logger.error(f"PostgreSQL connection test failed: {e}")
             return False
 
@@ -286,20 +282,18 @@ def get_database(database_url: Optional[str] = None) -> Database:
     """
     global _db_instance
     if _db_instance is None:
-        print("=" * 60)
-        print("Initializing Database Connection")
-        print("=" * 60)
+        logger.info("=" * 60)
+        logger.info("Initializing Database Connection")
+        logger.info("=" * 60)
         _db_instance = Database(database_url)
         # Test connection
         if _db_instance.test_connection():
-            print("[OK] Database connection established")
             logger.info("Database connection established")
             # Note: Database schema is managed by Alembic migrations
             # Run migrations on startup using: from app.core.database_init import initialize_database
         else:
-            print("[ERROR] Database connection failed - API key management will not be available")
             logger.error("PostgreSQL connection failed - API key management will not be available")
-        print("=" * 60)
+        logger.info("=" * 60)
     return _db_instance
 
 

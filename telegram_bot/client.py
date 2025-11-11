@@ -32,30 +32,24 @@ class BotServiceClient:
         mime_type: str = None
     ) -> dict:
         """Send message to bot service with retry logic"""
-        
+
+        # Simplified payload for /v1/chat endpoint (public mode - no auth)
+        # Images not supported in simplified version
+        if image_data:
+            logger.warning("Image attachments not supported in simplified API")
+
         payload = {
-            "platform": "telegram",
             "user_id": user_id,
             "chat_id": chat_id,
-            "message_id": message_id,
-            "text": text,
-            "type": "text" if text and not image_data else "image",
-            "attachments": []
+            "text": text or "📷 [Image]"  # Fallback for image messages
         }
-        
-        if image_data:
-            payload["attachments"].append({
-                "type": "image",
-                "data": image_data,
-                "mime_type": mime_type or "image/jpeg"
-            })
-        
+
         last_error = None
-        
+
         for attempt in range(self.max_retries):
             try:
                 response = await self.client.post(
-                    f"{self.service_url}/message",
+                    f"{self.service_url}/v1/chat",
                     json=payload
                 )
                 response.raise_for_status()

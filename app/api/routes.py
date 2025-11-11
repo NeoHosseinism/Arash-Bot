@@ -6,7 +6,7 @@ These endpoints are accessible to ALL valid API keys (both TEAM and ADMIN levels
 However, they are designed for external teams (clients) using the chatbot service.
 
 PUBLIC ENDPOINTS (ALL VALID API KEYS):
-- /api/v1/chat - Process chat messages
+- /v1/chat - Process chat messages
 
 SECURITY MODEL:
 - External teams (TEAM level) think they're using a simple chatbot API
@@ -40,7 +40,9 @@ from app.models.schemas import (
 from app.models.database import APIKey
 from app.services.message_processor import message_processor
 from app.services.ai_client import ai_client
-from app.api.dependencies import require_team_access
+from app.services.platform_manager import platform_manager
+from app.api.dependencies import require_team_access, optional_team_access
+from app.core.constants import COMMAND_DESCRIPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -51,38 +53,56 @@ router = APIRouter()
 @router.post("/chat", response_model=BotResponse)
 async def chat(
     message: IncomingMessage,
-    api_key: APIKey = Depends(require_team_access),
+    api_key: Optional[APIKey] = Depends(optional_team_access),
 ):
     """
-    Process a chat message (simplified interface).
+    Process a chat message - supports both public and private access (modular endpoint).
 
-    CHANGES FROM PREVIOUS VERSION:
-    - Platform auto-detected from API key's team.platform_name
-    - chat_id auto-generated if not provided (for new conversations)
-    - message_id auto-generated internally
-    - No metadata, type, or attachments (text-only in this version)
+    MODES:
+    1. PUBLIC MODE (Telegram bot - no authentication):
+       - No Authorization header required
+       - Uses platform="telegram" with no team_id
+       - Session keys: telegram:chat_id (no team isolation)
 
-    SECURITY:
-    - Requires valid API key (team or super admin)
-    - Team isolation enforced via session keys (platform_name:team_id:chat_id)
-    - Each team thinks only they exist
+    2. PRIVATE MODE (Authenticated teams):
+       - Requires valid API key in Authorization header
+       - Platform auto-detected from team.platform_name
+       - Session keys: platform_name:team_id:chat_id (team isolation enforced)
 
-    Request:
+    AUTHENTICATION:
+    - Optional: No auth header → Public Telegram bot
+    - Optional: Valid auth header → Private authenticated team
+    - Error: Invalid auth header → 403 Forbidden
+
+    PUBLIC REQUEST (Telegram):
+    {
+      "user_id": "telegram_user_id",
+      "text": "Hello",
+      "chat_id": "telegram_chat_id"
+    }
+
+    PRIVATE REQUEST (Authenticated):
+    Authorization: Bearer <your-api-key>
     {
       "user_id": "user123",
       "text": "Hello",
       "chat_id": "optional-for-continuation"
     }
 
-    Response:
+    RESPONSE:
     {
       "success": true,
       "response": "Hi! How can I help?",
-      "chat_id": "generated-or-provided",
-      "session_id": "Internal-BI:5:chat-id",
-      "model": "GPT-5 Chat",
+      "chat_id": "chat-id",
+      "session_id": "platform:chat_id OR platform:team_id:chat_id",
+      "model": "Model Name",
       "message_count": 1
     }
+
+    SECURITY:
+    - Public: No team isolation (Telegram only)
+    - Private: Complete team isolation via session tagging
+    - Invalid keys rejected (no fallback to public)
     """
     import uuid
 
@@ -92,19 +112,30 @@ async def chat(
     # Auto-generate message_id internally
     message_id = str(uuid.uuid4())
 
-    # Extract platform from API key's team
-    # This is transparent to the client - they don't know about platforms
-    platform_name = api_key.team.platform_name
-    team_id = api_key.team_id
-    api_key_id = api_key.id
-    api_key_prefix = api_key.key_prefix
+    # Determine mode based on API key presence
+    if api_key is None:
+        # PUBLIC MODE: Telegram bot (no authentication)
+        platform_name = "telegram"
+        team_id = None
+        api_key_id = None
+        api_key_prefix = None
 
-    logger.info(
-        f"chat_request platform={platform_name} team_id={team_id} "
-        f"user_id={message.user_id} chat_id={chat_id}"
-    )
+        logger.info(
+            f"[PUBLIC] telegram_request user_id={message.user_id} chat_id={chat_id}"
+        )
+    else:
+        # PRIVATE MODE: Authenticated team
+        platform_name = api_key.team.platform_name
+        team_id = api_key.team_id
+        api_key_id = api_key.id
+        api_key_prefix = api_key.key_prefix
 
-    # Process message with simplified parameters
+        logger.info(
+            f"[PRIVATE] chat_request platform={platform_name} team_id={team_id} "
+            f"user_id={message.user_id} chat_id={chat_id}"
+        )
+
+    # Process message (handles both modes)
     return await message_processor.process_message_simple(
         platform_name=platform_name,
         team_id=team_id,
@@ -115,3 +146,67 @@ async def chat(
         message_id=message_id,
         text=message.text,
     )
+
+
+@router.get("/commands")
+async def get_commands(
+    api_key: Optional[APIKey] = Depends(optional_team_access),
+):
+    """
+    Get available commands with Persian descriptions - supports both public and private access.
+
+    MODES:
+    1. PUBLIC MODE (No authentication):
+       - Returns Telegram commands
+       - Platform: telegram
+
+    2. PRIVATE MODE (Authenticated):
+       - Returns commands for authenticated team's platform
+       - Platform: Based on team.platform_name
+
+    RESPONSE:
+    {
+      "success": true,
+      "platform": "telegram" or "Internal-BI",
+      "commands": [
+        {
+          "command": "start",
+          "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
+          "usage": "/start"
+        },
+        ...
+      ]
+    }
+
+    SECURITY:
+    - Public: Returns Telegram commands only
+    - Private: Returns commands for user's platform
+    """
+    # Determine platform based on authentication
+    if api_key is None:
+        # PUBLIC MODE: Telegram bot
+        platform_name = "telegram"
+        logger.info("[PUBLIC] commands_request platform=telegram")
+    else:
+        # PRIVATE MODE: Authenticated team
+        platform_name = api_key.team.platform_name
+        logger.info(f"[PRIVATE] commands_request platform={platform_name} team_id={api_key.team_id}")
+
+    # Get allowed commands for this platform
+    allowed_commands = platform_manager.get_allowed_commands(platform_name)
+
+    # Build command list with descriptions
+    commands_list = []
+    for cmd in allowed_commands:
+        if cmd in COMMAND_DESCRIPTIONS:
+            commands_list.append({
+                "command": cmd,
+                "description": COMMAND_DESCRIPTIONS[cmd],
+                "usage": f"/{cmd}"
+            })
+
+    return {
+        "success": True,
+        "platform": platform_name,
+        "commands": commands_list
+    }

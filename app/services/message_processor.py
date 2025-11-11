@@ -94,9 +94,9 @@ class MessageProcessor:
     async def process_message_simple(
         self,
         platform_name: str,
-        team_id: int,
-        api_key_id: int,
-        api_key_prefix: str,
+        team_id: Optional[int],
+        api_key_id: Optional[int],
+        api_key_prefix: Optional[str],
         user_id: str,
         chat_id: str,
         message_id: str,
@@ -106,10 +106,10 @@ class MessageProcessor:
         Process message with simplified interface (text-only, no webhooks).
 
         Args:
-            platform_name: Team's platform name (e.g., "Internal-BI")
-            team_id: Team ID
-            api_key_id: API key ID
-            api_key_prefix: API key prefix
+            platform_name: Platform name (e.g., "telegram", "Internal-BI")
+            team_id: Team ID (None for Telegram, required for authenticated platforms)
+            api_key_id: API key ID (None for Telegram)
+            api_key_prefix: API key prefix (None for Telegram)
             user_id: User ID
             chat_id: Chat ID (auto-generated if not provided by client)
             message_id: Message ID (auto-generated)
@@ -136,7 +136,7 @@ class MessageProcessor:
                 return BotResponse(
                     success=False,
                     error="rate_limit_exceeded",
-                    response=f"Rate limit exceeded. Please wait before sending more messages. Limit: {rate_limit} messages/minute.",
+                    response=f"⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: {rate_limit} پیام در دقیقه",
                     chat_id=chat_id,
                     session_id=session.session_id,
                 )
@@ -166,7 +166,7 @@ class MessageProcessor:
             return BotResponse(
                 success=False,
                 error="processing_error",
-                response="Sorry, an error occurred while processing your message. Please try again.",
+                response="❌ متأسفم، خطایی در پردازش پیام شما رخ داد. لطفاً دوباره تلاش کنید.",
                 chat_id=chat_id,
             )
 
@@ -199,13 +199,13 @@ class MessageProcessor:
             except Exception as ai_service_error:
                 logger.error(f"AI service error: {ai_service_error}")
                 return (
-                    "Sorry, the AI service is currently unavailable. "
-                    "Please try again in a few moments or contact support."
+                    "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست. "
+                    "لطفاً چند لحظه دیگر دوباره تلاش کنید یا با پشتیبانی تماس بگیرید."
                 )
 
         except Exception as e:
             logger.error(f"Error processing chat: {e}", exc_info=True)
-            return "An error occurred while processing your message."
+            return "خطایی در پردازش پیام شما رخ داد. لطفاً دوباره تلاش کنید."
 
     async def _handle_command(self, session: ChatSession, text: str) -> str:
         """Handle command"""
