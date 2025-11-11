@@ -174,3 +174,67 @@ def require_team_access(
             status_code=500,
             detail="Error validating API key"
         )
+
+
+def optional_team_access(
+    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
+) -> Optional[APIKey]:
+    """
+    Optional TEAM API key authentication - supports both public and private access
+
+    MODES:
+    1. PUBLIC MODE (No auth header):
+       - Returns None
+       - Used for public Telegram bot
+       - No team isolation (platform:chat_id sessions)
+
+    2. PRIVATE MODE (Auth header provided):
+       - Returns APIKey object
+       - Used for authenticated teams
+       - Team isolation enforced (platform:team_id:chat_id sessions)
+
+    AUTHENTICATION:
+    - If auth header provided: Validates against database
+    - If no auth header: Returns None (public access allowed)
+    - If invalid auth header: Raises 403 error
+
+    USAGE:
+    - Used by: Modular /api/v1/chat endpoint
+    - Returns: APIKey object (private) OR None (public)
+
+    ERROR RESPONSES:
+    - 403: Invalid API key (only if auth header provided but invalid)
+    - No 401 error (public access allowed)
+
+    SECURITY:
+    - Public access only for Telegram bot (no team isolation)
+    - Private access enforces team isolation via team_id
+    - Invalid keys are rejected (no fallback to public)
+    """
+    if not authorization:
+        # Public access (Telegram bot)
+        logger.debug("Public access (no authentication)")
+        return None
+
+    # Private access - validate API key
+    db = get_db_session()
+    try:
+        api_key = APIKeyManager.validate_api_key(db, authorization.credentials)
+
+        if not api_key:
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid API key"
+            )
+
+        logger.debug(f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})")
+        return api_key
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error validating team API key: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Error validating API key"
+        )
