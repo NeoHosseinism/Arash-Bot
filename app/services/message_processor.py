@@ -199,13 +199,13 @@ class MessageProcessor:
             except Exception as ai_service_error:
                 logger.error(f"AI service error: {ai_service_error}")
                 return (
-                    "Sorry, the AI service is currently unavailable. "
-                    "Please try again in a few moments or contact support."
+                    "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست. "
+                    "لطفاً چند لحظه دیگر دوباره تلاش کنید یا با پشتیبانی تماس بگیرید."
                 )
 
         except Exception as e:
             logger.error(f"Error processing chat: {e}", exc_info=True)
-            return "An error occurred while processing your message."
+            return "خطایی در پردازش پیام شما رخ داد. لطفاً دوباره تلاش کنید."
 
     async def _handle_command(self, session: ChatSession, text: str) -> str:
         """Handle command"""

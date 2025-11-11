@@ -414,7 +414,7 @@ async def get_team(
     team = APIKeyManager.get_team_by_id(db, team_id)
 
     if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+        raise HTTPException(status_code=404, detail="تیم پیدا نشد")
 
     # Get the team's API key
     api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
@@ -451,7 +451,7 @@ async def update_team(
     )
 
     if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+        raise HTTPException(status_code=404, detail="تیم پیدا نشد")
 
     # Get the team's API key
     api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
@@ -490,7 +490,7 @@ async def get_team_usage(
     # Verify team exists
     team = APIKeyManager.get_team_by_id(db, team_id)
     if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+        raise HTTPException(status_code=404, detail="تیم پیدا نشد")
 
     start_date = datetime.utcnow() - timedelta(days=days)
     stats = UsageTracker.get_team_usage_stats(db, team_id, start_date)
