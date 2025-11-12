@@ -90,7 +90,7 @@ class TestAuthentication:
         mock_process.return_value = {
             "success": True,
             "response": "سلام! چطور می‌تونم کمکتون کنم؟",
-            "chat_id": "chat_123",
+            "conversation_id": "chat_123",
             "model": "Gemini 2.0 Flash"
         }
 
@@ -160,7 +160,7 @@ class TestChatEndpoint:
         mock_process.return_value = {
             "success": True,
             "response": "سلام! چطور می‌تونم کمکتون کنم؟",
-            "chat_id": "chat_123",
+            "conversation_id": "chat_123",
             "model": "Gemini 2.0 Flash",
             "message_count": 1
         }
@@ -219,7 +219,7 @@ class TestChatEndpoint:
             "success": False,
             "error": "access_denied",
             "response": "❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.\n\nAccess denied. This chat belongs to a different API key.",
-            "chat_id": "chat_owned_by_other_key",
+            "conversation_id": "chat_owned_by_other_key",
         }
 
         response = client.post(
@@ -228,7 +228,7 @@ class TestChatEndpoint:
             json={
                 "user_id": "user1",
                 "text": "Hello",
-                "chat_id": "chat_owned_by_other_key"
+                "conversation_id": "chat_owned_by_other_key"
             }
         )
         assert response.status_code == 200

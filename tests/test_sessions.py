@@ -34,7 +34,7 @@ class TestSessionCreation:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -43,7 +43,7 @@ class TestSessionCreation:
         assert session is not None
         assert session.platform == "internal"
         assert session.user_id == "user1"
-        assert session.chat_id == "chat1"
+        assert session.conversation_id == "chat1"
         assert session.team_id == 100
         assert session.api_key_id == 1
         assert session.api_key_prefix == "sk_test_"
@@ -53,7 +53,7 @@ class TestSessionCreation:
         session = session_manager.get_or_create_session(
             platform="telegram",
             user_id="tg_user1",
-            chat_id="tg_chat1",
+            conversation_id="tg_chat1",
             team_id=None,
             api_key_id=None,
             api_key_prefix=None
@@ -72,7 +72,7 @@ class TestSessionKeyGeneration:
         """Test session key format includes team_id"""
         key = session_manager.get_session_key(
             platform="internal",
-            chat_id="chat123",
+            conversation_id="chat123",
             team_id=100
         )
 
@@ -82,14 +82,14 @@ class TestSessionKeyGeneration:
         """Test session key format without team_id"""
         key = session_manager.get_session_key(
             platform="telegram",
-            chat_id="chat123",
+            conversation_id="chat123",
             team_id=None
         )
 
         assert key == "telegram:chat123"
 
     def test_session_key_collision_prevention(self, session_manager):
-        """Test that different teams with same chat_id get different keys"""
+        """Test that different teams with same conversation_id get different keys"""
         key_team_1 = session_manager.get_session_key("internal", "chat123", team_id=1)
         key_team_2 = session_manager.get_session_key("internal", "chat123", team_id=2)
 
@@ -103,21 +103,21 @@ class TestSessionIsolation:
 
     def test_different_teams_cannot_share_sessions(self, session_manager):
         """Test that sessions are isolated by team_id"""
-        # Team 1 creates session with chat_id "user123"
+        # Team 1 creates session with conversation_id "user123"
         session_team_1 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user123",
-            chat_id="user123",
+            conversation_id="user123",
             team_id=1,
             api_key_id=10,
             api_key_prefix="sk_team1_"
         )
 
-        # Team 2 creates session with same chat_id "user123"
+        # Team 2 creates session with same conversation_id "user123"
         session_team_2 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user123",
-            chat_id="user123",
+            conversation_id="user123",
             team_id=2,
             api_key_id=20,
             api_key_prefix="sk_team2_"
@@ -136,7 +136,7 @@ class TestSessionIsolation:
         session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_t100_"
@@ -145,7 +145,7 @@ class TestSessionIsolation:
         session_manager.get_or_create_session(
             platform="internal",
             user_id="user2",
-            chat_id="chat2",
+            conversation_id="chat2",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_t100_"
@@ -155,7 +155,7 @@ class TestSessionIsolation:
         session_manager.get_or_create_session(
             platform="internal",
             user_id="user3",
-            chat_id="chat3",
+            conversation_id="chat3",
             team_id=200,
             api_key_id=2,
             api_key_prefix="sk_t200_"
@@ -182,7 +182,7 @@ class TestSessionRetrieval:
         session1 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -192,7 +192,7 @@ class TestSessionRetrieval:
         session2 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -207,7 +207,7 @@ class TestSessionRetrieval:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -233,7 +233,7 @@ class TestSessionDeletion:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -242,7 +242,7 @@ class TestSessionDeletion:
         # Delete session
         success = session_manager.delete_session(
             platform="internal",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100
         )
 
@@ -258,7 +258,7 @@ class TestSessionDeletion:
         session = session_manager.get_or_create_session(
             platform="telegram",
             user_id="tg_user",
-            chat_id="tg_chat",
+            conversation_id="tg_chat",
             team_id=None,
             api_key_id=None,
             api_key_prefix=None
@@ -267,7 +267,7 @@ class TestSessionDeletion:
         # Delete session
         success = session_manager.delete_session(
             platform="telegram",
-            chat_id="tg_chat",
+            conversation_id="tg_chat",
             team_id=None
         )
 
@@ -282,7 +282,7 @@ class TestSessionHistory:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -305,7 +305,7 @@ class TestSessionHistory:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -325,7 +325,7 @@ class TestSessionHistory:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -349,7 +349,7 @@ class TestSessionExpiration:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -363,7 +363,7 @@ class TestSessionExpiration:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_"
@@ -386,7 +386,7 @@ class TestChatSession:
             platform="internal",
             platform_config={"type": "private", "model": "gpt-4"},
             user_id="user1",
-            chat_id="chat1",
+            conversation_id="chat1",
             current_model="gpt-4",
             team_id=100,
             api_key_id=1,
@@ -405,7 +405,7 @@ class TestChatSession:
             platform="telegram",
             platform_config={"type": "private", "model": "gemini-2.0-flash"},
             user_id="tg_user",
-            chat_id="tg_chat",
+            conversation_id="tg_chat",
             current_model="gemini-2.0-flash",
             team_id=None,
             api_key_id=None,

@@ -15,7 +15,7 @@ def sample_user_message():
     return {
         "platform": "telegram",
         "user_id": "test_user_123",
-        "chat_id": "test_chat_456",
+        "conversation_id": "test_chat_456",
         "message_id": "test_msg_789",
         "text": "سلام، این یک تست است",
         "type": "text"
@@ -29,7 +29,7 @@ def sample_session_data():
         "session_id": "test_session_abc",
         "platform": "telegram",
         "user_id": "test_user_123",
-        "chat_id": "test_chat_456",
+        "conversation_id": "test_chat_456",
         "current_model": "google/gemini-2.0-flash-001"
     }
 

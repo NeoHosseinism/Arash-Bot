@@ -37,7 +37,7 @@ class TelegramHandlers:
         try:
             response = await self.bot_client.send_message(
                 user_id=str(user.id),
-                chat_id=str(chat.id),
+                conversation_id=str(chat.id),
                 message_id=str(update.message.message_id),
                 text="/start"
             )
@@ -62,7 +62,7 @@ class TelegramHandlers:
         try:
             response = await self.bot_client.send_message(
                 user_id=str(user.id),
-                chat_id=str(chat.id),
+                conversation_id=str(chat.id),
                 message_id=str(update.message.message_id),
                 text="/help"
             )
@@ -86,12 +86,12 @@ class TelegramHandlers:
         message = update.message
         
         # Show typing indicator
-        await context.bot.send_chat_action(chat_id=chat.id, action="typing")
+        await context.bot.send_chat_action(conversation_id=chat.id, action="typing")
         
         try:
             response = await self.bot_client.send_message(
                 user_id=str(user.id),
-                chat_id=str(chat.id),
+                conversation_id=str(chat.id),
                 message_id=str(message.message_id),
                 text=message.text
             )
@@ -129,7 +129,7 @@ class TelegramHandlers:
             return
         
         # Show typing indicator
-        await context.bot.send_chat_action(chat_id=chat.id, action="typing")
+        await context.bot.send_chat_action(conversation_id=chat.id, action="typing")
         
         try:
             # Get the largest photo
@@ -156,7 +156,7 @@ class TelegramHandlers:
             # Send to bot service
             response = await self.bot_client.send_message(
                 user_id=str(user.id),
-                chat_id=str(chat.id),
+                conversation_id=str(chat.id),
                 message_id=str(message.message_id),
                 text=caption,
                 image_data=photo_base64,
@@ -190,7 +190,7 @@ class TelegramHandlers:
         
         # Check if it's an image document
         if document.mime_type and document.mime_type.startswith("image/"):
-            await context.bot.send_chat_action(chat_id=chat.id, action="typing")
+            await context.bot.send_chat_action(conversation_id=chat.id, action="typing")
             
             # Check file size
             if document.file_size and document.file_size > self.max_file_size:
@@ -214,7 +214,7 @@ class TelegramHandlers:
                 # Send to bot service
                 response = await self.bot_client.send_message(
                     user_id=str(user.id),
-                    chat_id=str(chat.id),
+                    conversation_id=str(chat.id),
                     message_id=str(message.message_id),
                     text=caption,
                     image_data=file_base64,

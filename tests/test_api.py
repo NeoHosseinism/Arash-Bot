@@ -177,7 +177,7 @@ class TestAuthenticationV1:
             json={
                 "platform": "internal",
                 "user_id": "user1",
-                "chat_id": "chat1",
+                "conversation_id": "chat1",
                 "message_id": "msg1",
                 "text": "Hello",
                 "type": "text"
@@ -235,7 +235,7 @@ class TestMessageEndpointV1:
             response="Hello! How can I help?",
             session_id="test_session_123",
             model="gpt-4",
-            chat_id="chat1"
+            conversation_id="chat1"
         ))
 
         response = client.post(
@@ -243,7 +243,7 @@ class TestMessageEndpointV1:
             headers={"Authorization": "Bearer valid_key"},
             json={
                 "user_id": "user1",
-                "chat_id": "chat1",
+                "conversation_id": "chat1",
                 "text": "Hello"
             }
         )
@@ -365,16 +365,16 @@ class TestSessionKeyIsolation:
         assert key_with_team != key_without_team
 
     @patch("app.services.session_manager.session_manager")
-    def test_different_teams_same_chat_id_different_sessions(self, mock_sess_mgr):
-        """Test that two teams with same chat_id get different sessions"""
+    def test_different_teams_same_conversation_id_different_sessions(self, mock_sess_mgr):
+        """Test that two teams with same conversation_id get different sessions"""
         from app.services.session_manager import SessionManager
 
         manager = SessionManager()
 
-        # Team 100 with chat_id "user123"
+        # Team 100 with conversation_id "user123"
         key_team_100 = manager.get_session_key("internal", "user123", team_id=100)
 
-        # Team 200 with chat_id "user123" (same chat_id, different team)
+        # Team 200 with conversation_id "user123" (same conversation_id, different team)
         key_team_200 = manager.get_session_key("internal", "user123", team_id=200)
 
         # Keys must be different to prevent session collision

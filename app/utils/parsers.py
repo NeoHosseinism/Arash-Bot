@@ -30,7 +30,7 @@ def parse_telegram_webhook(data: Dict[str, Any]) -> Optional[IncomingMessage]:
     msg = data["message"]
     
     # Extract basic info
-    chat_id = str(msg["chat"]["id"])
+    conversation_id = str(msg["chat"]["id"])
     user_id = str(msg["from"]["id"])
     message_id = str(msg["message_id"])
     
@@ -65,7 +65,7 @@ def parse_telegram_webhook(data: Dict[str, Any]) -> Optional[IncomingMessage]:
     return IncomingMessage(
         platform="telegram",
         user_id=user_id,
-        chat_id=chat_id,
+        conversation_id=conversation_id,
         message_id=message_id,
         text=text,
         type=msg_type,
@@ -96,7 +96,7 @@ def parse_internal_webhook(data: Dict[str, Any]) -> Optional[IncomingMessage]:
     return IncomingMessage(
         platform="internal",
         user_id=data.get("user_id", ""),
-        chat_id=data.get("chat_id", ""),
+        conversation_id=data.get("conversation_id", ""),
         message_id=data.get("message_id", ""),
         text=data.get("text"),
         type=MessageType(data.get("type", "text")),

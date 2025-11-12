@@ -97,7 +97,7 @@ def main():
     # Telegram message processing
     slog.info("telegram_message_received",
               context="telegram.handler",
-              chat_id=123456789,
+              conversation_id=123456789,
               user_id=987654321,
               message_type="text",
               length=250)
@@ -121,7 +121,7 @@ def main():
     slog.warning("rate_limit_warning",
                  context="session.manager",
                  platform="telegram",
-                 chat_id=123456789,
+                 conversation_id=123456789,
                  current_requests=18,
                  limit=20,
                  window="1m")
