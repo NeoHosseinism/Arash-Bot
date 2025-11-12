@@ -2,7 +2,7 @@
 # Essential commands for development and deployment
 
 .PHONY: help check-poetry install run run-dev test lint format clean \
-        docker-build docker-run migrate-up migrate-down migrate-status migrate-create \
+        migrate-up migrate-down migrate-status migrate-create \
         db-teams db-keys db-team-create db-key-create demo-logging show-config
 
 # Detect poetry location (allow override with POETRY=/path/to/poetry)
@@ -53,10 +53,6 @@ help:
 	@echo ""
 	@echo "[Logging]"
 	@echo "  make demo-logging   Run logging demo (timestamp modes)"
-	@echo ""
-	@echo "[Docker]"
-	@echo "  make docker-build   Build Docker image"
-	@echo "  make docker-run     Run Docker container"
 	@echo ""
 	@echo "For full documentation, see README.md"
 	@echo ""
@@ -114,18 +110,6 @@ show-config: check-poetry
 demo-logging:
 	@echo "[Running Logging Demo...]"
 	python3 demo_timestamp_modes.py
-
-# ============================================================================
-# Docker
-# ============================================================================
-
-docker-build:
-	@echo "[Building Docker image...]"
-	docker build -t arash-external-api:latest .
-
-docker-run:
-	@echo "[Running Docker container...]"
-	docker run --rm --env-file .env -p 3000:3000 arash-external-api:latest
 
 # ============================================================================
 # Database Migrations

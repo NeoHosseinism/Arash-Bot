@@ -1,4 +1,4 @@
-# Arash Bot
+# Arash External API
 
 **Multi-platform AI chatbot service with team-based access control, supporting Telegram and REST API integrations.**
 
@@ -88,9 +88,9 @@ cp .env.example .env  # Edit: DB, AI_SERVICE_URL, tokens
 make migrate-up
 
 # 4. Run service (API + integrated Telegram bot)
-make run
-# API: http://localhost:3000
-# Docs: http://localhost:3000/docs
+make run-dev
+# IMPORTANT: THE DOCS IS DISABLED IN `make run` like the prod and stage.
+
 ```
 
 ---
@@ -108,7 +108,7 @@ DB_PASSWORD=***
 DB_NAME=arash_db
 
 # AI Service (external multi-model router)
-AI_SERVICE_URL=https://your-ai-service.com
+AI_SERVICE_URL=https://our-ai-service.com
 
 # Authentication
 SUPER_ADMIN_API_KEYS=admin_key_1,admin_key_2  # Comma-separated
@@ -123,99 +123,4 @@ LOG_LEVEL=INFO
 
 ---
 
-## API Examples
-
-### Chat Endpoint (Team Key)
-```bash
-curl -X POST http://localhost:3000/v1/chat \
-  -H "Authorization: Bearer <team-api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "user_123",
-    "text": "سلام، چطوری؟"
-  }'
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "response": "سلام! خوبم، ممنون. چطور می‌تونم کمکتون کنم؟",
-  "conversation_id": "conv_abc123",
-  "model": "Gemini 2.0 Flash",
-  "message_count": 1
-}
-```
-
-### Create Team (Admin Key)
-```bash
-curl -X POST http://localhost:3000/v1/admin/teams \
-  -H "Authorization: Bearer <admin-api-key>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "platform_name": "Internal-BI",
-    "monthly_quota": 100000,
-    "daily_quota": 5000
-  }'
-```
-
-**Interactive Docs:** http://localhost:3000/docs
-
----
-
-## Deployment
-
-### Docker (Production)
-```bash
-docker build -t arash-bot .
-docker run --env-file .env -p 3000:3000 arash-bot
-```
-
-### Kubernetes
-Manifests available for dev/stage/prod environments:
-```bash
-kubectl apply -f manifests/prod/
-```
-
----
-
-## Development Commands
-
-| Command | Description |
-|---------|-------------|
-| `make run` | Start service (port 3000) |
-| `make run-dev` | Start with auto-reload |
-| `make test` | Run test suite |
-| `make lint` | Check code quality (ruff) |
-| `make format` | Format code (black) |
-| `make migrate-up` | Apply pending migrations |
-| `make migrate-create MSG="..."` | Create new migration |
-| `make docker-build` | Build Docker image |
-| `make db-teams` | List all teams |
-| `make db-keys` | List all API keys |
-
----
-
-## Roadmap
-
-Future enhancements planned for upcoming releases:
-
-- 🎙️ **Voice Message Support** - Process audio messages via speech-to-text
-- 🌐 **Multi-Language UI** - Internationalization for bot responses
-- 📊 **Advanced Analytics Dashboard** - Real-time usage metrics and insights
-- 🔔 **Team Usage Webhooks** - Real-time notifications for quota alerts
-- 🧠 **Custom Model Fine-Tuning** - Team-specific AI model customization
-- 👤 **Per-User Rate Limiting** - Granular rate control beyond team-level
-- 📤 **Conversation Export API** - Export chat history in multiple formats
-- 🔄 **Model Fallback Chain** - Automatic failover between AI models
-- 🔐 **OAuth Integration** - Support for OAuth2 authentication flows
-
----
-
-## License
-
-MIT
-
----
-
-**Version:** 1.1.0 | **Docs:** [OpenAPI Spec](http://localhost:3000/docs) | **Development:** See [CLAUDE.md](CLAUDE.md)
+**Version:** 1.1.0 | **API Docs:** [Apidog](https://app.apidog.com/project/1110139) | **Development:** See [CLAUDE.md](CLAUDE.md)

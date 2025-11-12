@@ -30,7 +30,7 @@ def init_database():
     print("[OK] Database initialized successfully")
 
 
-def create_team(name: str, description: str = None, daily_quota: int = None, monthly_quota: int = None):
+def create_team(name: str, daily_quota: int = None, monthly_quota: int = None):
     """Create a new team"""
     db = get_database()
     session = next(db.get_session())
@@ -39,13 +39,13 @@ def create_team(name: str, description: str = None, daily_quota: int = None, mon
         team = APIKeyManager.create_team(
             db=session,
             name=name,
-            description=description,
             daily_quota=daily_quota,
             monthly_quota=monthly_quota,
         )
         print(f"[OK] Team created successfully!")
         print(f"  ID: {team.id}")
         print(f"  Name: {team.name}")
+        print(f"  Platform: {team.platform_name}")
         print(f"  Daily Quota: {team.daily_quota or 'Unlimited'}")
         print(f"  Monthly Quota: {team.monthly_quota or 'Unlimited'}")
     except Exception as e:
@@ -69,14 +69,14 @@ def list_teams():
         table_data.append([
             team.id,
             team.name,
-            team.description or "-",
+            team.platform_name,
             team.daily_quota or "unlimited",
             team.monthly_quota or "unlimited",
             "active" if team.is_active else "inactive",
             team.created_at.strftime("%Y-%m-%d"),
         ])
 
-    headers = ["ID", "Name", "Description", "Daily Quota", "Monthly Quota", "Active", "Created"]
+    headers = ["ID", "Name", "Platform", "Daily Quota", "Monthly Quota", "Active", "Created"]
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
 
@@ -291,7 +291,6 @@ def main():
 
     team_create = team_subparsers.add_parser("create", help="Create a new team")
     team_create.add_argument("name", help="Team name")
-    team_create.add_argument("--description", help="Team description")
     team_create.add_argument("--daily-quota", type=int, help="Daily request quota")
     team_create.add_argument("--monthly-quota", type=int, help="Monthly request quota")
 
@@ -337,7 +336,7 @@ def main():
 
     elif args.command == "team":
         if args.subcommand == "create":
-            create_team(args.name, args.description, args.daily_quota, args.monthly_quota)
+            create_team(args.name, args.daily_quota, args.monthly_quota)
         elif args.subcommand == "list":
             list_teams()
         elif args.subcommand == "delete":
