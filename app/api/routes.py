@@ -26,7 +26,7 @@ WHAT THEY DON'T SEE:
 - Admin endpoints
 """
 
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 import logging
 
@@ -41,7 +41,7 @@ from app.models.database import APIKey
 from app.services.message_processor import message_processor
 from app.services.ai_client import ai_client
 from app.services.platform_manager import platform_manager
-from app.api.dependencies import require_team_access, optional_team_access
+from app.api.dependencies import require_team_access, require_chat_access
 from app.core.constants import COMMAND_DESCRIPTIONS
 
 logger = logging.getLogger(__name__)
@@ -90,12 +90,22 @@ router = APIRouter()
                 }
             }
         },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authentication required. Please provide an API key in the Authorization header."
+                    }
+                }
+            }
+        },
         403: {
             "description": "Invalid API key",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "Invalid API key"
+                        "detail": "Invalid API key. Please check your credentials."
                     }
                 }
             }
@@ -114,40 +124,49 @@ router = APIRouter()
 )
 async def chat(
     message: IncomingMessage,
-    api_key: Optional[APIKey] = Depends(optional_team_access),
+    auth: Union[str, APIKey] = Depends(require_chat_access),
 ):
     """
-    Process a chat message - supports both public and private access (modular endpoint).
+    Process a chat message - **AUTHENTICATION REQUIRED**.
 
-    ## Modes
+    ## Security Update (CRITICAL)
+    **Authentication is now MANDATORY for all requests.**
+    - Telegram bot: Must use TELEGRAM_SERVICE_KEY
+    - External teams: Must use their team API keys
+    - Unauthenticated requests: REJECTED with 401
 
-    ### 1. PUBLIC MODE (Telegram bot - no authentication):
-    - No Authorization header required
-    - Uses platform="telegram" with no team_id
-    - Session keys: telegram:chat_id (no team isolation)
+    ## Authentication Modes
 
-    ### 2. PRIVATE MODE (Authenticated teams):
-    - Requires valid API key in Authorization header
+    ### 1. TELEGRAM MODE (Telegram bot service):
+    - Telegram bot uses TELEGRAM_SERVICE_KEY in Authorization header
+    - Platform="telegram", no team_id
+    - Session keys: telegram:chat_id
+
+    ### 2. TEAM MODE (External authenticated teams):
+    - External teams use their team API keys
     - Platform auto-detected from team.platform_name
     - Session keys: platform_name:team_id:chat_id (team isolation enforced)
 
-    ## Authentication
-    - ✅ No auth header → Public Telegram bot
-    - ✅ Valid auth header → Private authenticated team
-    - ❌ Invalid auth header → 403 Forbidden
+    ## Chat ID Logic
+    - **No chat_id provided**: NEW conversation (auto-generated UUID)
+    - **chat_id provided**: CONTINUATION of existing conversation
+    - Chat IDs are unique per conversation and used for session history
 
     ## Examples
 
-    ### PUBLIC REQUEST (Telegram):
+    ### TELEGRAM BOT REQUEST:
+    ```http
+    Authorization: Bearer <TELEGRAM_SERVICE_KEY>
+    ```
     ```json
     {
-      "user_id": "telegram_user_id",
-      "text": "سلام",
-      "chat_id": "telegram_chat_id"
+      "user_id": "telegram_user_12345",
+      "text": "سلام، چطوری؟",
+      "chat_id": "existing_chat_id_or_null_for_new"
     }
     ```
 
-    ### PRIVATE REQUEST (Authenticated):
+    ### EXTERNAL TEAM REQUEST:
     ```http
     Authorization: Bearer ark_1234567890abcdef
     ```
@@ -155,44 +174,49 @@ async def chat(
     {
       "user_id": "user123",
       "text": "چطور می‌تونم مدل رو عوض کنم؟",
-      "chat_id": "optional-for-continuation"
+      "chat_id": null
     }
     ```
+    **Response includes chat_id** - use it for continuing the conversation.
 
     ## Security
-    - Public: No team isolation (Telegram only)
-    - Private: Complete team isolation via session tagging
-    - Invalid keys rejected (no fallback to public)
+    - Telegram traffic: Authenticated and logged as [TELEGRAM]
+    - Team traffic: Authenticated and logged as [TEAM]
+    - Unauthorized traffic: Blocked with 401/403
+    - Super admins can now track ALL API usage
     """
     import uuid
 
-    # Auto-generate chat_id if not provided (new conversation)
+    # Auto-generate chat_id if not provided (NEW conversation)
+    # If chat_id is provided, it's a CONTINUATION of existing conversation
     chat_id = message.chat_id or str(uuid.uuid4())
 
     # Auto-generate message_id internally
     message_id = str(uuid.uuid4())
 
-    # Determine mode based on API key presence
-    if api_key is None:
-        # PUBLIC MODE: Telegram bot (no authentication)
+    # Determine mode based on authentication type
+    if auth == "telegram":
+        # TELEGRAM MODE: Telegram bot service
         platform_name = "telegram"
         team_id = None
         api_key_id = None
         api_key_prefix = None
 
         logger.info(
-            f"[PUBLIC] telegram_request user_id={message.user_id} chat_id={chat_id}"
+            f"[TELEGRAM] bot_request user_id={message.user_id} chat_id={chat_id} "
+            f"new_conversation={message.chat_id is None}"
         )
     else:
-        # PRIVATE MODE: Authenticated team
-        platform_name = api_key.team.platform_name
-        team_id = api_key.team_id
-        api_key_id = api_key.id
-        api_key_prefix = api_key.key_prefix
+        # TEAM MODE: Authenticated external team
+        platform_name = auth.team.platform_name
+        team_id = auth.team_id
+        api_key_id = auth.id
+        api_key_prefix = auth.key_prefix
 
         logger.info(
-            f"[PRIVATE] chat_request platform={platform_name} team_id={team_id} "
-            f"user_id={message.user_id} chat_id={chat_id}"
+            f"[TEAM] chat_request platform={platform_name} team_id={team_id} "
+            f"user_id={message.user_id} chat_id={chat_id} "
+            f"new_conversation={message.chat_id is None}"
         )
 
     # Process message (handles both modes)
@@ -283,12 +307,22 @@ async def chat(
                 }
             }
         },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authentication required. Please provide an API key in the Authorization header."
+                    }
+                }
+            }
+        },
         403: {
             "description": "Invalid API key",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "Invalid API key"
+                        "detail": "Invalid API key. Please check your credentials."
                     }
                 }
             }
@@ -296,20 +330,26 @@ async def chat(
     }
 )
 async def get_commands(
-    api_key: Optional[APIKey] = Depends(optional_team_access),
+    auth: Union[str, APIKey] = Depends(require_chat_access),
 ):
     """
-    Get available commands with Persian descriptions - supports both public and private access.
+    Get available commands with Persian descriptions - **AUTHENTICATION REQUIRED**.
 
-    ## Modes
+    ## Security Update (CRITICAL)
+    **Authentication is now MANDATORY for all requests.**
+    - Telegram bot: Must use TELEGRAM_SERVICE_KEY
+    - External teams: Must use their team API keys
+    - Unauthenticated requests: REJECTED with 401
 
-    ### 1. PUBLIC MODE (No authentication):
-    - Returns Telegram commands
-    - Platform: telegram
+    ## Authentication Modes
 
-    ### 2. PRIVATE MODE (Authenticated):
+    ### 1. TELEGRAM MODE:
+    - Telegram bot uses TELEGRAM_SERVICE_KEY
+    - Returns Telegram platform commands
+
+    ### 2. TEAM MODE:
+    - External teams use their team API keys
     - Returns commands for authenticated team's platform
-    - Platform: Based on team.platform_name
 
     ## Response Format
     ```json
@@ -327,18 +367,19 @@ async def get_commands(
     ```
 
     ## Security
-    - Public: Returns Telegram commands only
-    - Private: Returns commands for user's platform
+    - Telegram traffic: Logged as [TELEGRAM]
+    - Team traffic: Logged as [TEAM]
+    - Unauthorized traffic: Blocked with 401/403
     """
-    # Determine platform based on authentication
-    if api_key is None:
-        # PUBLIC MODE: Telegram bot
+    # Determine platform based on authentication type
+    if auth == "telegram":
+        # TELEGRAM MODE: Telegram bot service
         platform_name = "telegram"
-        logger.info("[PUBLIC] commands_request platform=telegram")
+        logger.info("[TELEGRAM] commands_request platform=telegram")
     else:
-        # PRIVATE MODE: Authenticated team
-        platform_name = api_key.team.platform_name
-        logger.info(f"[PRIVATE] commands_request platform={platform_name} team_id={api_key.team_id}")
+        # TEAM MODE: Authenticated external team
+        platform_name = auth.team.platform_name
+        logger.info(f"[TEAM] commands_request platform={platform_name} team_id={auth.team_id}")
 
     # Get allowed commands for this platform
     allowed_commands = platform_manager.get_allowed_commands(platform_name)

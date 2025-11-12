@@ -13,12 +13,14 @@ logger = logging.getLogger(__name__)
 
 class BotServiceClient:
     """Client for communicating with bot service"""
-    
+
     def __init__(self, service_url: str = "http://localhost:8001"):
         self.service_url = service_url
+        self.service_key = settings.TELEGRAM_SERVICE_KEY
         self.client = httpx.AsyncClient(
             timeout=httpx.Timeout(30.0, connect=5.0),
-            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10)
+            limits=httpx.Limits(max_keepalive_connections=5, max_connections=10),
+            headers={"Authorization": f"Bearer {self.service_key}"}
         )
         self.max_retries = 3
     

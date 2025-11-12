@@ -18,6 +18,7 @@ class Settings(BaseSettings):
 
     # Telegram Configuration
     TELEGRAM_BOT_TOKEN: str
+    TELEGRAM_SERVICE_KEY: str  # API key for Telegram bot to authenticate with the chat API
     TELEGRAM_DEFAULT_MODEL: str = "google/gemini-2.0-flash-001"
     TELEGRAM_MODELS: str = (
         "google/gemini-2.0-flash-001,google/gemini-2.5-flash,"
