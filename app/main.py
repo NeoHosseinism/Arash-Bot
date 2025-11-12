@@ -246,6 +246,7 @@ async def health_check():
 if __name__ == "__main__":
     import argparse
     import sys
+
     import uvicorn
 
     parser = argparse.ArgumentParser(
@@ -264,14 +265,10 @@ Environment Variables:
   API_HOST                 API host address (default: 0.0.0.0)
   API_PORT                 API port (default: 3000)
   ENVIRONMENT              Environment: development, staging, production
-        """
+        """,
     )
 
-    parser.add_argument(
-        "--reload",
-        action="store_true",
-        help="Enable auto-reload for development"
-    )
+    parser.add_argument("--reload", action="store_true", help="Enable auto-reload for development")
 
     args = parser.parse_args()
 
@@ -284,7 +281,7 @@ Environment Variables:
             port=settings.API_PORT,
             reload=args.reload or settings.is_development,
             log_level=settings.LOG_LEVEL.lower(),
-            access_log=True
+            access_log=True,
         )
     except KeyboardInterrupt:
         logger.info("\nShutdown requested by user")

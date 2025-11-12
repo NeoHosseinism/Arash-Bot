@@ -439,9 +439,7 @@ class APIKeyManager:
             return False
 
         # Check for active API keys
-        active_keys = (
-            db.query(APIKey).filter(APIKey.team_id == team_id, APIKey.is_active).count()
-        )
+        active_keys = db.query(APIKey).filter(APIKey.team_id == team_id, APIKey.is_active).count()
 
         if active_keys > 0 and not force:
             logger.warning(
