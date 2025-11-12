@@ -138,20 +138,8 @@ class TestHealthEndpoint:
 class TestAuthenticationV1:
     """Test API v1 authentication"""
 
-    @patch("app.api.routes.message_processor")
-    def test_missing_auth_header(self, mock_processor, client):
-        """Test request without auth header - should work in public mode"""
-        # Mock message processor response for public Telegram mode
-        from app.models.schemas import BotResponse
-        mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
-            success=True,
-            response="Hello from Telegram bot!",
-            data={
-                "session_id": "telegram:test_session",
-                "model": "test-model"
-            }
-        ))
-
+    def test_missing_auth_header(self, client):
+        """Test request without auth header - should require authentication (401)"""
         response = client.post(
             "/v1/chat",
             json={
@@ -159,10 +147,10 @@ class TestAuthenticationV1:
                 "text": "Hello"
             }
         )
-        # Should succeed in public mode (200)
-        assert response.status_code == 200
+        # SECURITY FIX: Authentication now required - should return 401
+        assert response.status_code == 401
         data = response.json()
-        assert data["success"] is True
+        assert "Authentication required" in data["detail"]
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
@@ -199,10 +187,8 @@ class TestAuthenticationV1:
         mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
             success=True,
             response="Test response",
-            data={
-                "session_id": "test_session",
-                "model": "test-model"
-            }
+            conversation_id="test_conversation",
+            model="test-model"
         ))
 
         response = client.post(
@@ -233,9 +219,8 @@ class TestMessageEndpointV1:
         mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
             success=True,
             response="Hello! How can I help?",
-            session_id="test_session_123",
-            model="gpt-4",
-            conversation_id="chat1"
+            conversation_id="chat1",
+            model="gpt-4"
         ))
 
         response = client.post(
@@ -252,7 +237,7 @@ class TestMessageEndpointV1:
         data = response.json()
         assert data["success"] is True
         assert data["response"] == "Hello! How can I help?"
-        assert data["session_id"] == "test_session_123"
+        assert data["conversation_id"] == "chat1"
         assert data["model"] == "gpt-4"
 
     @patch("app.api.dependencies.APIKeyManager")
@@ -267,10 +252,8 @@ class TestMessageEndpointV1:
         mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
             success=True,
             response="Platform determined from API key",
-            data={
-                "session_id": "test_session",
-                "model": "test-model"
-            }
+            conversation_id="test_conversation",
+            model="test-model"
         ))
 
         response = client.post(
