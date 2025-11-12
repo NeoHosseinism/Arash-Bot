@@ -64,8 +64,7 @@ router = APIRouter()
                             "value": {
                                 "success": True,
                                 "response": "سلام! چطور می‌تونم کمکتون کنم؟",
-                                "chat_id": "chat_67890",
-                                "session_id": "internal:1:chat_67890",
+                                "conversation_id": "conv_67890",
                                 "model": "Gemini 2.0 Flash",
                                 "message_count": 1
                             }
@@ -140,17 +139,17 @@ async def chat(
     ### 1. TELEGRAM MODE (Telegram bot service):
     - Telegram bot uses TELEGRAM_SERVICE_KEY in Authorization header
     - Platform="telegram", no team_id
-    - Session keys: telegram:chat_id
+    - Session keys: telegram:conversation_id
 
     ### 2. TEAM MODE (External authenticated teams):
     - External teams use their team API keys
     - Platform auto-detected from team.platform_name
-    - Session keys: platform_name:team_id:chat_id (team isolation enforced)
+    - Session keys: platform_name:team_id:conversation_id (team isolation enforced)
 
-    ## Chat ID Logic
-    - **No chat_id provided**: NEW conversation (auto-generated UUID)
-    - **chat_id provided**: CONTINUATION of existing conversation
-    - Chat IDs are unique per conversation and used for session history
+    ## Conversation ID Logic
+    - **No conversation_id provided**: NEW conversation (auto-generated UUID)
+    - **conversation_id provided**: CONTINUATION of existing conversation
+    - Conversation IDs uniquely identify each multi-message dialogue
 
     ## Examples
 
@@ -162,7 +161,7 @@ async def chat(
     {
       "user_id": "telegram_user_12345",
       "text": "سلام، چطوری؟",
-      "chat_id": "existing_chat_id_or_null_for_new"
+      "conversation_id": "existing_conv_id_or_null_for_new"
     }
     ```
 
@@ -174,10 +173,10 @@ async def chat(
     {
       "user_id": "user123",
       "text": "چطور می‌تونم مدل رو عوض کنم؟",
-      "chat_id": null
+      "conversation_id": null
     }
     ```
-    **Response includes chat_id** - use it for continuing the conversation.
+    **Response includes conversation_id** - use it for continuing the conversation.
 
     ## Security
     - Telegram traffic: Authenticated and logged as [TELEGRAM]
@@ -187,9 +186,9 @@ async def chat(
     """
     import uuid
 
-    # Auto-generate chat_id if not provided (NEW conversation)
-    # If chat_id is provided, it's a CONTINUATION of existing conversation
-    chat_id = message.chat_id or str(uuid.uuid4())
+    # Auto-generate conversation_id if not provided (NEW conversation)
+    # If conversation_id is provided, it's a CONTINUATION of existing conversation
+    conversation_id = message.conversation_id or str(uuid.uuid4())
 
     # Auto-generate message_id internally
     message_id = str(uuid.uuid4())
@@ -203,8 +202,8 @@ async def chat(
         api_key_prefix = None
 
         logger.info(
-            f"[TELEGRAM] bot_request user_id={message.user_id} chat_id={chat_id} "
-            f"new_conversation={message.chat_id is None}"
+            f"[TELEGRAM] bot_request user_id={message.user_id} conversation_id={conversation_id} "
+            f"new_conversation={message.conversation_id is None}"
         )
     else:
         # TEAM MODE: Authenticated external team
@@ -215,8 +214,8 @@ async def chat(
 
         logger.info(
             f"[TEAM] chat_request platform={platform_name} team_id={team_id} "
-            f"user_id={message.user_id} chat_id={chat_id} "
-            f"new_conversation={message.chat_id is None}"
+            f"user_id={message.user_id} conversation_id={conversation_id} "
+            f"new_conversation={message.conversation_id is None}"
         )
 
     # Process message (handles both modes)
@@ -226,7 +225,7 @@ async def chat(
         api_key_id=api_key_id,
         api_key_prefix=api_key_prefix,
         user_id=message.user_id,
-        chat_id=chat_id,
+        conversation_id=conversation_id,
         message_id=message_id,
         text=message.text,
     )
