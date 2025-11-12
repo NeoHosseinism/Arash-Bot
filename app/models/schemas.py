@@ -76,7 +76,8 @@ class BotResponse(BaseModel):
     """
     Bot response model for chat endpoint.
 
-    Includes chat_id so clients can continue conversation.
+    Use chat_id to continue conversations. Each API key can only access
+    conversations started with that specific API key.
     """
     model_config = ConfigDict(
         json_schema_extra={
@@ -85,7 +86,6 @@ class BotResponse(BaseModel):
                     "success": True,
                     "response": "برای تغییر مدل، از دستور /model استفاده کنید. مدل‌های موجود: Gemini Flash، DeepSeek v3، GPT-5",
                     "chat_id": "chat_67890",
-                    "session_id": "internal:1:chat_67890",
                     "model": "Gemini 2.0 Flash",
                     "message_count": 3
                 },
@@ -101,7 +101,6 @@ class BotResponse(BaseModel):
     success: bool = Field(..., examples=[True, False])
     response: Optional[str] = Field(None, examples=["سلام! چطور می‌تونم کمکتون کنم؟"])
     chat_id: Optional[str] = Field(None, examples=["chat_67890"])
-    session_id: Optional[str] = Field(None, examples=["internal:1:chat_67890", "telegram:chat_12345"])
     model: Optional[str] = Field(None, examples=["Gemini 2.0 Flash", "DeepSeek v3", "GPT-5 Chat"])
     message_count: Optional[int] = Field(None, examples=[1, 5, 10])
     error: Optional[str] = Field(None, examples=["rate_limit_exceeded", "ai_service_unavailable"])
@@ -139,8 +138,8 @@ class SessionStatusResponse(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "session_id": "internal:1:chat_67890",
-                    "platform": "internal",
+                    "chat_id": "chat_67890",
+                    "platform": "Internal-BI",
                     "platform_type": "private",
                     "current_model": "Gemini 2.0 Flash",
                     "message_count": 5,
@@ -154,8 +153,8 @@ class SessionStatusResponse(BaseModel):
         }
     )
 
-    session_id: str = Field(..., examples=["internal:1:chat_67890"])
-    platform: str = Field(..., examples=["telegram", "internal"])
+    chat_id: str = Field(..., examples=["chat_67890"])
+    platform: str = Field(..., examples=["telegram", "Internal-BI"])
     platform_type: str = Field(..., examples=["public", "private"])
     current_model: str = Field(..., examples=["Gemini 2.0 Flash"])
     message_count: int = Field(..., examples=[5])
@@ -176,8 +175,8 @@ class SessionListResponse(BaseModel):
                     "authenticated": True,
                     "sessions": [
                         {
-                            "session_id": "internal:1:chat_67890",
-                            "platform": "internal",
+                            "chat_id": "chat_67890",
+                            "platform": "Internal-BI",
                             "message_count": 5,
                             "last_activity": "2025-01-15T14:30:00"
                         }

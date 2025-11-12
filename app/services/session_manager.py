@@ -46,12 +46,16 @@ class SessionManager:
         api_key_id: int | None = None,
         api_key_prefix: str | None = None
     ) -> ChatSession:
-        """Get existing session or create new one with platform-specific config and team isolation"""
-        # SECURITY: Include team_id in key to prevent session collision
+        """
+        Get existing session or create new one with platform-specific config and team isolation
+
+        SECURITY: API key isolation - each API key can only access sessions it created
+        """
+        # SECURITY: Include team_id in key to prevent session collision between teams
         key = self.get_session_key(platform, chat_id, team_id)
 
         if key not in self.sessions:
-            # Get platform configuration
+            # Create new session
             config = platform_manager.get_config(platform)
 
             self.sessions[key] = ChatSession(
@@ -73,8 +77,21 @@ class SessionManager:
             team_info = f" (team: {team_id}, key: {api_key_prefix})" if team_id else ""
             logger.info(f"Created new session for {friendly_platform} (session: {masked_id}){team_info}")
         else:
+            # Existing session found - verify API key ownership
+            existing_session = self.sessions[key]
+
+            # SECURITY: API key isolation - verify this API key owns this session
+            if api_key_id is not None and existing_session.api_key_id != api_key_id:
+                logger.warning(
+                    f"[SECURITY] API key {api_key_prefix} attempted to access chat_id={chat_id} "
+                    f"owned by API key ID {existing_session.api_key_id}"
+                )
+                raise PermissionError(
+                    f"Access denied. This chat belongs to a different API key."
+                )
+
             # Update last activity
-            self.sessions[key].update_activity()
+            existing_session.update_activity()
 
         return self.sessions[key]
     

@@ -2,6 +2,7 @@
 Message processor with platform-aware logic
 """
 import logging
+import time
 from typing import Dict, Any, Optional
 import asyncio
 
@@ -12,6 +13,7 @@ from app.services.session_manager import session_manager
 from app.services.platform_manager import platform_manager
 from app.services.command_processor import command_processor
 from app.services.ai_client import ai_client
+from app.services.usage_tracker import UsageTracker
 from app.core.constants import MESSAGES_FA, MessageType
 
 logger = logging.getLogger(__name__)
@@ -118,27 +120,55 @@ class MessageProcessor:
         Returns:
             BotResponse with chat_id for continuation
         """
+        start_time = time.time()
+        db = get_db_session()
+
         try:
             # Get or create session with platform_name
-            session = session_manager.get_or_create_session(
-                platform=platform_name,  # Now using platform_name instead of "internal"
-                user_id=user_id,
-                chat_id=chat_id,
-                team_id=team_id,
-                api_key_id=api_key_id,
-                api_key_prefix=api_key_prefix
-            )
+            # This will raise PermissionError if API key doesn't own the chat_id
+            try:
+                session = session_manager.get_or_create_session(
+                    platform=platform_name,  # Now using platform_name instead of "internal"
+                    user_id=user_id,
+                    chat_id=chat_id,
+                    team_id=team_id,
+                    api_key_id=api_key_id,
+                    api_key_prefix=api_key_prefix
+                )
+            except PermissionError as e:
+                # API key doesn't own this chat - return 403 error
+                return BotResponse(
+                    success=False,
+                    error="access_denied",
+                    response=f"❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.\n\nAccess denied. This chat belongs to a different API key.",
+                    chat_id=chat_id,
+                )
 
             # Check rate limit (use platform_name for rate limiting)
             if not session_manager.check_rate_limit(platform_name, user_id):
                 # Get rate limit for this platform from session config
                 rate_limit = session.platform_config.get("rate_limit", 60)
+
+                # Log rate limit failure (only for authenticated teams)
+                if team_id and api_key_id:
+                    response_time_ms = int((time.time() - start_time) * 1000)
+                    UsageTracker.log_usage(
+                        db=db,
+                        api_key_id=api_key_id,
+                        team_id=team_id,
+                        session_id=chat_id,
+                        platform=platform_name,
+                        model_used=session.current_model,
+                        success=False,
+                        response_time_ms=response_time_ms,
+                        error_message="rate_limit_exceeded",
+                    )
+
                 return BotResponse(
                     success=False,
                     error="rate_limit_exceeded",
                     response=f"⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: {rate_limit} پیام در دقیقه",
                     chat_id=chat_id,
-                    session_id=session.session_id,
                 )
 
             # Process command or message
@@ -151,18 +181,59 @@ class MessageProcessor:
             session.message_count += 1
             session.update_activity()
 
-            # Return simplified response with chat_id
+            # Log successful usage (only for authenticated teams)
+            if team_id and api_key_id:
+                response_time_ms = int((time.time() - start_time) * 1000)
+                UsageTracker.log_usage(
+                    db=db,
+                    api_key_id=api_key_id,
+                    team_id=team_id,
+                    session_id=chat_id,
+                    platform=platform_name,
+                    model_used=session.current_model,
+                    success=True,
+                    response_time_ms=response_time_ms,
+                )
+
+            # Return simplified response with chat_id (NO session_id)
             return BotResponse(
                 success=True,
                 response=response_text,
-                chat_id=chat_id,  # Include chat_id for continuation
-                session_id=session.session_id,
+                chat_id=chat_id,  # Only chat_id needed for continuation
                 model=session.current_model,
                 message_count=session.message_count,
             )
 
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
+
+            # Log error (only for authenticated teams)
+            if team_id and api_key_id:
+                response_time_ms = int((time.time() - start_time) * 1000)
+                try:
+                    # Get model from session if available
+                    session = session_manager.get_or_create_session(
+                        platform=platform_name,
+                        user_id=user_id,
+                        chat_id=chat_id,
+                        team_id=team_id,
+                        api_key_id=api_key_id,
+                        api_key_prefix=api_key_prefix
+                    )
+                    UsageTracker.log_usage(
+                        db=db,
+                        api_key_id=api_key_id,
+                        team_id=team_id,
+                        session_id=chat_id,
+                        platform=platform_name,
+                        model_used=session.current_model,
+                        success=False,
+                        response_time_ms=response_time_ms,
+                        error_message=str(e),
+                    )
+                except:
+                    pass  # Don't fail on logging errors
+
             return BotResponse(
                 success=False,
                 error="processing_error",

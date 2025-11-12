@@ -356,11 +356,13 @@ async def get_statistics(
         is_active = not session.is_expired(5)
 
         if session.platform == "telegram":
+            # Telegram bot sessions
             telegram_stats["sessions"] += 1
             telegram_stats["messages"] += session.message_count
             if is_active:
                 telegram_stats["active"] += 1
-        elif session.platform == "internal":
+        elif session.team_id is not None:
+            # Team-based sessions (any platform with team_id)
             internal_stats["sessions"] += 1
             internal_stats["messages"] += session.message_count
             friendly_model = get_friendly_model_name(session.current_model)
@@ -369,17 +371,16 @@ async def get_statistics(
                 internal_stats["active"] += 1
 
             # Aggregate by team
-            if session.team_id:
-                team_id = session.team_id
-                if team_id not in team_stats:
-                    team_stats[team_id]["team_id"] = team_id
-                    team_stats[team_id]["team_name"] = team_name_map.get(team_id, f"Team {team_id}")
+            team_id = session.team_id
+            if team_id not in team_stats:
+                team_stats[team_id]["team_id"] = team_id
+                team_stats[team_id]["team_name"] = team_name_map.get(team_id, f"Team {team_id}")
 
-                team_stats[team_id]["sessions"] += 1
-                team_stats[team_id]["messages"] += session.message_count
-                team_stats[team_id]["models_used"][friendly_model] += 1
-                if is_active:
-                    team_stats[team_id]["active"] += 1
+            team_stats[team_id]["sessions"] += 1
+            team_stats[team_id]["messages"] += session.message_count
+            team_stats[team_id]["models_used"][friendly_model] += 1
+            if is_active:
+                team_stats[team_id]["active"] += 1
 
     # Convert team stats to list
     team_breakdown = [

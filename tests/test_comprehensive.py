@@ -91,7 +91,6 @@ class TestAuthentication:
             "success": True,
             "response": "سلام! چطور می‌تونم کمکتون کنم؟",
             "chat_id": "chat_123",
-            "session_id": "telegram:chat_123",
             "model": "Gemini 2.0 Flash"
         }
 
@@ -162,7 +161,6 @@ class TestChatEndpoint:
             "success": True,
             "response": "سلام! چطور می‌تونم کمکتون کنم؟",
             "chat_id": "chat_123",
-            "session_id": "telegram:chat_123",
             "model": "Gemini 2.0 Flash",
             "message_count": 1
         }
@@ -177,6 +175,8 @@ class TestChatEndpoint:
         assert data["success"] is True
         assert "response" in data
         assert data["model"] == "Gemini 2.0 Flash"
+        # Verify session_id is NOT in response (removed for simplicity)
+        assert "session_id" not in data
 
     @patch("app.api.dependencies.settings")
     @patch("app.services.message_processor.message_processor.process_message_simple")
@@ -207,6 +207,34 @@ class TestChatEndpoint:
         )
         # Returns 401 (auth required) before validation
         assert response.status_code == 401
+
+    @patch("app.api.dependencies.settings")
+    @patch("app.services.message_processor.message_processor.process_message_simple")
+    def test_api_key_isolation(self, mock_process, mock_settings, client):
+        """API keys can only access their own chats (API key isolation)"""
+        mock_settings.TELEGRAM_SERVICE_KEY = "test_telegram_key"
+
+        # Mock PermissionError when trying to access another API key's chat
+        mock_process.return_value = {
+            "success": False,
+            "error": "access_denied",
+            "response": "❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.\n\nAccess denied. This chat belongs to a different API key.",
+            "chat_id": "chat_owned_by_other_key",
+        }
+
+        response = client.post(
+            "/v1/chat",
+            headers={"Authorization": "Bearer test_telegram_key"},
+            json={
+                "user_id": "user1",
+                "text": "Hello",
+                "chat_id": "chat_owned_by_other_key"
+            }
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is False
+        assert data["error"] == "access_denied"
 
 
 class TestCommandsEndpoint:
