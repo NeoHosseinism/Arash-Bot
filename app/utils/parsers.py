@@ -2,11 +2,11 @@
 Webhook parsers for different platforms
 """
 
-from typing import Dict, Any, Optional
 import logging
+from typing import Any, Dict, Optional
 
-from app.models.schemas import IncomingMessage, MessageAttachment
 from app.core.constants import MessageType
+from app.models.schemas import IncomingMessage, MessageAttachment
 
 logger = logging.getLogger(__name__)
 

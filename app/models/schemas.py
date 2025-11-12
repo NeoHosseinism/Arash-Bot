@@ -2,10 +2,12 @@
 Pydantic models for request/response schemas with OpenAPI examples
 """
 
-from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from app.core.constants import MessageType, Platform
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.core.constants import MessageType
 
 
 class MessageAttachment(BaseModel):

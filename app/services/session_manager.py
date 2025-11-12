@@ -3,16 +3,16 @@ Session manager with rate limiting
 """
 
 import hashlib
+import logging
 import time
-from typing import Dict, List
 from collections import defaultdict
 from datetime import datetime, timedelta
-import logging
+from typing import Dict, List
 
-from app.models.session import ChatSession
-from app.services.platform_manager import platform_manager
 from app.core.config import settings
 from app.core.name_mapping import get_friendly_platform_name, mask_session_id
+from app.models.session import ChatSession
+from app.services.platform_manager import platform_manager
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +92,7 @@ class SessionManager:
                     f"owned by API key ID {existing_session.api_key_id}"
                 )
                 raise PermissionError(
-                    f"Access denied. This conversation belongs to a different API key."
+                    "Access denied. This conversation belongs to a different API key."
                 )
 
             # Update last activity

@@ -3,22 +3,21 @@ FastAPI application entry point with integrated Telegram bot
 """
 
 import asyncio
-from datetime import datetime
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.core.config import settings
-from app.api.routes import router
 from app.api.admin_routes import router as admin_router
-from app.services.session_manager import session_manager
-from app.services.platform_manager import platform_manager
+from app.api.routes import router
+from app.core.config import settings
+from app.core.database_init import create_logs_directory, initialize_database
 from app.services.ai_client import ai_client
-from app.models.database import get_database
-from app.core.database_init import initialize_database, create_logs_directory
+from app.services.platform_manager import platform_manager
+from app.services.session_manager import session_manager
 from app.utils.logger import setup_logging
 
 # Setup logging

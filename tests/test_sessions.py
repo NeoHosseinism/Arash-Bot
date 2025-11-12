@@ -8,17 +8,17 @@ Tests for:
 - Session history management
 """
 
-import pytest
-from datetime import datetime, timedelta
-from unittest.mock import Mock
 import sys
+from datetime import datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.services.session_manager import SessionManager
 from app.models.session import ChatSession
+from app.services.session_manager import SessionManager
 
 
 @pytest.fixture
@@ -250,7 +250,7 @@ class TestSessionDeletion:
     def test_delete_session_without_team_id(self, session_manager):
         """Test deleting session without team_id (Telegram)"""
         # Create session
-        session = session_manager.get_or_create_session(
+        session_manager.get_or_create_session(
             platform="telegram",
             user_id="tg_user",
             conversation_id="tg_chat",

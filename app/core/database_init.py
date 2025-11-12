@@ -6,7 +6,9 @@ This module ensures database schema is up-to-date using Alembic migrations.
 import logging
 import subprocess
 from pathlib import Path
+
 from sqlalchemy import inspect, text
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

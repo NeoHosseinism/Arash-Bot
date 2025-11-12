@@ -2,9 +2,10 @@
 Chat session model
 """
 
-from typing import Dict, Any, List
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Any, Dict, List
+
+from pydantic import BaseModel, Field
 
 
 class ChatSession(BaseModel):

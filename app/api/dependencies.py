@@ -24,10 +24,11 @@ SECURITY:
 - Team isolation via session tagging
 """
 
-from typing import Optional, Union
 import logging
-from fastapi import HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional, Union
+
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
 from app.models.database import APIKey, get_db_session
@@ -158,7 +159,7 @@ def require_team_access(
         raise
     except Exception as e:
         logger.error(f"Error validating team API key: {e}")
-        raise HTTPException(status_code=500, detail="Error validating API key")
+        raise HTTPException(status_code=500, detail="Error validating API key") from e
 
 
 def require_chat_access(
@@ -231,4 +232,4 @@ def require_chat_access(
         raise
     except Exception as e:
         logger.error(f"Error validating API key: {e}")
-        raise HTTPException(status_code=500, detail="Error validating API key")
+        raise HTTPException(status_code=500, detail="Error validating API key") from e

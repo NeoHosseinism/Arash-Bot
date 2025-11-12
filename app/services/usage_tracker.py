@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.name_mapping import get_friendly_model_name
-from app.models.database import APIKey, Team, UsageLog
+from app.models.database import APIKey, UsageLog
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ class UsageTracker:
             .filter(
                 UsageLog.api_key_id == api_key.id,
                 UsageLog.timestamp >= period_start,
-                UsageLog.success == True,  # Only count successful requests
+                UsageLog.success,  # Only count successful requests
             )
             .scalar()
         )
@@ -209,7 +209,7 @@ class UsageTracker:
                 UsageLog.team_id == team_id,
                 UsageLog.timestamp >= start_date,
                 UsageLog.timestamp <= end_date,
-                UsageLog.success == True,
+                UsageLog.success,
             )
             .scalar()
         )
@@ -344,7 +344,7 @@ class UsageTracker:
                 UsageLog.api_key_id == api_key_id,
                 UsageLog.timestamp >= start_date,
                 UsageLog.timestamp <= end_date,
-                UsageLog.success == True,
+                UsageLog.success,
             )
             .scalar()
         )

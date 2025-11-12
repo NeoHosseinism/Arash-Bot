@@ -3,12 +3,13 @@ Comprehensive Test Suite for Arash Bot
 Tests all major functionality end-to-end
 """
 
+import sys
+from datetime import datetime
+from pathlib import Path
+from unittest.mock import Mock, patch
+
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
-import sys
-from pathlib import Path
-from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 

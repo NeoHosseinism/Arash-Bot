@@ -26,23 +26,20 @@ WHAT THEY DON'T SEE:
 - Admin endpoints
 """
 
-from typing import Optional, Union
-from datetime import datetime
 import logging
+from typing import Union
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 
-from app.models.schemas import (
-    IncomingMessage,
-    BotResponse,
-    HealthCheckResponse,
-)
-from app.models.database import APIKey
-from app.services.message_processor import message_processor
-from app.services.ai_client import ai_client
-from app.services.platform_manager import platform_manager
-from app.api.dependencies import require_team_access, require_chat_access
+from app.api.dependencies import require_chat_access
 from app.core.constants import COMMAND_DESCRIPTIONS
+from app.models.database import APIKey
+from app.models.schemas import (
+    BotResponse,
+    IncomingMessage,
+)
+from app.services.message_processor import message_processor
+from app.services.platform_manager import platform_manager
 
 logger = logging.getLogger(__name__)
 

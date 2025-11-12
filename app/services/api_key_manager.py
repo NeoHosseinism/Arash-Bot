@@ -4,8 +4,8 @@ Handles creation, validation, and management of API keys for team-based access c
 """
 
 import hashlib
-import secrets
 import logging
+import secrets
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
@@ -367,7 +367,7 @@ class APIKeyManager:
         """
         query = db.query(Team)
         if active_only:
-            query = query.filter(Team.is_active == True)
+            query = query.filter(Team.is_active)
         return query.all()
 
     @staticmethod
@@ -440,7 +440,7 @@ class APIKeyManager:
 
         # Check for active API keys
         active_keys = (
-            db.query(APIKey).filter(APIKey.team_id == team_id, APIKey.is_active == True).count()
+            db.query(APIKey).filter(APIKey.team_id == team_id, APIKey.is_active).count()
         )
 
         if active_keys > 0 and not force:

@@ -8,11 +8,12 @@ Tests for API v1 endpoints including:
 - Session management
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from unittest.mock import Mock, patch, MagicMock, AsyncMock
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock, Mock, patch
+
+import pytest
+from fastapi.testclient import TestClient
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))

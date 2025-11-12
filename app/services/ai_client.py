@@ -3,9 +3,10 @@ AI Service API client with retry logic
 """
 
 import asyncio
-from typing import List, Dict, Any, Optional
-import httpx
 import logging
+from typing import Any, Dict, List
+
+import httpx
 
 from app.core.config import settings
 from app.core.name_mapping import get_friendly_model_name, mask_session_id

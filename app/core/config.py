@@ -2,11 +2,12 @@
 Configuration management using Pydantic Settings V2
 """
 
+import json
+from pathlib import Path
 from typing import List, Optional
+
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pathlib import Path
-import json
 
 
 class Settings(BaseSettings):
@@ -138,7 +139,7 @@ class Settings(BaseSettings):
                     raise ValueError("INTERNAL_MODELS array cannot be empty")
                 return v
             except json.JSONDecodeError as e:
-                raise ValueError(f"INTERNAL_MODELS invalid JSON: {e}")
+                raise ValueError(f"INTERNAL_MODELS invalid JSON: {e}") from e
 
         # Otherwise treat as comma-separated
         if not any(c in v for c in [",", "/"]):

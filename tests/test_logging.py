@@ -9,8 +9,8 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from app.utils.logger import setup_logging, get_structured_logger
 from app.core.config import settings
+from app.utils.logger import get_structured_logger, setup_logging
 
 
 def main():
@@ -177,8 +177,8 @@ def main():
     print("7. Exception with Stack Trace:")
     print("-" * 80)
     try:
-        result = 1 / 0
-    except Exception as e:
+        _ = 1 / 0
+    except Exception:
         logger.error('calculation_failed error="division by zero"', exc_info=True)
     print()
 

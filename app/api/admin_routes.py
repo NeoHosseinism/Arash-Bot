@@ -19,21 +19,21 @@ SECURITY:
 """
 
 import logging
-from datetime import datetime, timedelta
-from typing import List, Optional, Dict, Any
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Header
-from pydantic import BaseModel, Field, ConfigDict
+from datetime import datetime, timedelta
+from typing import List, Optional
 
-from app.models.database import get_db_session, APIKey
-from app.models.schemas import HealthCheckResponse, StatsResponse
-from app.services.api_key_manager import APIKeyManager
-from app.services.usage_tracker import UsageTracker
-from app.services.session_manager import session_manager
-from app.services.platform_manager import platform_manager
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
+
 from app.api.dependencies import require_admin_access
 from app.core.name_mapping import get_friendly_model_name
-from app.core.config import settings
+from app.models.database import APIKey, get_db_session
+from app.models.schemas import HealthCheckResponse, StatsResponse
+from app.services.api_key_manager import APIKeyManager
+from app.services.platform_manager import platform_manager
+from app.services.session_manager import session_manager
+from app.services.usage_tracker import UsageTracker
 
 logger = logging.getLogger(__name__)
 
@@ -670,7 +670,7 @@ async def get_recent_usage(
     logs = UsageTracker.get_recent_usage(db=db, team_id=team_id, limit=limit)
 
     # Build mapping for team names
-    team_ids = set(log.team_id for log in logs if log.team_id)
+    team_ids = {log.team_id for log in logs if log.team_id}
 
     team_name_map = {}
     for tid in team_ids:

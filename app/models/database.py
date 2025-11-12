@@ -4,11 +4,9 @@ Note: Chat history is NOT stored here - it's handled by the AI service.
 This database only stores API keys, teams, and usage statistics.
 """
 
-import os
-from datetime import datetime
-from enum import Enum
-from typing import Optional
 import logging
+from datetime import datetime
+from typing import Optional
 
 from sqlalchemy import (
     Boolean,
@@ -24,7 +22,6 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
-from sqlalchemy.exc import OperationalError, ProgrammingError
 
 logger = logging.getLogger(__name__)
 
@@ -174,8 +171,8 @@ class Database:
         # Validate PostgreSQL URL
         if not database_url.startswith("postgresql"):
             raise ValueError(
-                f"Only PostgreSQL is supported. "
-                f"DATABASE_URL must start with 'postgresql://' or 'postgresql+psycopg2://'"
+                "Only PostgreSQL is supported. "
+                "DATABASE_URL must start with 'postgresql://' or 'postgresql+psycopg2://'"
             )
 
         # Hide password in logs

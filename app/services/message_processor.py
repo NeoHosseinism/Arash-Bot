@@ -4,18 +4,17 @@ Message processor with platform-aware logic
 
 import logging
 import time
-from typing import Dict, Any, Optional
-import asyncio
+from typing import Optional
 
-from app.models.schemas import IncomingMessage, BotResponse
-from app.models.session import ChatSession
-from app.models.database import Team, get_db_session
-from app.services.session_manager import session_manager
-from app.services.platform_manager import platform_manager
-from app.services.command_processor import command_processor
-from app.services.ai_client import ai_client
-from app.services.usage_tracker import UsageTracker
 from app.core.constants import MESSAGES_FA, MessageType
+from app.models.database import get_db_session
+from app.models.schemas import BotResponse, IncomingMessage
+from app.models.session import ChatSession
+from app.services.ai_client import ai_client
+from app.services.command_processor import command_processor
+from app.services.platform_manager import platform_manager
+from app.services.session_manager import session_manager
+from app.services.usage_tracker import UsageTracker
 
 logger = logging.getLogger(__name__)
 
@@ -134,12 +133,12 @@ class MessageProcessor:
                     api_key_id=api_key_id,
                     api_key_prefix=api_key_prefix,
                 )
-            except PermissionError as e:
+            except PermissionError:
                 # API key doesn't own this conversation - return 403 error
                 return BotResponse(
                     success=False,
                     error="access_denied",
-                    response=f"❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.\n\nAccess denied. This conversation belongs to a different API key.",
+                    response="❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.\n\nAccess denied. This conversation belongs to a different API key.",
                     conversation_id=conversation_id,
                 )
 
@@ -230,7 +229,7 @@ class MessageProcessor:
                         response_time_ms=response_time_ms,
                         error_message=str(e),
                     )
-                except:
+                except Exception:
                     pass  # Don't fail on logging errors
 
             return BotResponse(

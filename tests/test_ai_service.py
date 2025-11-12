@@ -4,11 +4,11 @@ Tests connectivity and functionality of the AI service
 """
 
 import asyncio
-import pytest
-import httpx
-from typing import Dict, Any
 import sys
 from pathlib import Path
+
+import httpx
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -161,7 +161,7 @@ class TestAIServiceConfiguration:
         """Test URL format is valid"""
         url = settings.AI_SERVICE_URL
         assert not url.endswith("/"), "AI_SERVICE_URL should not end with /"
-        print(f"[OK] URL format valid")
+        print("[OK] URL format valid")
 
     def test_models_configured(self):
         """Test that models are properly configured"""
@@ -212,7 +212,7 @@ def manual_test():
             print(f"   [OK] Status: {response.status_code}")
             print(f"   Response: {response.text[:150]}")
         except httpx.TimeoutException:
-            print(f"   [ERROR] Timeout: Service did not respond within 5 seconds")
+            print("   [ERROR] Timeout: Service did not respond within 5 seconds")
         except Exception as e:
             print(f"   [ERROR] Error: {e}")
 
@@ -235,10 +235,10 @@ def manual_test():
             data = response.json()
             print(f"   Response: {str(data)[:200]}")
         except httpx.TimeoutException:
-            print(f"   [ERROR] Timeout: Chat request took too long (>30s)")
-            print(f"   Hint: Service might be overloaded or slow")
+            print("   [ERROR] Timeout: Chat request took too long (>30s)")
+            print("   Hint: Service might be overloaded or slow")
         except httpx.ConnectError:
-            print(f"   [ERROR] Cannot connect to service")
+            print("   [ERROR] Cannot connect to service")
         except Exception as e:
             print(f"   [ERROR] Error: {e}")
 
@@ -247,9 +247,9 @@ def manual_test():
         try:
             is_healthy = await ai_client.health_check()
             if is_healthy:
-                print(f"   [OK] Service is healthy")
+                print("   [OK] Service is healthy")
             else:
-                print(f"   [WARNING] Service reported unhealthy")
+                print("   [WARNING] Service reported unhealthy")
         except Exception as e:
             print(f"   [ERROR] Error: {e}")
 

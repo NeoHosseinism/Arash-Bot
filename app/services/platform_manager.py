@@ -2,11 +2,12 @@
 Platform configuration manager
 """
 
-from typing import List, Dict, Any, Optional
+import logging
+from typing import Any, Dict, List, Optional
+
 from app.core.config import settings
 from app.core.constants import Platform, PlatformType
 from app.core.name_mapping import get_friendly_model_name, get_technical_model_name
-import logging
 
 logger = logging.getLogger(__name__)
 
