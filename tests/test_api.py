@@ -7,6 +7,7 @@ Tests for API v1 endpoints including:
 - Message processing
 - Session management
 """
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch, MagicMock, AsyncMock
@@ -140,13 +141,7 @@ class TestAuthenticationV1:
 
     def test_missing_auth_header(self, client):
         """Test request without auth header - should require authentication (401)"""
-        response = client.post(
-            "/v1/chat",
-            json={
-                "user_id": "user1",
-                "text": "Hello"
-            }
-        )
+        response = client.post("/v1/chat", json={"user_id": "user1", "text": "Hello"})
         # SECURITY FIX: Authentication now required - should return 401
         assert response.status_code == 401
         data = response.json()
@@ -168,8 +163,8 @@ class TestAuthenticationV1:
                 "conversation_id": "chat1",
                 "message_id": "msg1",
                 "text": "Hello",
-                "type": "text"
-            }
+                "type": "text",
+            },
         )
         assert response.status_code == 403
         assert "Invalid API key" in response.text
@@ -177,27 +172,29 @@ class TestAuthenticationV1:
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
     @patch("app.api.routes.message_processor")
-    def test_valid_api_key(self, mock_processor, mock_get_db, mock_key_mgr, client, mock_api_key_user):
+    def test_valid_api_key(
+        self, mock_processor, mock_get_db, mock_key_mgr, client, mock_api_key_user
+    ):
         """Test request with valid API key"""
         # Mock valid key
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
         # Mock message processor response with AsyncMock - use process_message_simple
         from app.models.schemas import BotResponse
-        mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
-            success=True,
-            response="Test response",
-            conversation_id="test_conversation",
-            model="test-model"
-        ))
+
+        mock_processor.process_message_simple = AsyncMock(
+            return_value=BotResponse(
+                success=True,
+                response="Test response",
+                conversation_id="test_conversation",
+                model="test-model",
+            )
+        )
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
-            json={
-                "user_id": "user1",
-                "text": "Hello"
-            }
+            json={"user_id": "user1", "text": "Hello"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -210,27 +207,28 @@ class TestMessageEndpointV1:
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
     @patch("app.api.routes.message_processor")
-    def test_message_endpoint_success(self, mock_processor, mock_get_db, mock_key_mgr, client, mock_api_key_user):
+    def test_message_endpoint_success(
+        self, mock_processor, mock_get_db, mock_key_mgr, client, mock_api_key_user
+    ):
         """Test successful message processing"""
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
         # Mock message processor response with AsyncMock - use process_message_simple
         from app.models.schemas import BotResponse
-        mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
-            success=True,
-            response="Hello! How can I help?",
-            conversation_id="chat1",
-            model="gpt-4"
-        ))
+
+        mock_processor.process_message_simple = AsyncMock(
+            return_value=BotResponse(
+                success=True,
+                response="Hello! How can I help?",
+                conversation_id="chat1",
+                model="gpt-4",
+            )
+        )
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
-            json={
-                "user_id": "user1",
-                "conversation_id": "chat1",
-                "text": "Hello"
-            }
+            json={"user_id": "user1", "conversation_id": "chat1", "text": "Hello"},
         )
 
         assert response.status_code == 200
@@ -243,26 +241,28 @@ class TestMessageEndpointV1:
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
     @patch("app.api.routes.message_processor")
-    def test_message_endpoint_requires_internal_platform(self, mock_processor, mock_get_db, mock_key_mgr, client, mock_api_key_user):
+    def test_message_endpoint_requires_internal_platform(
+        self, mock_processor, mock_get_db, mock_key_mgr, client, mock_api_key_user
+    ):
         """Test that API endpoint uses platform from API key"""
         mock_key_mgr.validate_api_key.return_value = mock_api_key_user
 
         # Mock message processor
         from app.models.schemas import BotResponse
-        mock_processor.process_message_simple = AsyncMock(return_value=BotResponse(
-            success=True,
-            response="Platform determined from API key",
-            conversation_id="test_conversation",
-            model="test-model"
-        ))
+
+        mock_processor.process_message_simple = AsyncMock(
+            return_value=BotResponse(
+                success=True,
+                response="Platform determined from API key",
+                conversation_id="test_conversation",
+                model="test-model",
+            )
+        )
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
-            json={
-                "user_id": "user1",
-                "text": "Hello"
-            }
+            json={"user_id": "user1", "text": "Hello"},
         )
 
         # Should succeed - platform is determined from API key's team.platform_name
@@ -280,10 +280,7 @@ class TestAdminEndpointsV1:
     def test_admin_endpoint_requires_admin_access(self, client):
         """Test that admin endpoints reject non-super-admin keys"""
         # Regular API key (not in super admin list)
-        response = client.get(
-            "/v1/admin/",
-            headers={"Authorization": "Bearer user_key_12345"}
-        )
+        response = client.get("/v1/admin/", headers={"Authorization": "Bearer user_key_12345"})
 
         assert response.status_code == 403
         assert "Invalid super admin API key" in response.text
@@ -295,8 +292,7 @@ class TestAdminEndpointsV1:
         mock_settings.super_admin_keys_set = {"test_super_admin_key_12345"}
 
         response = client.get(
-            "/v1/admin/",
-            headers={"Authorization": "Bearer test_super_admin_key_12345"}
+            "/v1/admin/", headers={"Authorization": "Bearer test_super_admin_key_12345"}
         )
 
         # Should succeed (200) or have different error if endpoint not fully mocked

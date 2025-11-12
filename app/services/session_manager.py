@@ -1,6 +1,7 @@
 """
 Session manager with rate limiting
 """
+
 import hashlib
 import time
 from typing import Dict, List
@@ -18,12 +19,14 @@ logger = logging.getLogger(__name__)
 
 class SessionManager:
     """Manages chat sessions with platform-aware configuration"""
-    
+
     def __init__(self):
         self.sessions: Dict[str, ChatSession] = {}
         self.rate_limits: Dict[str, List[float]] = defaultdict(list)
-    
-    def get_session_key(self, platform: str, conversation_id: str, team_id: int | None = None) -> str:
+
+    def get_session_key(
+        self, platform: str, conversation_id: str, team_id: int | None = None
+    ) -> str:
         """
         Generate unique session key with team isolation
 
@@ -36,7 +39,7 @@ class SessionManager:
         if team_id is not None:
             return f"{platform}:{team_id}:{conversation_id}"
         return f"{platform}:{conversation_id}"
-    
+
     def get_or_create_session(
         self,
         platform: str,
@@ -44,7 +47,7 @@ class SessionManager:
         conversation_id: str,
         team_id: int | None = None,
         api_key_id: int | None = None,
-        api_key_prefix: str | None = None
+        api_key_prefix: str | None = None,
     ) -> ChatSession:
         """
         Get existing session or create new one with platform-specific config and team isolation
@@ -69,13 +72,15 @@ class SessionManager:
                 # Team isolation - CRITICAL for security
                 team_id=team_id,
                 api_key_id=api_key_id,
-                api_key_prefix=api_key_prefix
+                api_key_prefix=api_key_prefix,
             )
 
             friendly_platform = get_friendly_platform_name(platform)
             masked_id = mask_session_id(self.sessions[key].session_id)
             team_info = f" (team: {team_id}, key: {api_key_prefix})" if team_id else ""
-            logger.info(f"Created new session for {friendly_platform} (session: {masked_id}){team_info}")
+            logger.info(
+                f"Created new session for {friendly_platform} (session: {masked_id}){team_info}"
+            )
         else:
             # Existing session found - verify API key ownership
             existing_session = self.sessions[key]
@@ -94,8 +99,10 @@ class SessionManager:
             existing_session.update_activity()
 
         return self.sessions[key]
-    
-    def get_session(self, platform: str, conversation_id: str, team_id: int | None = None) -> ChatSession:
+
+    def get_session(
+        self, platform: str, conversation_id: str, team_id: int | None = None
+    ) -> ChatSession:
         """Get existing session by platform, conversation_id, and team_id"""
         key = self.get_session_key(platform, conversation_id, team_id)
         return self.sessions.get(key)
@@ -107,7 +114,9 @@ class SessionManager:
                 return session
         return None
 
-    def delete_session(self, platform: str, conversation_id: str, team_id: int | None = None) -> bool:
+    def delete_session(
+        self, platform: str, conversation_id: str, team_id: int | None = None
+    ) -> bool:
         """Delete a session"""
         key = self.get_session_key(platform, conversation_id, team_id)
         if key in self.sessions:
@@ -115,52 +124,47 @@ class SessionManager:
             logger.info(f"Deleted session: {key}")
             return True
         return False
-    
+
     def check_rate_limit(self, platform: str, user_id: str) -> bool:
         """Check if user exceeded rate limit for their platform"""
         now = time.time()
         minute_ago = now - 60
         rate_limit = platform_manager.get_rate_limit(platform)
-        
+
         key = f"{platform}:{user_id}"
-        
+
         # Clean old entries
-        self.rate_limits[key] = [
-            t for t in self.rate_limits[key] if t > minute_ago
-        ]
-        
+        self.rate_limits[key] = [t for t in self.rate_limits[key] if t > minute_ago]
+
         # Check limit
         if len(self.rate_limits[key]) >= rate_limit:
             logger.warning(f"Rate limit exceeded for {key}")
             return False
-        
+
         # Add current request
         self.rate_limits[key].append(now)
         return True
-    
+
     def get_rate_limit_remaining(self, platform: str, user_id: str) -> int:
         """Get remaining rate limit for user"""
         now = time.time()
         minute_ago = now - 60
         rate_limit = platform_manager.get_rate_limit(platform)
-        
+
         key = f"{platform}:{user_id}"
-        
+
         # Clean old entries
-        self.rate_limits[key] = [
-            t for t in self.rate_limits[key] if t > minute_ago
-        ]
-        
+        self.rate_limits[key] = [t for t in self.rate_limits[key] if t > minute_ago]
+
         return max(0, rate_limit - len(self.rate_limits[key]))
-    
+
     def clear_old_sessions(self):
         """Clear expired sessions"""
         timeout_minutes = settings.SESSION_TIMEOUT_MINUTES
         timeout = datetime.utcnow() - timedelta(minutes=timeout_minutes)
 
         keys_to_remove = [
-            key for key, session in self.sessions.items()
-            if session.last_activity < timeout
+            key for key, session in self.sessions.items() if session.last_activity < timeout
         ]
 
         for key in keys_to_remove:
@@ -177,9 +181,7 @@ class SessionManager:
         minute_ago = now - 60
 
         for key in list(self.rate_limits.keys()):
-            self.rate_limits[key] = [
-                t for t in self.rate_limits[key] if t > minute_ago
-            ]
+            self.rate_limits[key] = [t for t in self.rate_limits[key] if t > minute_ago]
 
             # Remove empty entries
             if not self.rate_limits[key]:
@@ -188,10 +190,7 @@ class SessionManager:
     def get_all_sessions(self, platform: str = None) -> List[ChatSession]:
         """Get all sessions, optionally filtered by platform"""
         if platform:
-            return [
-                session for session in self.sessions.values()
-                if session.platform == platform
-            ]
+            return [session for session in self.sessions.values() if session.platform == platform]
         return list(self.sessions.values())
 
     def get_session_count(self, platform: str = None) -> int:
@@ -203,17 +202,11 @@ class SessionManager:
     def get_active_session_count(self, minutes: int = 5) -> int:
         """Get count of recently active sessions"""
         threshold = datetime.utcnow() - timedelta(minutes=minutes)
-        return len([
-            s for s in self.sessions.values()
-            if s.last_activity > threshold
-        ])
+        return len([s for s in self.sessions.values() if s.last_activity > threshold])
 
     def get_sessions_by_team(self, team_id: int) -> List[ChatSession]:
         """Get all sessions for a specific team (for team isolation)"""
-        return [
-            session for session in self.sessions.values()
-            if session.team_id == team_id
-        ]
+        return [session for session in self.sessions.values() if session.team_id == team_id]
 
     def get_session_count_by_team(self, team_id: int) -> int:
         """Get count of sessions for a specific team"""

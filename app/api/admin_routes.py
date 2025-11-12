@@ -54,26 +54,31 @@ class TeamCreate(BaseModel):
     - Removed webhooks (not supported)
     - Auto-generates API key on creation
     """
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
-                {
-                    "platform_name": "Internal-BI",
-                    "monthly_quota": 100000,
-                    "daily_quota": 5000
-                },
+                {"platform_name": "Internal-BI", "monthly_quota": 100000, "daily_quota": 5000},
                 {
                     "platform_name": "External-Marketing",
                     "monthly_quota": 50000,
-                    "daily_quota": 2000
-                }
+                    "daily_quota": 2000,
+                },
             ]
         }
     )
 
-    platform_name: str = Field(..., description="Platform name (e.g., 'Internal-BI', 'External-Marketing')", examples=["Internal-BI", "External-Marketing"])
-    monthly_quota: Optional[int] = Field(None, description="Monthly request quota (None = unlimited)", examples=[100000, None])
-    daily_quota: Optional[int] = Field(None, description="Daily request quota (None = unlimited)", examples=[5000, None])
+    platform_name: str = Field(
+        ...,
+        description="Platform name (e.g., 'Internal-BI', 'External-Marketing')",
+        examples=["Internal-BI", "External-Marketing"],
+    )
+    monthly_quota: Optional[int] = Field(
+        None, description="Monthly request quota (None = unlimited)", examples=[100000, None]
+    )
+    daily_quota: Optional[int] = Field(
+        None, description="Daily request quota (None = unlimited)", examples=[5000, None]
+    )
 
 
 class TeamUpdate(BaseModel):
@@ -84,6 +89,7 @@ class TeamUpdate(BaseModel):
     - Uses platform_name instead of name/description
     - Removed webhooks (not supported)
     """
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -91,11 +97,9 @@ class TeamUpdate(BaseModel):
                     "platform_name": "Internal-BI-Updated",
                     "monthly_quota": 150000,
                     "daily_quota": 7000,
-                    "is_active": True
+                    "is_active": True,
                 },
-                {
-                    "is_active": False
-                }
+                {"is_active": False},
             ]
         }
     )
@@ -112,6 +116,7 @@ class TeamResponse(BaseModel):
 
     Includes API key prefix (one key per team).
     """
+
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={
@@ -125,10 +130,10 @@ class TeamResponse(BaseModel):
                     "api_key_prefix": "ark_1234",
                     "api_key_last_used": "2025-01-15T14:30:00",
                     "created_at": "2025-01-01T10:00:00",
-                    "updated_at": "2025-01-15T14:30:00"
+                    "updated_at": "2025-01-15T14:30:00",
                 }
             ]
-        }
+        },
     )
 
     id: int = Field(..., examples=[1])
@@ -148,6 +153,7 @@ class TeamCreateResponse(BaseModel):
 
     The API key is shown ONLY ONCE during creation.
     """
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -159,7 +165,7 @@ class TeamCreateResponse(BaseModel):
                     "is_active": True,
                     "created_at": "2025-01-15T10:00:00",
                     "api_key": "ark_1234567890abcdef1234567890abcdef12345678",
-                    "warning": "Save this API key securely. It will not be shown again."
+                    "warning": "Save this API key securely. It will not be shown again.",
                 }
             ]
         }
@@ -171,12 +177,17 @@ class TeamCreateResponse(BaseModel):
     daily_quota: Optional[int] = Field(None, examples=[5000])
     is_active: bool = Field(..., examples=[True])
     created_at: datetime
-    api_key: str = Field(..., description="Full API key - shown only once!", examples=["ark_1234567890abcdef1234567890abcdef12345678"])
+    api_key: str = Field(
+        ...,
+        description="Full API key - shown only once!",
+        examples=["ark_1234567890abcdef1234567890abcdef12345678"],
+    )
     warning: str = "Save this API key securely. It will not be shown again."
 
 
 class UsageStatsResponse(BaseModel):
     """Response model for usage statistics (team-based only, no api_key_id)"""
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -186,42 +197,17 @@ class UsageStatsResponse(BaseModel):
                     "period": {
                         "start": "2025-01-01T00:00:00",
                         "end": "2025-01-31T23:59:59",
-                        "days": 30
+                        "days": 30,
                     },
-                    "requests": {
-                        "total": 15000,
-                        "successful": 14850,
-                        "failed": 150
-                    },
-                    "tokens": {
-                        "total": 1500000,
-                        "average_per_request": 100
-                    },
-                    "cost": {
-                        "total": 15.50,
-                        "currency": "USD"
-                    },
-                    "performance": {
-                        "average_response_time_ms": 850,
-                        "p95_response_time_ms": 1200
-                    },
+                    "requests": {"total": 15000, "successful": 14850, "failed": 150},
+                    "tokens": {"total": 1500000, "average_per_request": 100},
+                    "cost": {"total": 15.50, "currency": "USD"},
+                    "performance": {"average_response_time_ms": 850, "p95_response_time_ms": 1200},
                     "models": [
-                        {
-                            "model": "Gemini 2.0 Flash",
-                            "requests": 8000,
-                            "percentage": 53.3
-                        },
-                        {
-                            "model": "GPT-5 Chat",
-                            "requests": 5000,
-                            "percentage": 33.3
-                        },
-                        {
-                            "model": "DeepSeek v3",
-                            "requests": 2000,
-                            "percentage": 13.3
-                        }
-                    ]
+                        {"model": "Gemini 2.0 Flash", "requests": 8000, "percentage": 53.3},
+                        {"model": "GPT-5 Chat", "requests": 5000, "percentage": 33.3},
+                        {"model": "DeepSeek v3", "requests": 2000, "percentage": 13.3},
+                    ],
                 }
             ]
         }
@@ -301,7 +287,9 @@ async def get_platforms(
         "internal": {
             "type": "private",
             "default_model": get_friendly_model_name(internal_config.model),
-            "available_models": [get_friendly_model_name(m) for m in internal_config.available_models],
+            "available_models": [
+                get_friendly_model_name(m) for m in internal_config.available_models
+            ],
             "rate_limit": internal_config.rate_limit,
             "commands": internal_config.commands,
             "max_history": internal_config.max_history,
@@ -343,14 +331,16 @@ async def get_statistics(
     }
 
     # Statistics by team (for internal platform)
-    team_stats = defaultdict(lambda: {
-        "team_id": None,
-        "team_name": "Unknown",
-        "sessions": 0,
-        "messages": 0,
-        "active": 0,
-        "models_used": defaultdict(int),
-    })
+    team_stats = defaultdict(
+        lambda: {
+            "team_id": None,
+            "team_name": "Unknown",
+            "sessions": 0,
+            "messages": 0,
+            "active": 0,
+            "models_used": defaultdict(int),
+        }
+    )
 
     for session in session_manager.sessions.values():
         is_active = not session.is_expired(5)
@@ -425,9 +415,7 @@ async def clear_sessions(
     """
     if team_id:
         keys_to_remove = [
-            key
-            for key, session in session_manager.sessions.items()
-            if session.team_id == team_id
+            key for key, session in session_manager.sessions.items() if session.team_id == team_id
         ]
     else:
         keys_to_remove = list(session_manager.sessions.keys())
@@ -465,32 +453,20 @@ async def clear_sessions(
                         "is_active": True,
                         "created_at": "2025-01-15T10:00:00",
                         "api_key": "ark_1234567890abcdef1234567890abcdef12345678",
-                        "warning": "Save this API key securely. It will not be shown again."
+                        "warning": "Save this API key securely. It will not be shown again.",
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Authentication required",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Authentication required"
-                    }
-                }
-            }
+            "content": {"application/json": {"example": {"detail": "Authentication required"}}},
         },
         403: {
             "description": "Invalid super admin API key",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Invalid super admin API key"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "Invalid super admin API key"}}},
+        },
+    },
 )
 async def create_team(
     team_data: TeamCreate,
@@ -527,7 +503,7 @@ async def create_team(
     if existing_team:
         raise HTTPException(
             status_code=400,
-            detail=f"Team with platform name '{team_data.platform_name}' already exists"
+            detail=f"Team with platform name '{team_data.platform_name}' already exists",
         )
 
     # Create team with auto-generated API key
@@ -564,17 +540,19 @@ async def list_teams(
         # Get the team's API key (one per team)
         api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
 
-        responses.append(TeamResponse(
-            id=team.id,
-            platform_name=team.platform_name,
-            monthly_quota=team.monthly_quota,
-            daily_quota=team.daily_quota,
-            is_active=team.is_active,
-            api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
-            api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
-            created_at=team.created_at,
-            updated_at=team.updated_at,
-        ))
+        responses.append(
+            TeamResponse(
+                id=team.id,
+                platform_name=team.platform_name,
+                monthly_quota=team.monthly_quota,
+                daily_quota=team.daily_quota,
+                is_active=team.is_active,
+                api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
+                api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
+                created_at=team.created_at,
+                updated_at=team.updated_at,
+            )
+        )
 
     return responses
 
@@ -689,11 +667,7 @@ async def get_recent_usage(
     """
     db = get_db_session()
 
-    logs = UsageTracker.get_recent_usage(
-        db=db,
-        team_id=team_id,
-        limit=limit
-    )
+    logs = UsageTracker.get_recent_usage(db=db, team_id=team_id, limit=limit)
 
     # Build mapping for team names
     team_ids = set(log.team_id for log in logs if log.team_id)
@@ -718,7 +692,5 @@ async def get_recent_usage(
                 "timestamp": log.timestamp.isoformat(),
             }
             for log in logs
-        ]
+        ],
     }
-
-

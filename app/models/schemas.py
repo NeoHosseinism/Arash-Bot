@@ -1,6 +1,7 @@
 """
 Pydantic models for request/response schemas with OpenAPI examples
 """
+
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from pydantic import BaseModel, Field, field_validator, ConfigDict
@@ -9,6 +10,7 @@ from app.core.constants import MessageType, Platform
 
 class MessageAttachment(BaseModel):
     """Message attachment model"""
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -17,7 +19,7 @@ class MessageAttachment(BaseModel):
                     "url": "https://example.com/image.jpg",
                     "file_id": "file_12345",
                     "mime_type": "image/jpeg",
-                    "file_size": 102400
+                    "file_size": 102400,
                 }
             ]
         }
@@ -51,25 +53,31 @@ class IncomingMessage(BaseModel):
     - Removed metadata (not needed)
     - Made conversation_id optional (auto-generated if not provided for new conversations)
     """
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
                     "user_id": "user_12345",
                     "text": "سلام، چطور می‌تونم مدل رو عوض کنم؟",
-                    "conversation_id": "conv_67890"
+                    "conversation_id": "conv_67890",
                 },
-                {
-                    "user_id": "telegram_987654",
-                    "text": "What is the weather like today?"
-                }
+                {"user_id": "telegram_987654", "text": "What is the weather like today?"},
             ]
         }
     )
 
-    user_id: str = Field(..., description="Unique user identifier", examples=["user_12345", "telegram_987654"])
-    text: str = Field(..., description="Message text content", examples=["سلام!", "Hello, how can I help?"])
-    conversation_id: Optional[str] = Field(None, description="Conversation ID for continuing conversation (auto-generated if not provided)", examples=["conv_67890", None])
+    user_id: str = Field(
+        ..., description="Unique user identifier", examples=["user_12345", "telegram_987654"]
+    )
+    text: str = Field(
+        ..., description="Message text content", examples=["سلام!", "Hello, how can I help?"]
+    )
+    conversation_id: Optional[str] = Field(
+        None,
+        description="Conversation ID for continuing conversation (auto-generated if not provided)",
+        examples=["conv_67890", None],
+    )
 
 
 class BotResponse(BaseModel):
@@ -79,6 +87,7 @@ class BotResponse(BaseModel):
     Use conversation_id to continue conversations. Each API key can only access
     conversations started with that specific API key.
     """
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -87,13 +96,13 @@ class BotResponse(BaseModel):
                     "response": "برای تغییر مدل، از دستور /model استفاده کنید. مدل‌های موجود: Gemini Flash، DeepSeek v3، GPT-5",
                     "conversation_id": "conv_67890",
                     "model": "Gemini 2.0 Flash",
-                    "message_count": 3
+                    "message_count": 3,
                 },
                 {
                     "success": False,
                     "error": "rate_limit_exceeded",
-                    "response": "⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: 20 پیام در دقیقه"
-                }
+                    "response": "⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: 20 پیام در دقیقه",
+                },
             ]
         }
     )
@@ -108,6 +117,7 @@ class BotResponse(BaseModel):
 
 class PlatformConfigResponse(BaseModel):
     """Platform configuration response"""
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -117,7 +127,7 @@ class PlatformConfigResponse(BaseModel):
                     "rate_limit": 60,
                     "commands": ["start", "help", "model", "models", "clear", "status"],
                     "max_history": 30,
-                    "features": {"model_switching": True, "requires_auth": True}
+                    "features": {"model_switching": True, "requires_auth": True},
                 }
             ]
         }
@@ -125,15 +135,20 @@ class PlatformConfigResponse(BaseModel):
 
     type: str = Field(..., examples=["public", "private"])
     model: Optional[str] = Field(None, examples=["Gemini 2.0 Flash"])
-    available_models: Optional[List[str]] = Field(None, examples=[["Gemini 2.0 Flash", "GPT-5 Chat", "DeepSeek v3"]])
+    available_models: Optional[List[str]] = Field(
+        None, examples=[["Gemini 2.0 Flash", "GPT-5 Chat", "DeepSeek v3"]]
+    )
     rate_limit: int = Field(..., examples=[20, 60])
     commands: List[str] = Field(..., examples=[["start", "help", "model", "clear"]])
     max_history: int = Field(..., examples=[10, 30])
-    features: Dict[str, bool] = Field(..., examples=[{"model_switching": True, "requires_auth": True}])
+    features: Dict[str, bool] = Field(
+        ..., examples=[{"model_switching": True, "requires_auth": True}]
+    )
 
 
 class SessionStatusResponse(BaseModel):
     """Session status response"""
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -147,7 +162,7 @@ class SessionStatusResponse(BaseModel):
                     "last_activity": "2025-01-15T14:30:00",
                     "uptime_seconds": 3600.5,
                     "rate_limit": 60,
-                    "is_admin": False
+                    "is_admin": False,
                 }
             ]
         }
@@ -167,6 +182,7 @@ class SessionStatusResponse(BaseModel):
 
 class SessionListResponse(BaseModel):
     """Session list response"""
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -178,9 +194,9 @@ class SessionListResponse(BaseModel):
                             "conversation_id": "conv_67890",
                             "platform": "Internal-BI",
                             "message_count": 5,
-                            "last_activity": "2025-01-15T14:30:00"
+                            "last_activity": "2025-01-15T14:30:00",
                         }
-                    ]
+                    ],
                 }
             ]
         }
@@ -193,21 +209,16 @@ class SessionListResponse(BaseModel):
 
 class StatsResponse(BaseModel):
     """Statistics response"""
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
                     "total_sessions": 150,
                     "active_sessions": 25,
-                    "telegram": {
-                        "sessions": 10,
-                        "model": "Gemini 2.0 Flash"
-                    },
-                    "internal": {
-                        "sessions": 15,
-                        "teams": 5
-                    },
-                    "uptime_seconds": 86400.0
+                    "telegram": {"sessions": 10, "model": "Gemini 2.0 Flash"},
+                    "internal": {"sessions": 15, "teams": 5},
+                    "uptime_seconds": 86400.0,
                 }
             ]
         }
@@ -222,6 +233,7 @@ class StatsResponse(BaseModel):
 
 class HealthCheckResponse(BaseModel):
     """Health check response"""
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -233,16 +245,16 @@ class HealthCheckResponse(BaseModel):
                         "telegram": {
                             "type": "public",
                             "model": "Gemini 2.0 Flash",
-                            "rate_limit": 20
+                            "rate_limit": 20,
                         },
                         "internal": {
                             "type": "private",
                             "models": ["Gemini 2.0 Flash", "GPT-5 Chat", "DeepSeek v3"],
-                            "rate_limit": 60
-                        }
+                            "rate_limit": 60,
+                        },
                     },
                     "active_sessions": 25,
-                    "timestamp": "2025-01-15T14:30:00"
+                    "timestamp": "2025-01-15T14:30:00",
                 }
             ]
         }
@@ -258,6 +270,7 @@ class HealthCheckResponse(BaseModel):
 
 class ErrorResponse(BaseModel):
     """Error response model"""
+
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
@@ -265,19 +278,21 @@ class ErrorResponse(BaseModel):
                     "success": False,
                     "error": "Authentication required",
                     "detail": "No valid API key provided",
-                    "timestamp": "2025-01-15T14:30:00"
+                    "timestamp": "2025-01-15T14:30:00",
                 },
                 {
                     "success": False,
                     "error": "Invalid API key",
                     "detail": "The provided API key is invalid or has been revoked",
-                    "timestamp": "2025-01-15T14:30:00"
-                }
+                    "timestamp": "2025-01-15T14:30:00",
+                },
             ]
         }
     )
 
     success: bool = Field(False, examples=[False])
-    error: str = Field(..., examples=["Authentication required", "Invalid API key", "Team not found"])
+    error: str = Field(
+        ..., examples=["Authentication required", "Invalid API key", "Team not found"]
+    )
     detail: Optional[str] = Field(None, examples=["No valid API key provided"])
     timestamp: datetime = Field(default_factory=datetime.utcnow)

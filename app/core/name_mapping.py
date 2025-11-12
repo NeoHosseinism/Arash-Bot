@@ -14,7 +14,6 @@ MODEL_NAME_MAPPINGS: Dict[str, str] = {
     "google/gemini-2.0-flash-thinking-001": "Gemini 2.0 Flash Thinking",
     "google/gemma-3-1b-it": "Gemma 3 1B",
     "google/gemma-2-9b-it": "Gemma 2 9B",
-
     # OpenAI Models
     "openai/gpt-5-chat": "GPT-5 Chat",
     "openai/gpt-4.1": "GPT-4.1",
@@ -25,7 +24,6 @@ MODEL_NAME_MAPPINGS: Dict[str, str] = {
     "openai/o1": "O1",
     "openai/o1-mini": "O1 Mini",
     "openai/o1-preview": "O1 Preview",
-
     # Anthropic Models
     "anthropic/claude-opus-4": "Claude Opus 4",
     "anthropic/claude-opus-4.5": "Claude Opus 4.5",
@@ -33,30 +31,25 @@ MODEL_NAME_MAPPINGS: Dict[str, str] = {
     "anthropic/claude-sonnet-4.5": "Claude Sonnet 4.5",
     "anthropic/claude-3.5-sonnet": "Claude 3.5 Sonnet",
     "anthropic/claude-3-opus": "Claude 3 Opus",
-
     # DeepSeek Models
     "deepseek/deepseek-chat": "DeepSeek Chat",
     "deepseek/deepseek-chat-v3-0324": "DeepSeek Chat V3",
     "deepseek/deepseek-r1": "DeepSeek R1",
     "deepseek/deepseek-reasoner": "DeepSeek Reasoner",
-
     # xAI Models
     "x-ai/grok-2": "Grok 2",
     "x-ai/grok-beta": "Grok Beta",
     "x-ai/grok-4": "Grok 4",
     "x-ai/grok-4-beta": "Grok 4 Beta",
-
     # Meta Models
     "meta-llama/llama-3.1-405b-instruct": "Llama 3.1 405B",
     "meta-llama/llama-3.3-70b-instruct": "Llama 3.3 70B",
     "meta-llama/llama-4-maverick": "Llama 4 Maverick",
-
     # Mistral Models
     "mistralai/mistral-large": "Mistral Large",
     "mistralai/mistral-medium": "Mistral Medium",
     "mistralai/mistral-small": "Mistral Small",
     "mistralai/mixtral-8x7b": "Mixtral 8x7B",
-
     # Qwen Models
     "qwen/qwen-2.5-72b-instruct": "Qwen 2.5 72B",
     "qwen/qwq-32b-preview": "QwQ 32B Preview",
@@ -70,6 +63,7 @@ PLATFORM_MAPPINGS: Dict[str, str] = {
     "telegram": "public-platform",
     "internal": "private-platform",
 }
+
 
 def get_friendly_model_name(technical_name: str) -> str:
     """
@@ -97,13 +91,18 @@ def get_friendly_model_name(technical_name: str) -> str:
         formatted_words = []
         for word in words:
             # Keep version numbers and special terms uppercase
-            if word.replace(".", "").replace("v", "").isdigit() or word.upper() in ["GPT", "LLM", "AI"]:
+            if word.replace(".", "").replace("v", "").isdigit() or word.upper() in [
+                "GPT",
+                "LLM",
+                "AI",
+            ]:
                 formatted_words.append(word.upper())
             else:
                 formatted_words.append(word.capitalize())
         return " ".join(formatted_words)
 
     return technical_name
+
 
 def get_technical_model_name(friendly_name: str) -> str:
     """
@@ -118,6 +117,7 @@ def get_technical_model_name(friendly_name: str) -> str:
     """
     return FRIENDLY_TO_TECHNICAL.get(friendly_name, friendly_name)
 
+
 def get_friendly_platform_name(technical_name: str) -> str:
     """
     Convert platform name to friendly name.
@@ -129,6 +129,7 @@ def get_friendly_platform_name(technical_name: str) -> str:
         Friendly platform name (e.g., "public-platform")
     """
     return PLATFORM_MAPPINGS.get(technical_name, "unknown-platform")
+
 
 def mask_session_id(session_id: str, show_chars: int = 8) -> str:
     """

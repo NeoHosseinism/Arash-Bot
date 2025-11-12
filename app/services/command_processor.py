@@ -1,6 +1,7 @@
 """
 Command processor with platform-aware access control
 """
+
 from typing import List, Tuple, Optional
 import logging
 
@@ -65,9 +66,7 @@ class CommandProcessor:
             allowed = platform_manager.get_allowed_commands(session.platform)
             commands_list = "\n".join([f"• /{c}" for c in allowed])
             return MESSAGES_FA["command_not_available_platform"].format(
-                command=command,
-                platform=session.platform.title(),
-                commands=commands_list
+                command=command, platform=session.platform.title(), commands=commands_list
             )
 
         # Execute command
@@ -93,8 +92,7 @@ class CommandProcessor:
             return welcome
         else:
             return MESSAGES_FA["welcome_telegram"].format(
-                model=friendly_model,  # ✓ Show friendly name
-                rate_limit=config.rate_limit
+                model=friendly_model, rate_limit=config.rate_limit  # ✓ Show friendly name
             )
 
     async def handle_help(self, session: ChatSession, args: List[str]) -> str:
@@ -218,7 +216,9 @@ class CommandProcessor:
 
     async def handle_models(self, session: ChatSession, args: List[str]) -> str:
         """Handle /models command - shows all as friendly names"""
-        friendly_models = platform_manager.get_available_models_friendly(session.platform)  # ✓ Get friendly names
+        friendly_models = platform_manager.get_available_models_friendly(
+            session.platform
+        )  # ✓ Get friendly names
         current_friendly = session.current_model_friendly
 
         if session.platform == "telegram":

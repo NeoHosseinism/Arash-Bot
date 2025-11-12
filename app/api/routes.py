@@ -66,28 +66,28 @@ router = APIRouter()
                                 "response": "سلام! چطور می‌تونم کمکتون کنم؟",
                                 "conversation_id": "conv_67890",
                                 "model": "Gemini 2.0 Flash",
-                                "message_count": 1
-                            }
+                                "message_count": 1,
+                            },
                         },
                         "rate_limit_exceeded": {
                             "summary": "Rate limit exceeded",
                             "value": {
                                 "success": False,
                                 "error": "rate_limit_exceeded",
-                                "response": "⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: 60 پیام در دقیقه"
-                            }
+                                "response": "⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: 60 پیام در دقیقه",
+                            },
                         },
                         "ai_service_error": {
                             "summary": "AI service unavailable",
                             "value": {
                                 "success": False,
                                 "error": "ai_service_unavailable",
-                                "response": "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست. لطفاً چند لحظه دیگر دوباره تلاش کنید یا با پشتیبانی تماس بگیرید."
-                            }
-                        }
+                                "response": "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست. لطفاً چند لحظه دیگر دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.",
+                            },
+                        },
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Authentication required",
@@ -97,29 +97,21 @@ router = APIRouter()
                         "detail": "Authentication required. Please provide an API key in the Authorization header."
                     }
                 }
-            }
+            },
         },
         403: {
             "description": "Invalid API key",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Invalid API key. Please check your credentials."
-                    }
+                    "example": {"detail": "Invalid API key. Please check your credentials."}
                 }
-            }
+            },
         },
         500: {
             "description": "Internal server error",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "detail": "Error validating API key"
-                    }
-                }
-            }
-        }
-    }
+            "content": {"application/json": {"example": {"detail": "Error validating API key"}}},
+        },
+    },
 )
 async def chat(
     message: IncomingMessage,
@@ -248,20 +240,20 @@ async def chat(
                                     {
                                         "command": "start",
                                         "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
-                                        "usage": "/start"
+                                        "usage": "/start",
                                     },
                                     {
                                         "command": "help",
                                         "description": "نمایش راهنمای استفاده و دستورات موجود",
-                                        "usage": "/help"
+                                        "usage": "/help",
                                     },
                                     {
                                         "command": "clear",
                                         "description": "پاک کردن تاریخچه گفتگو و شروع مجدد",
-                                        "usage": "/clear"
-                                    }
-                                ]
-                            }
+                                        "usage": "/clear",
+                                    },
+                                ],
+                            },
                         },
                         "internal_commands": {
                             "summary": "Internal (private) commands",
@@ -272,39 +264,39 @@ async def chat(
                                     {
                                         "command": "start",
                                         "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
-                                        "usage": "/start"
+                                        "usage": "/start",
                                     },
                                     {
                                         "command": "help",
                                         "description": "نمایش راهنمای استفاده و دستورات موجود",
-                                        "usage": "/help"
+                                        "usage": "/help",
                                     },
                                     {
                                         "command": "model",
                                         "description": "تغییر مدل هوش مصنوعی",
-                                        "usage": "/model"
+                                        "usage": "/model",
                                     },
                                     {
                                         "command": "models",
                                         "description": "نمایش لیست تمام مدل‌های موجود",
-                                        "usage": "/models"
+                                        "usage": "/models",
                                     },
                                     {
                                         "command": "clear",
                                         "description": "پاک کردن تاریخچه گفتگو و شروع مجدد",
-                                        "usage": "/clear"
+                                        "usage": "/clear",
                                     },
                                     {
                                         "command": "status",
                                         "description": "نمایش وضعیت نشست و اطلاعات جاری",
-                                        "usage": "/status"
-                                    }
-                                ]
-                            }
-                        }
+                                        "usage": "/status",
+                                    },
+                                ],
+                            },
+                        },
                     }
                 }
-            }
+            },
         },
         401: {
             "description": "Authentication required",
@@ -314,19 +306,17 @@ async def chat(
                         "detail": "Authentication required. Please provide an API key in the Authorization header."
                     }
                 }
-            }
+            },
         },
         403: {
             "description": "Invalid API key",
             "content": {
                 "application/json": {
-                    "example": {
-                        "detail": "Invalid API key. Please check your credentials."
-                    }
+                    "example": {"detail": "Invalid API key. Please check your credentials."}
                 }
-            }
-        }
-    }
+            },
+        },
+    },
 )
 async def get_commands(
     auth: Union[str, APIKey] = Depends(require_chat_access),
@@ -387,14 +377,8 @@ async def get_commands(
     commands_list = []
     for cmd in allowed_commands:
         if cmd in COMMAND_DESCRIPTIONS:
-            commands_list.append({
-                "command": cmd,
-                "description": COMMAND_DESCRIPTIONS[cmd],
-                "usage": f"/{cmd}"
-            })
+            commands_list.append(
+                {"command": cmd, "description": COMMAND_DESCRIPTIONS[cmd], "usage": f"/{cmd}"}
+            )
 
-    return {
-        "success": True,
-        "platform": platform_name,
-        "commands": commands_list
-    }
+    return {"success": True, "platform": platform_name, "commands": commands_list}

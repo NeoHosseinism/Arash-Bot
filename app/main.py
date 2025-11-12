@@ -1,6 +1,7 @@
 """
 FastAPI application entry point with integrated Telegram bot
 """
+
 import asyncio
 from datetime import datetime
 from contextlib import asynccontextmanager
@@ -84,7 +85,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"    - Rate Limit: {internal_config.rate_limit}/min")
     logger.info(f"    - Commands: {len(internal_config.commands)}")
     logger.info(f"    - Max History: {internal_config.max_history}")
-    logger.info(f"    - Authentication: {'Required' if internal_config.requires_auth else 'Not required'}")
+    logger.info(
+        f"    - Authentication: {'Required' if internal_config.requires_auth else 'Not required'}"
+    )
     logger.info(f"AI Service: {settings.AI_SERVICE_URL}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
 
@@ -125,22 +128,22 @@ async def lifespan(app: FastAPI):
             await telegram_bot.application.stop()
             await telegram_bot.application.shutdown()
         logger.info("Telegram bot stopped")
-    
+
     # Cancel cleanup task
     cleanup_task.cancel()
     try:
         await cleanup_task
     except asyncio.CancelledError:
         pass
-    
+
     # Close HTTP client
     await ai_client.close()
-    
+
     # Log statistics
     total_sessions = len(session_manager.sessions)
     telegram_count = session_manager.get_session_count("telegram")
     internal_count = session_manager.get_session_count("internal")
-    
+
     logger.info(f"Sessions processed: {total_sessions}")
     logger.info(f"  - Telegram: {telegram_count}")
     logger.info(f"  - Internal: {internal_count}")
@@ -188,7 +191,7 @@ app = FastAPI(
     docs_url="/docs" if settings.ENABLE_API_DOCS else None,
     redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,
     openapi_url="/openapi.json" if settings.ENABLE_API_DOCS else None,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -211,8 +214,8 @@ async def global_exception_handler(request, exc):
         content={
             "success": False,
             "error": "internal_server_error",
-            "detail": "An internal error occurred" if settings.is_production else str(exc)
-        }
+            "detail": "An internal error occurred" if settings.is_production else str(exc),
+        },
     )
 
 
@@ -243,11 +246,11 @@ async def health_check():
 # Development server helper
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host=settings.API_HOST,
         port=settings.API_PORT,
         reload=not settings.is_production,
-        log_level=settings.LOG_LEVEL.lower()
+        log_level=settings.LOG_LEVEL.lower(),
     )

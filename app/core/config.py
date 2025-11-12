@@ -1,6 +1,7 @@
 """
 Configuration management using Pydantic Settings V2
 """
+
 from typing import List, Optional
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -10,7 +11,7 @@ import json
 
 class Settings(BaseSettings):
     """Application settings with validation - Pydantic V2"""
-    
+
     # Core Configuration
     ENVIRONMENT: str = "dev"  # dev, stage, prod - Controls database selection and optimizations
     AI_SERVICE_URL: str
@@ -83,15 +84,15 @@ class Settings(BaseSettings):
 
     # Telegram Bot Integration
     RUN_TELEGRAM_BOT: bool = True
-    
+
     # Pydantic V2 model configuration
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=True,
-        extra="ignore"  # Ignore extra fields in .env file
+        extra="ignore",  # Ignore extra fields in .env file
     )
-    
+
     @field_validator("TELEGRAM_BOT_TOKEN")
     @classmethod
     def validate_telegram_token(cls, v: str) -> str:
@@ -101,7 +102,7 @@ class Settings(BaseSettings):
         if ":" not in v:
             raise ValueError("Invalid Telegram bot token format")
         return v
-    
+
     @field_validator("INTERNAL_API_KEY")
     @classmethod
     def validate_api_key(cls, v: str) -> str:
@@ -111,7 +112,7 @@ class Settings(BaseSettings):
         if len(v) < 32:
             raise ValueError("INTERNAL_API_KEY must be at least 32 characters")
         return v
-    
+
     @field_validator("LOG_FILE")
     @classmethod
     def create_log_directory(cls, v: str) -> str:
@@ -119,16 +120,16 @@ class Settings(BaseSettings):
         log_path = Path(v)
         log_path.parent.mkdir(parents=True, exist_ok=True)
         return v
-    
+
     @field_validator("INTERNAL_MODELS")
     @classmethod
     def validate_internal_models(cls, v: str) -> str:
         """Validate INTERNAL_MODELS is valid JSON array or comma-separated string"""
         if not v:
             raise ValueError("INTERNAL_MODELS cannot be empty")
-        
+
         # Try parsing as JSON first
-        if v.strip().startswith('['):
+        if v.strip().startswith("["):
             try:
                 models = json.loads(v)
                 if not isinstance(models, list):
@@ -138,41 +139,41 @@ class Settings(BaseSettings):
                 return v
             except json.JSONDecodeError as e:
                 raise ValueError(f"INTERNAL_MODELS invalid JSON: {e}")
-        
+
         # Otherwise treat as comma-separated
-        if not any(c in v for c in [',', '/']):
+        if not any(c in v for c in [",", "/"]):
             raise ValueError("INTERNAL_MODELS must be JSON array or comma-separated list")
-        
+
         return v
-    
+
     @property
     def telegram_commands_list(self) -> List[str]:
         """Get Telegram commands as list"""
         return [cmd.strip() for cmd in self.TELEGRAM_COMMANDS.split(",") if cmd.strip()]
-    
+
     @property
     def telegram_models_list(self) -> List[str]:
         """Get Telegram models as list"""
         return [model.strip() for model in self.TELEGRAM_MODELS.split(",") if model.strip()]
-    
+
     @property
     def telegram_admin_users_set(self) -> set:
         """Get Telegram admin users as set"""
         return {user.strip() for user in self.TELEGRAM_ADMIN_USERS.split(",") if user.strip()}
-    
+
     @property
     def internal_models_list(self) -> List[str]:
         """Get internal models as list"""
         # Handle JSON array format
-        if self.INTERNAL_MODELS.strip().startswith('['):
+        if self.INTERNAL_MODELS.strip().startswith("["):
             try:
                 return json.loads(self.INTERNAL_MODELS)
             except json.JSONDecodeError:
                 pass
-        
+
         # Handle comma-separated format
         return [model.strip() for model in self.INTERNAL_MODELS.split(",") if model.strip()]
-    
+
     @property
     def internal_admin_users_set(self) -> set:
         """Get internal admin users as set"""
@@ -196,12 +197,12 @@ class Settings(BaseSettings):
         if self.CORS_ORIGINS == "*":
             return ["*"]
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
-    
+
     @property
     def max_image_size_bytes(self) -> int:
         """Get max image size in bytes"""
         return self.MAX_IMAGE_SIZE_MB * 1024 * 1024
-    
+
     @property
     def database_url(self) -> str:
         """Build async database URL for SQLAlchemy from generic parameters"""
@@ -217,7 +218,6 @@ class Settings(BaseSettings):
             f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
             f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
         )
-
 
     @property
     def is_production(self) -> bool:
@@ -242,7 +242,7 @@ class Settings(BaseSettings):
 
 # Global settings instance
 # This will raise validation errors if required fields are missing from .env
-settings = Settings()   # type: ignore[call-arg]
+settings = Settings()  # type: ignore[call-arg]
 
 
 def get_settings() -> Settings:

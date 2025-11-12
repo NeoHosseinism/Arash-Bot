@@ -144,9 +144,7 @@ class APIKeyManager:
         db.commit()
         db.refresh(api_key)
 
-        logger.info(
-            f"Created API key: {name} (prefix: {key_prefix}) for team ID {team_id}"
-        )
+        logger.info(f"Created API key: {name} (prefix: {key_prefix}) for team ID {team_id}")
 
         return api_key_string, api_key
 
@@ -192,9 +190,7 @@ class APIKeyManager:
         db_key.last_used_at = datetime.utcnow()
         db.commit()
 
-        logger.debug(
-            f"API key validated (prefix: {db_key.key_prefix}, team: {db_key.team.name})"
-        )
+        logger.debug(f"API key validated (prefix: {db_key.key_prefix}, team: {db_key.team.name})")
         return db_key
 
     @staticmethod
@@ -329,7 +325,7 @@ class APIKeyManager:
             name=f"API Key for {platform_name}",  # Auto-generated name
             team_id=team.id,
             monthly_quota=None,  # Use team quotas
-            daily_quota=None,    # Use team quotas
+            daily_quota=None,  # Use team quotas
             created_by="system",  # Auto-created by system
             description=f"Auto-generated key for {platform_name}",
         )
@@ -443,14 +439,17 @@ class APIKeyManager:
             return False
 
         # Check for active API keys
-        active_keys = db.query(APIKey).filter(
-            APIKey.team_id == team_id,
-            APIKey.is_active == True
-        ).count()
+        active_keys = (
+            db.query(APIKey).filter(APIKey.team_id == team_id, APIKey.is_active == True).count()
+        )
 
         if active_keys > 0 and not force:
-            logger.warning(f"Cannot delete team {team.name}: has {active_keys} active API keys. Use force=True to delete anyway.")
-            raise ValueError(f"Team has {active_keys} active API keys. Revoke them first or use --force flag.")
+            logger.warning(
+                f"Cannot delete team {team.name}: has {active_keys} active API keys. Use force=True to delete anyway."
+            )
+            raise ValueError(
+                f"Team has {active_keys} active API keys. Revoke them first or use --force flag."
+            )
 
         team_name = team.name
 
@@ -462,7 +461,9 @@ class APIKeyManager:
             # Delete API keys
             deleted_keys = db.query(APIKey).filter(APIKey.team_id == team_id).delete()
 
-            logger.info(f"Force deleting team {team_name}: removed {deleted_keys} keys and {deleted_logs} usage logs")
+            logger.info(
+                f"Force deleting team {team_name}: removed {deleted_keys} keys and {deleted_logs} usage logs"
+            )
 
         # Delete the team
         db.delete(team)

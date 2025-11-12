@@ -1,17 +1,20 @@
 """
 Application constants and messages
 """
+
 from enum import Enum
 
 
 class Platform(str, Enum):
     """Supported messaging platforms"""
+
     TELEGRAM = "telegram"
     INTERNAL = "internal"
 
 
 class MessageType(str, Enum):
     """Types of messages"""
+
     TEXT = "text"
     IMAGE = "image"
     DOCUMENT = "document"
@@ -24,6 +27,7 @@ class MessageType(str, Enum):
 
 class PlatformType(str, Enum):
     """Platform access types"""
+
     PUBLIC = "public"
     PRIVATE = "private"
 
@@ -37,7 +41,6 @@ MODEL_ALIASES = {
     "claude-4": "Claude Sonnet 4",
     "sonnet": "Claude Sonnet 4",
     "opus": "Claude Opus 4.5",
-
     # GPT models
     "gpt": "GPT-5 Chat",
     "gpt5": "GPT-5 Chat",
@@ -49,7 +52,6 @@ MODEL_ALIASES = {
     "web": "GPT-4o Search Preview",
     "search": "GPT-4o Search Preview",
     "o1": "O1",
-
     # Gemini models (Available on Telegram)
     "gemini": "Gemini 2.5 Flash",
     "gemini-2.5": "Gemini 2.5 Flash",
@@ -58,7 +60,6 @@ MODEL_ALIASES = {
     "flash-2": "Gemini 2.0 Flash",
     "flash-2.5": "Gemini 2.5 Flash",
     "gemma": "Gemma 3 1B",
-
     # Other models
     "grok": "Grok 4",
     "deepseek": "DeepSeek Chat V3",
@@ -97,11 +98,9 @@ MESSAGES_FA = {
 **مدل فعلی:** {model}
 
 برای دیدن همه‌ی دستورات موجود، دستور /help را تایپ کنید.""",
-    
     "welcome_internal_admin": """
 
 👑 شما دسترسی مدیریتی (ادمین) دارید.""",
-    
     "welcome_telegram": """🤖 **خوش آمدید به ربات آرش!**
 
 من یک دستیار هوش مصنوعی هستم و اینجا هستم تا به سوالات شما کمک کنم.
@@ -110,7 +109,6 @@ MESSAGES_FA = {
 **محدودیت سرعت:** {rate_limit} پیام در دقیقه
 
 برای دیدن دستورات موجود، دستور /help را تایپ کنید.""",
-    
     # Error messages
     "error_rate_limit": "⚠️ محدودیت سرعت ({rate_limit} پیام/دقیقه). لطفاً کمی صبر کنید.",
     "error_auth_failed": "❌ احراز هویت ناموفق. لطفاً کلید API معتبر ارائه دهید.",
@@ -120,22 +118,18 @@ MESSAGES_FA = {
     "error_no_photo": "❌ هیچ تصویری در پیام یافت نشد.",
     "error_timeout": "⏱️ درخواست به پایان زمان رسید. ممکن است تصویر خیلی بزرگ باشد یا سرویس کند باشد. لطفاً دوباره تلاش کنید.",
     "error_generic": "❌ متأسفم، خطایی رخ داد. لطفاً بعداً تلاش کنید.",
-    
     # Command not available
     "command_not_available_telegram": "❌ دستور `/{command}` در تلگرام در دسترس نیست.",
     "command_not_available_platform": "❌ دستور `/{command}` در {platform} در دسترس نیست.\n\n**دستورات موجود:**\n{commands}",
     "command_unknown": "❓ دستور ناشناخته: /{command}\nبرای دیدن دستورات موجود /help را تایپ کنید.",
-    
     # Model switching
     "model_switch_not_available": "❌ تغییر مدل امکان‌پذیر نیست.\nشما از **{model}** استفاده می‌کنید",
     "model_current": "**مدل فعلی:** {model}",
     "model_switched": "✅ به **{model}** تغییر یافت",
     "model_invalid": "❌ مدل نامعتبر: `{model}`",
-    
     # Session
     "session_cleared": "✨ تاریخچه گفت‌وگو پاک شد! شروع تازه.",
     "session_no_history": "هنوز گفت‌وگویی برای خلاصه کردن وجود ندارد!",
-    
     # Only internal
     "internal_only": "❌ این قابلیت فقط برای کاربران داخلی در دسترس است.",
 }
@@ -154,11 +148,9 @@ You have access to advanced features:
 **Current model:** {model}
 
 Type /help to see all available commands.""",
-    
     "welcome_internal_admin": """
 
 👑 You have admin access.""",
-    
     "welcome_telegram": """🤖 **Welcome to Arash Bot!**
 
 I'm an AI assistant here to help answer your questions.
@@ -167,7 +159,6 @@ I'm an AI assistant here to help answer your questions.
 **Rate limit:** {rate_limit} messages/minute
 
 Type /help to see available commands.""",
-    
     "error_rate_limit": "⚠️ Rate limit exceeded ({rate_limit} msg/min). Please wait.",
     "error_auth_failed": "❌ Authentication failed. Please provide valid API key.",
     "error_processing": "❌ Sorry, an error occurred processing your message. Please try again.",
@@ -176,19 +167,15 @@ Type /help to see available commands.""",
     "error_no_photo": "❌ No photo found in message.",
     "error_timeout": "⏱️ Request timed out. Image might be too large or service is slow. Please try again.",
     "error_generic": "❌ Sorry, an error occurred. Please try again later.",
-    
     "command_not_available_telegram": "❌ Command `/{command}` is not available on Telegram.",
     "command_not_available_platform": "❌ Command `/{command}` is not available on {platform}.\n\n**Available commands:**\n{commands}",
     "command_unknown": "❓ Unknown command: /{command}\nType /help to see available commands.",
-    
     "model_switch_not_available": "❌ Model switching not available.\nYou're using: **{model}**",
     "model_current": "**Current model:** {model}",
     "model_switched": "✅ Switched to **{model}**",
     "model_invalid": "❌ Invalid model: `{model}`",
-    
     "session_cleared": "✨ Conversation history cleared! Starting fresh.",
     "session_no_history": "No conversation to summarize yet!",
-    
     "internal_only": "❌ This feature is only available for internal users.",
 }
 

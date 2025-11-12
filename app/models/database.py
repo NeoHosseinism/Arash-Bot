@@ -43,7 +43,9 @@ class Team(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), unique=True, nullable=False, index=True)  # Internal name
-    platform_name = Column(String(255), unique=True, nullable=False, index=True)  # Public platform identifier
+    platform_name = Column(
+        String(255), unique=True, nullable=False, index=True
+    )  # Public platform identifier
     monthly_quota = Column(Integer, nullable=True)  # Requests per month, None = unlimited
     daily_quota = Column(Integer, nullable=True)  # Requests per day, None = unlimited
     is_active = Column(Boolean, default=True, nullable=False)
@@ -160,6 +162,7 @@ class Database:
         if database_url is None:
             # Build URL from config settings (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME)
             from app.core.config import settings
+
             database_url = settings.sync_database_url
 
         if not database_url:
@@ -176,7 +179,7 @@ class Database:
             )
 
         # Hide password in logs
-        log_url = database_url.split('@')[-1] if '@' in database_url else database_url
+        log_url = database_url.split("@")[-1] if "@" in database_url else database_url
         logger.info(f"Initializing PostgreSQL connection: {log_url}")
 
         # PostgreSQL-specific settings for better performance
@@ -234,7 +237,9 @@ class Database:
             force: Not used (kept for compatibility)
         """
         logger.warning("create_tables() is deprecated - use Alembic migrations instead")
-        logger.info("To initialize database, use: from app.core.database_init import initialize_database")
+        logger.info(
+            "To initialize database, use: from app.core.database_init import initialize_database"
+        )
 
     def test_connection(self) -> bool:
         """

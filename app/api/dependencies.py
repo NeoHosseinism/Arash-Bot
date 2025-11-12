@@ -23,6 +23,7 @@ SECURITY:
 - External teams don't know about super admins or access levels
 - Team isolation via session tagging
 """
+
 from typing import Optional, Union
 import logging
 from fastapi import HTTPException, Depends
@@ -39,7 +40,7 @@ security = HTTPBearer(auto_error=False)
 
 
 def require_admin_access(
-    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> str:
     """
     Require SUPER ADMIN access - infrastructure level (environment-based authentication)
@@ -74,35 +75,26 @@ def require_admin_access(
     - Complete separation from client database
     """
     if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required"
-        )
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     # Check if super admin keys are configured
     super_admin_keys = settings.super_admin_keys_set
     if not super_admin_keys:
         logger.error("SUPER_ADMIN_API_KEYS not configured - admin endpoints unavailable")
-        raise HTTPException(
-            status_code=401,
-            detail="Super admin authentication not configured"
-        )
+        raise HTTPException(status_code=401, detail="Super admin authentication not configured")
 
     # Validate against environment-based super admin keys
     provided_key = authorization.credentials
     if provided_key not in super_admin_keys:
         logger.warning(f"Invalid super admin API key attempted: {provided_key[:12]}...")
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid super admin API key"
-        )
+        raise HTTPException(status_code=403, detail="Invalid super admin API key")
 
     logger.info(f"Super admin access granted (key: {provided_key[:12]}...)")
     return provided_key
 
 
 def require_team_access(
-    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> APIKey:
     """
     Require valid TEAM API key - application level (database-based authentication)
@@ -148,36 +140,29 @@ def require_team_access(
     - Team isolation enforced via team_id in sessions
     """
     if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required"
-        )
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     db = get_db_session()
     try:
         api_key = APIKeyManager.validate_api_key(db, authorization.credentials)
 
         if not api_key:
-            raise HTTPException(
-                status_code=403,
-                detail="Invalid API key"
-            )
+            raise HTTPException(status_code=403, detail="Invalid API key")
 
-        logger.debug(f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})")
+        logger.debug(
+            f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})"
+        )
         return api_key
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error validating team API key: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error validating API key"
-        )
+        raise HTTPException(status_code=500, detail="Error validating API key")
 
 
 def require_chat_access(
-    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> Union[str, APIKey]:
     """
     Require authentication for chat and commands endpoints
@@ -216,7 +201,7 @@ def require_chat_access(
     if not authorization:
         raise HTTPException(
             status_code=401,
-            detail="Authentication required. Please provide an API key in the Authorization header."
+            detail="Authentication required. Please provide an API key in the Authorization header.",
         )
 
     provided_key = authorization.credentials
@@ -234,18 +219,16 @@ def require_chat_access(
         if not api_key:
             logger.warning(f"Invalid API key attempted: {provided_key[:12]}...")
             raise HTTPException(
-                status_code=403,
-                detail="Invalid API key. Please check your credentials."
+                status_code=403, detail="Invalid API key. Please check your credentials."
             )
 
-        logger.info(f"[TEAM] API access granted to: {api_key.key_prefix} (Team: {api_key.team.platform_name})")
+        logger.info(
+            f"[TEAM] API access granted to: {api_key.key_prefix} (Team: {api_key.team.platform_name})"
+        )
         return api_key
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error validating API key: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error validating API key"
-        )
+        raise HTTPException(status_code=500, detail="Error validating API key")

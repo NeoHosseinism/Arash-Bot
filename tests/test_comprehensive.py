@@ -2,6 +2,7 @@
 Comprehensive Test Suite for Arash Bot
 Tests all major functionality end-to-end
 """
+
 import pytest
 from fastapi.testclient import TestClient
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
@@ -73,10 +74,7 @@ class TestAuthentication:
 
     def test_chat_endpoint_no_auth_header(self, client):
         """Chat endpoint with no auth should return 401 (authentication required)"""
-        response = client.post(
-            "/v1/chat",
-            json={"user_id": "telegram_user", "text": "سلام"}
-        )
+        response = client.post("/v1/chat", json={"user_id": "telegram_user", "text": "سلام"})
         # SECURITY FIX: No unauthenticated access allowed
         assert response.status_code == 401
         data = response.json()
@@ -91,13 +89,13 @@ class TestAuthentication:
             "success": True,
             "response": "سلام! چطور می‌تونم کمکتون کنم؟",
             "conversation_id": "chat_123",
-            "model": "Gemini 2.0 Flash"
+            "model": "Gemini 2.0 Flash",
         }
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer telegram_service_key_12345"},
-            json={"user_id": "telegram_user", "text": "سلام"}
+            json={"user_id": "telegram_user", "text": "سلام"},
         )
         # Should work - Telegram bot authenticated
         assert response.status_code in [200, 500, 503]
@@ -111,7 +109,7 @@ class TestAuthentication:
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer ark_test_key"},
-            json={"user_id": "user123", "text": "Hello"}
+            json={"user_id": "user123", "text": "Hello"},
         )
         # Should process or fail on AI service
         assert response.status_code in [200, 500, 503]
@@ -127,7 +125,7 @@ class TestAuthentication:
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer invalid_key"},
-            json={"user_id": "user123", "text": "Hello"}
+            json={"user_id": "user123", "text": "Hello"},
         )
         assert response.status_code == 403
 
@@ -141,10 +139,7 @@ class TestAuthentication:
         """Admin endpoint with valid super admin key"""
         mock_settings.super_admin_keys_set = {"test_admin_key"}
 
-        response = client.get(
-            "/v1/admin/teams",
-            headers={"Authorization": "Bearer test_admin_key"}
-        )
+        response = client.get("/v1/admin/teams", headers={"Authorization": "Bearer test_admin_key"})
         # Should work or return data
         assert response.status_code in [200, 500]
 
@@ -162,13 +157,13 @@ class TestChatEndpoint:
             "response": "سلام! چطور می‌تونم کمکتون کنم؟",
             "conversation_id": "chat_123",
             "model": "Gemini 2.0 Flash",
-            "message_count": 1
+            "message_count": 1,
         }
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer test_telegram_key"},
-            json={"user_id": "user1", "text": "سلام"}
+            json={"user_id": "user1", "text": "سلام"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -186,13 +181,13 @@ class TestChatEndpoint:
         mock_process.return_value = {
             "success": False,
             "error": "rate_limit_exceeded",
-            "response": "⚠️ محدودیت سرعت. لطفاً کمی صبر کنید."
+            "response": "⚠️ محدودیت سرعت. لطفاً کمی صبر کنید.",
         }
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer test_telegram_key"},
-            json={"user_id": "user1", "text": "test"}
+            json={"user_id": "user1", "text": "test"},
         )
         assert response.status_code == 200
         data = response.json()
@@ -201,10 +196,7 @@ class TestChatEndpoint:
 
     def test_chat_missing_required_fields(self, client):
         """Chat endpoint validates required fields"""
-        response = client.post(
-            "/v1/chat",
-            json={"user_id": "user1"}  # Missing 'text'
-        )
+        response = client.post("/v1/chat", json={"user_id": "user1"})  # Missing 'text'
         # Returns 401 (auth required) before validation
         assert response.status_code == 401
 
@@ -228,8 +220,8 @@ class TestChatEndpoint:
             json={
                 "user_id": "user1",
                 "text": "Hello",
-                "conversation_id": "chat_owned_by_other_key"
-            }
+                "conversation_id": "chat_owned_by_other_key",
+            },
         )
         assert response.status_code == 200
         data = response.json()
@@ -246,8 +238,7 @@ class TestCommandsEndpoint:
         mock_settings.TELEGRAM_SERVICE_KEY = "telegram_service_key_12345"
 
         response = client.get(
-            "/v1/commands",
-            headers={"Authorization": "Bearer telegram_service_key_12345"}
+            "/v1/commands", headers={"Authorization": "Bearer telegram_service_key_12345"}
         )
         assert response.status_code == 200
         data = response.json()
@@ -266,10 +257,7 @@ class TestCommandsEndpoint:
         """Commands endpoint returns team-specific commands with team API key"""
         mock_validate.return_value = mock_api_key
 
-        response = client.get(
-            "/v1/commands",
-            headers={"Authorization": "Bearer test_key"}
-        )
+        response = client.get("/v1/commands", headers={"Authorization": "Bearer test_key"})
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -293,10 +281,7 @@ class TestAdminTeamEndpoints:
         mock_settings.super_admin_keys_set = {"admin_key"}
         mock_list.return_value = [mock_team]
 
-        response = client.get(
-            "/v1/admin/teams",
-            headers={"Authorization": "Bearer admin_key"}
-        )
+        response = client.get("/v1/admin/teams", headers={"Authorization": "Bearer admin_key"})
         assert response.status_code == 200
         data = response.json()
         assert isinstance(data, list)
@@ -313,11 +298,7 @@ class TestAdminTeamEndpoints:
         response = client.post(
             "/v1/admin/teams",
             headers={"Authorization": "Bearer admin_key"},
-            json={
-                "platform_name": "Test-Team",
-                "monthly_quota": 50000,
-                "daily_quota": 2000
-            }
+            json={"platform_name": "Test-Team", "monthly_quota": 50000, "daily_quota": 2000},
         )
         assert response.status_code == 200
         data = response.json()
@@ -331,10 +312,7 @@ class TestAdminTeamEndpoints:
         mock_settings.super_admin_keys_set = {"admin_key"}
         mock_get.return_value = mock_team
 
-        response = client.get(
-            "/v1/admin/teams/1",
-            headers={"Authorization": "Bearer admin_key"}
-        )
+        response = client.get("/v1/admin/teams/1", headers={"Authorization": "Bearer admin_key"})
         assert response.status_code == 200
         data = response.json()
         assert data["id"] == 1
@@ -345,10 +323,7 @@ class TestAdminTeamEndpoints:
         """Admin gets 404 for non-existent team"""
         mock_settings.super_admin_keys_set = {"admin_key"}
 
-        response = client.get(
-            "/v1/admin/teams/999",
-            headers={"Authorization": "Bearer admin_key"}
-        )
+        response = client.get("/v1/admin/teams/999", headers={"Authorization": "Bearer admin_key"})
         assert response.status_code == 404
 
 
@@ -363,10 +338,7 @@ class TestAdminStatsEndpoints:
         mock_session_mgr.sessions = {}
         mock_session_mgr.get_active_session_count.return_value = 0
 
-        response = client.get(
-            "/v1/admin/stats",
-            headers={"Authorization": "Bearer admin_key"}
-        )
+        response = client.get("/v1/admin/stats", headers={"Authorization": "Bearer admin_key"})
         assert response.status_code == 200
         data = response.json()
         assert "total_sessions" in data
@@ -386,8 +358,7 @@ class TestSessionManagement:
         mock_session_mgr.sessions = {"test_key": Mock()}
 
         response = client.post(
-            "/v1/admin/clear-sessions",
-            headers={"Authorization": "Bearer admin_key"}
+            "/v1/admin/clear-sessions", headers={"Authorization": "Bearer admin_key"}
         )
         assert response.status_code == 200
         data = response.json()
@@ -416,7 +387,7 @@ class TestErrorHandling:
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer test_telegram_key"},
-            json={"invalid": "schema"}  # Missing required fields
+            json={"invalid": "schema"},  # Missing required fields
         )
         assert response.status_code == 422
 
@@ -432,13 +403,13 @@ class TestPersianLanguageResponses:
         mock_process.return_value = {
             "success": False,
             "error": "rate_limit_exceeded",
-            "response": "⚠️ محدودیت سرعت"
+            "response": "⚠️ محدودیت سرعت",
         }
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer test_telegram_key"},
-            json={"user_id": "user1", "text": "test"}
+            json={"user_id": "user1", "text": "test"},
         )
         data = response.json()
         assert "محدودیت سرعت" in data["response"]
@@ -448,14 +419,11 @@ class TestPersianLanguageResponses:
         """Command descriptions are in Persian"""
         mock_settings.TELEGRAM_SERVICE_KEY = "test_telegram_key"
 
-        response = client.get(
-            "/v1/commands",
-            headers={"Authorization": "Bearer test_telegram_key"}
-        )
+        response = client.get("/v1/commands", headers={"Authorization": "Bearer test_telegram_key"})
         data = response.json()
         for cmd in data["commands"]:
             # Persian text should contain Persian characters
-            assert any('\u0600' <= c <= '\u06FF' for c in cmd["description"])
+            assert any("\u0600" <= c <= "\u06FF" for c in cmd["description"])
 
 
 class TestOpenAPIExamples:
