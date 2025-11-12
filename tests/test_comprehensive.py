@@ -72,18 +72,41 @@ class TestAuthentication:
     """Test authentication for all endpoint types"""
 
     def test_chat_endpoint_no_auth_header(self, client):
-        """Chat endpoint with no auth should work (public Telegram mode)"""
+        """Chat endpoint with no auth should return 401 (authentication required)"""
         response = client.post(
             "/v1/chat",
             json={"user_id": "telegram_user", "text": "سلام"}
         )
-        # Should work or fail gracefully (depends on AI service mock)
+        # SECURITY FIX: No unauthenticated access allowed
+        assert response.status_code == 401
+        data = response.json()
+        assert "Authentication required" in data["detail"]
+
+    @patch("app.api.dependencies.settings")
+    @patch("app.services.message_processor.message_processor.process_message_simple")
+    def test_chat_endpoint_with_telegram_service_key(self, mock_process, mock_settings, client):
+        """Chat endpoint with TELEGRAM_SERVICE_KEY (Telegram bot)"""
+        mock_settings.TELEGRAM_SERVICE_KEY = "telegram_service_key_12345"
+        mock_process.return_value = {
+            "success": True,
+            "response": "سلام! چطور می‌تونم کمکتون کنم؟",
+            "chat_id": "chat_123",
+            "session_id": "telegram:chat_123",
+            "model": "Gemini 2.0 Flash"
+        }
+
+        response = client.post(
+            "/v1/chat",
+            headers={"Authorization": "Bearer telegram_service_key_12345"},
+            json={"user_id": "telegram_user", "text": "سلام"}
+        )
+        # Should work - Telegram bot authenticated
         assert response.status_code in [200, 500, 503]
 
     @patch("app.api.dependencies.get_db_session")
     @patch("app.api.dependencies.APIKeyManager.validate_api_key")
-    def test_chat_endpoint_with_valid_key(self, mock_validate, mock_db, mock_api_key, client):
-        """Chat endpoint with valid API key"""
+    def test_chat_endpoint_with_valid_team_key(self, mock_validate, mock_db, mock_api_key, client):
+        """Chat endpoint with valid team API key"""
         mock_validate.return_value = mock_api_key
 
         response = client.post(
@@ -94,10 +117,12 @@ class TestAuthentication:
         # Should process or fail on AI service
         assert response.status_code in [200, 500, 503]
 
+    @patch("app.api.dependencies.settings")
     @patch("app.api.dependencies.get_db_session")
     @patch("app.api.dependencies.APIKeyManager.validate_api_key")
-    def test_chat_endpoint_with_invalid_key(self, mock_validate, mock_db, client):
+    def test_chat_endpoint_with_invalid_key(self, mock_validate, mock_db, mock_settings, client):
         """Chat endpoint with invalid API key returns 403"""
+        mock_settings.TELEGRAM_SERVICE_KEY = "correct_telegram_key"
         mock_validate.return_value = None
 
         response = client.post(
@@ -128,9 +153,11 @@ class TestAuthentication:
 class TestChatEndpoint:
     """Test /v1/chat endpoint thoroughly"""
 
+    @patch("app.api.dependencies.settings")
     @patch("app.services.message_processor.message_processor.process_message_simple")
-    def test_chat_success_response(self, mock_process, client):
+    def test_chat_success_response(self, mock_process, mock_settings, client):
         """Chat endpoint returns successful response"""
+        mock_settings.TELEGRAM_SERVICE_KEY = "test_telegram_key"
         mock_process.return_value = {
             "success": True,
             "response": "سلام! چطور می‌تونم کمکتون کنم؟",
@@ -142,6 +169,7 @@ class TestChatEndpoint:
 
         response = client.post(
             "/v1/chat",
+            headers={"Authorization": "Bearer test_telegram_key"},
             json={"user_id": "user1", "text": "سلام"}
         )
         assert response.status_code == 200
@@ -150,9 +178,11 @@ class TestChatEndpoint:
         assert "response" in data
         assert data["model"] == "Gemini 2.0 Flash"
 
+    @patch("app.api.dependencies.settings")
     @patch("app.services.message_processor.message_processor.process_message_simple")
-    def test_chat_rate_limit_error(self, mock_process, client):
+    def test_chat_rate_limit_error(self, mock_process, mock_settings, client):
         """Chat endpoint handles rate limit"""
+        mock_settings.TELEGRAM_SERVICE_KEY = "test_telegram_key"
         mock_process.return_value = {
             "success": False,
             "error": "rate_limit_exceeded",
@@ -161,6 +191,7 @@ class TestChatEndpoint:
 
         response = client.post(
             "/v1/chat",
+            headers={"Authorization": "Bearer test_telegram_key"},
             json={"user_id": "user1", "text": "test"}
         )
         assert response.status_code == 200
@@ -174,15 +205,22 @@ class TestChatEndpoint:
             "/v1/chat",
             json={"user_id": "user1"}  # Missing 'text'
         )
-        assert response.status_code == 422  # Validation error
+        # Returns 401 (auth required) before validation
+        assert response.status_code == 401
 
 
 class TestCommandsEndpoint:
     """Test /v1/commands endpoint"""
 
-    def test_commands_public_mode(self, client):
-        """Commands endpoint returns Telegram commands without auth"""
-        response = client.get("/v1/commands")
+    @patch("app.api.dependencies.settings")
+    def test_commands_telegram_mode(self, mock_settings, client):
+        """Commands endpoint returns Telegram commands with TELEGRAM_SERVICE_KEY"""
+        mock_settings.TELEGRAM_SERVICE_KEY = "telegram_service_key_12345"
+
+        response = client.get(
+            "/v1/commands",
+            headers={"Authorization": "Bearer telegram_service_key_12345"}
+        )
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
@@ -196,8 +234,8 @@ class TestCommandsEndpoint:
 
     @patch("app.api.dependencies.get_db_session")
     @patch("app.api.dependencies.APIKeyManager.validate_api_key")
-    def test_commands_private_mode(self, mock_validate, mock_db, mock_api_key, client):
-        """Commands endpoint returns team-specific commands with auth"""
+    def test_commands_team_mode(self, mock_validate, mock_db, mock_api_key, client):
+        """Commands endpoint returns team-specific commands with team API key"""
         mock_validate.return_value = mock_api_key
 
         response = client.get(
@@ -208,6 +246,13 @@ class TestCommandsEndpoint:
         data = response.json()
         assert data["success"] is True
         assert data["platform"] == "Internal-BI"
+
+    def test_commands_no_auth(self, client):
+        """Commands endpoint with no auth should return 401"""
+        response = client.get("/v1/commands")
+        assert response.status_code == 401
+        data = response.json()
+        assert "Authentication required" in data["detail"]
 
 
 class TestAdminTeamEndpoints:
@@ -335,10 +380,14 @@ class TestErrorHandling:
         response = client.get("/v1/chat")  # Should be POST
         assert response.status_code == 405
 
-    def test_422_on_invalid_json(self, client):
-        """Invalid JSON schema returns 422"""
+    @patch("app.api.dependencies.settings")
+    def test_422_on_invalid_json(self, mock_settings, client):
+        """Invalid JSON schema returns 422 (after authentication)"""
+        mock_settings.TELEGRAM_SERVICE_KEY = "test_telegram_key"
+
         response = client.post(
             "/v1/chat",
+            headers={"Authorization": "Bearer test_telegram_key"},
             json={"invalid": "schema"}  # Missing required fields
         )
         assert response.status_code == 422
@@ -347,9 +396,11 @@ class TestErrorHandling:
 class TestPersianLanguageResponses:
     """Test that user-facing responses are in Persian"""
 
+    @patch("app.api.dependencies.settings")
     @patch("app.services.message_processor.message_processor.process_message_simple")
-    def test_rate_limit_message_is_persian(self, mock_process, client):
+    def test_rate_limit_message_is_persian(self, mock_process, mock_settings, client):
         """Rate limit messages are in Persian"""
+        mock_settings.TELEGRAM_SERVICE_KEY = "test_telegram_key"
         mock_process.return_value = {
             "success": False,
             "error": "rate_limit_exceeded",
@@ -358,14 +409,21 @@ class TestPersianLanguageResponses:
 
         response = client.post(
             "/v1/chat",
+            headers={"Authorization": "Bearer test_telegram_key"},
             json={"user_id": "user1", "text": "test"}
         )
         data = response.json()
         assert "محدودیت سرعت" in data["response"]
 
-    def test_commands_descriptions_are_persian(self, client):
+    @patch("app.api.dependencies.settings")
+    def test_commands_descriptions_are_persian(self, mock_settings, client):
         """Command descriptions are in Persian"""
-        response = client.get("/v1/commands")
+        mock_settings.TELEGRAM_SERVICE_KEY = "test_telegram_key"
+
+        response = client.get(
+            "/v1/commands",
+            headers={"Authorization": "Bearer test_telegram_key"}
+        )
         data = response.json()
         for cmd in data["commands"]:
             # Persian text should contain Persian characters
