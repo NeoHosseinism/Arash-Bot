@@ -10,13 +10,13 @@ Powered by multiple AI models (GPT, Claude, Gemini, Grok, DeepSeek) with intelli
 
 ```mermaid
 graph TB
-    subgraph "Entry Points"
-        TG[Telegram Bot<br/>run_telegram_bot.py]
-        API[FastAPI Service<br/>run_service.py]
+    subgraph "Entry Point"
+        ENTRY[Unified Entry Point<br/>app/main.py<br/>RUN_TELEGRAM_BOT env]
     end
 
     subgraph "Core Services"
-        APP[FastAPI App<br/>app/main.py]
+        APP[FastAPI App]
+        BOT[Integrated Telegram Bot<br/>Optional]
         MSG[Message Processor]
         SESS[Session Manager]
         PLAT[Platform Manager]
@@ -27,16 +27,19 @@ graph TB
         DB[(PostgreSQL<br/>Teams & Usage)]
     end
 
-    TG --> APP
-    API --> APP
+    ENTRY --> APP
+    APP --> BOT
     APP --> MSG
+    BOT --> MSG
     MSG --> SESS
     MSG --> PLAT
     SESS --> AI
     PLAT --> DB
     MSG --> AI
 
+    style ENTRY fill:#9C27B0
     style APP fill:#4CAF50
+    style BOT fill:#00BCD4
     style AI fill:#2196F3
     style DB fill:#FF9800
 ```

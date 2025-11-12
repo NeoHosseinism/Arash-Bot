@@ -242,14 +242,53 @@ async def health_check():
     }
 
 
-# Development server helper
+# Direct execution support (replaces run_service.py and run_telegram_bot.py)
 if __name__ == "__main__":
+    import argparse
+    import sys
     import uvicorn
 
-    uvicorn.run(
-        "app.main:app",
-        host=settings.API_HOST,
-        port=settings.API_PORT,
-        reload=not settings.is_production,
-        log_level=settings.LOG_LEVEL.lower(),
+    parser = argparse.ArgumentParser(
+        description="Arash Bot - FastAPI service with optional integrated Telegram bot",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run FastAPI service (production mode)
+  python -m app.main
+
+  # Run with auto-reload (development mode)
+  python -m app.main --reload
+
+Environment Variables:
+  RUN_TELEGRAM_BOT=true    Enable integrated Telegram bot (default: false)
+  API_HOST                 API host address (default: 0.0.0.0)
+  API_PORT                 API port (default: 3000)
+  ENVIRONMENT              Environment: development, staging, production
+        """
     )
+
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable auto-reload for development"
+    )
+
+    args = parser.parse_args()
+
+    try:
+        # Run FastAPI service (Telegram bot controlled by RUN_TELEGRAM_BOT env var)
+        logger.info("Starting Arash External API Service...")
+        uvicorn.run(
+            "app.main:app",
+            host=settings.API_HOST,
+            port=settings.API_PORT,
+            reload=args.reload or settings.is_development,
+            log_level=settings.LOG_LEVEL.lower(),
+            access_log=True
+        )
+    except KeyboardInterrupt:
+        logger.info("\nShutdown requested by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
+        sys.exit(1)

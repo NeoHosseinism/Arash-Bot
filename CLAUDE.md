@@ -44,9 +44,9 @@ Arash Bot is a multi-platform AI chatbot service with team-based access control,
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Entry Points                             │
-│  • run_telegram_bot.py  - Standalone Telegram bot           │
-│  • run_service.py       - FastAPI service (API + bot)       │
+│                     Entry Point                              │
+│  • app/main.py          - Unified entry point               │
+│    └─ RUN_TELEGRAM_BOT env controls integrated bot          │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -55,6 +55,7 @@ Arash Bot is a multi-platform AI chatbot service with team-based access control,
 │  • app/main.py            - Application factory             │
 │  • app/api/routes.py      - Public chat endpoint            │
 │  • app/api/admin_routes.py - Team management (admin)        │
+│  • Integrated Telegram Bot - Background asyncio task        │
 └─────────────────────────────────────────────────────────────┘
                               │
                     ┌─────────┴─────────┐
@@ -86,47 +87,54 @@ Client Request
 
 ## Entry Points
 
-### 1. `run_telegram_bot.py` (Standalone Telegram Bot)
+The application has a **unified entry point** through `app/main.py`, which runs the FastAPI service with optional integrated Telegram bot (controlled by `RUN_TELEGRAM_BOT` environment variable).
 
-**Purpose:** Run the Telegram bot independently without the FastAPI service.
+### Running the Application
 
-```python
-# Usage
-python run_telegram_bot.py
+```bash
+# Production mode
+python -m app.main
+
+# Development mode with auto-reload
+python -m app.main --reload
+
+# Or via Makefile (recommended)
+make run          # Production mode
+make run-dev      # Development with auto-reload
 ```
 
-**When to use:**
-- Development/testing of Telegram bot features only
-- Running bot separately from API service
-- Legacy mode (before integration into main app)
+### Features
 
-**Note:** In production, the bot runs integrated within `app/main.py` when `RUN_TELEGRAM_BOT=true`.
-
-### 2. `run_service.py` (FastAPI Service)
-
-**Purpose:** Primary entry point for production - runs FastAPI service with optional integrated Telegram bot.
-
-```python
-# Usage
-python run_service.py
-
-# Or via Makefile
-make run
-make run-dev  # With auto-reload
-```
-
-**Features:**
 - FastAPI REST API (port 3000)
-- Integrated Telegram bot (background asyncio task)
+- Integrated Telegram bot (controlled by `RUN_TELEGRAM_BOT` environment variable)
 - Database migrations on startup
 - Health checks and periodic cleanup
 - CORS middleware
 - Global exception handling
+- Auto-reload support for development
 
-**Environment Control:**
+### Telegram Bot Control
+
+The Telegram bot is controlled **automatically via environment variable**:
+
 ```bash
-RUN_TELEGRAM_BOT=true   # Run bot integrated with API
-RUN_TELEGRAM_BOT=false  # API only (no bot)
+# In your .env file:
+RUN_TELEGRAM_BOT=true     # Service with integrated bot
+RUN_TELEGRAM_BOT=false    # Service only (no bot)
+
+# Then run:
+python -m app.main
+```
+
+The bot runs as an integrated background task within the FastAPI service when enabled. No separate process or command-line argument needed.
+
+### Docker & Kubernetes
+
+The Dockerfile and Kubernetes manifests use the same entry point:
+
+```bash
+# Dockerfile CMD
+python -m uvicorn app.main:app --host 0.0.0.0 --port 3000
 ```
 
 ---
@@ -184,8 +192,6 @@ Arash-Bot/
 │   ├── stage/                   # Staging environment
 │   └── prod/                    # Production environment
 │
-├── run_telegram_bot.py           # Telegram bot entry point
-├── run_service.py               # FastAPI service entry point
 ├── Dockerfile                   # Multi-stage Docker build
 ├── Makefile                     # Development automation
 ├── pyproject.toml               # Poetry dependencies
