@@ -57,8 +57,10 @@ logs/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
+.hypothesis/
 
 # Database
 *.db

@@ -2,10 +2,13 @@
 Database initialization with Alembic migration support.
 This module ensures database schema is up-to-date using Alembic migrations.
 """
+
 import logging
 import subprocess
 from pathlib import Path
+
 from sqlalchemy import inspect, text
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -69,13 +72,13 @@ def run_migrations() -> bool:
             cwd=project_root,
             capture_output=True,
             text=True,
-            timeout=60
+            timeout=60,
         )
 
         if result.returncode == 0:
             logger.info("Migrations completed successfully")
             if result.stdout:
-                for line in result.stdout.strip().split('\n'):
+                for line in result.stdout.strip().split("\n"):
                     logger.info(f"Migration: {line}")
             return True
         else:
@@ -115,6 +118,7 @@ def initialize_database() -> bool:
 
         # Get database connection (connection test handled internally)
         from app.models.database import get_database
+
         db = get_database()
 
         # Check if Alembic history exists

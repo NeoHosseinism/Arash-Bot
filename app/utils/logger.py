@@ -1,12 +1,14 @@
 """
 Custom logging configuration with colorized output and dual timestamps (UTC/IR)
 """
+
 import logging
-import sys
 import os
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
 import jdatetime
 import pytz
 
@@ -18,24 +20,24 @@ class ColoredFormatter(logging.Formatter):
 
     # ANSI color codes
     COLORS = {
-        'utc_timestamp': '\033[96m',      # Cyan
-        'ir_timestamp': '\033[94m',       # Blue
-        'debug': '\033[90m',              # Gray
-        'info': '\033[92m',               # Green
-        'warning': '\033[93m',            # Yellow
-        'error': '\033[91m',              # Red
-        'context': '\033[95m',            # Magenta
-        'key': '\033[36m',                # Cyan
-        'reset': '\033[0m',               # Reset
+        "utc_timestamp": "\033[96m",  # Cyan
+        "ir_timestamp": "\033[94m",  # Blue
+        "debug": "\033[90m",  # Gray
+        "info": "\033[92m",  # Green
+        "warning": "\033[93m",  # Yellow
+        "error": "\033[91m",  # Red
+        "context": "\033[95m",  # Magenta
+        "key": "\033[36m",  # Cyan
+        "reset": "\033[0m",  # Reset
     }
 
     # Level name mapping
     LEVEL_NAMES = {
-        'DEBUG': 'debug',
-        'INFO': 'info',
-        'WARNING': 'warn',
-        'ERROR': 'error',
-        'CRITICAL': 'error',
+        "DEBUG": "debug",
+        "INFO": "info",
+        "WARNING": "warn",
+        "ERROR": "error",
+        "CRITICAL": "error",
     }
 
     def __init__(self, use_colors: bool = True):
@@ -47,23 +49,23 @@ class ColoredFormatter(logging.Formatter):
     def _should_use_colors(self) -> bool:
         """Determine if colors should be used"""
         # Check NO_COLOR environment variable
-        if os.environ.get('NO_COLOR', settings.NO_COLOR) == '1':
+        if os.environ.get("NO_COLOR", settings.NO_COLOR) == "1":
             return False
 
         # Check LOG_COLOR setting
         log_color = settings.LOG_COLOR.lower()
-        if log_color == 'false':
+        if log_color == "false":
             return False
-        if log_color == 'true':
+        if log_color == "true":
             return True
 
         # Auto mode: check if output is a TTY
         # Check if we're in Docker/K8s (usually no TTY)
-        if os.path.exists('/.dockerenv') or os.environ.get('KUBERNETES_SERVICE_HOST'):
+        if os.path.exists("/.dockerenv") or os.environ.get("KUBERNETES_SERVICE_HOST"):
             return False
 
         # Check if stdout is a TTY
-        return hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+        return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
     def _colorize(self, text: str, color_key: str) -> str:
         """Apply color to text if colors are enabled"""
@@ -80,12 +82,12 @@ class ColoredFormatter(logging.Formatter):
             microseconds = f"{int(record.msecs * 1000):06d}"
 
         timestamp = f"{dt.strftime('%Y-%m-%d %H:%M:%S')}.{microseconds} UTC"
-        return self._colorize(f"[{timestamp}]", 'utc_timestamp')
+        return self._colorize(f"[{timestamp}]", "utc_timestamp")
 
     def _format_timestamp_ir(self, record: logging.LogRecord) -> str:
         """Format Iranian (Jalali) timestamp in Tehran timezone - Server agnostic"""
         # Convert UTC timestamp to Tehran timezone (Asia/Tehran)
-        tehran_tz = pytz.timezone('Asia/Tehran')
+        tehran_tz = pytz.timezone("Asia/Tehran")
         utc_dt = datetime.utcfromtimestamp(record.created).replace(tzinfo=pytz.utc)
         tehran_dt = utc_dt.astimezone(tehran_tz)
 
@@ -99,7 +101,7 @@ class ColoredFormatter(logging.Formatter):
 
         # Format: YYYY-MM-DD HH:MM:SS.μs IR (NO 'J' prefix)
         timestamp = f"{jdt.strftime('%Y-%m-%d %H:%M:%S')}.{microseconds} IR"
-        return self._colorize(f"[{timestamp}]", 'ir_timestamp')
+        return self._colorize(f"[{timestamp}]", "ir_timestamp")
 
     def _format_level(self, levelname: str) -> str:
         """Format log level with color"""
@@ -109,31 +111,31 @@ class ColoredFormatter(logging.Formatter):
     def _format_context(self, record: logging.LogRecord) -> str:
         """Format context (module.component) if available"""
         # Extract context from logger name (e.g., "app.api.routes" -> "api.routes")
-        if hasattr(record, 'context'):
+        if hasattr(record, "context"):
             context = record.context
         else:
             # Auto-generate context from logger name
-            name_parts = record.name.split('.')
-            if len(name_parts) > 1 and name_parts[0] == 'app':
-                context = '.'.join(name_parts[1:])
-            elif record.name != 'root':
+            name_parts = record.name.split(".")
+            if len(name_parts) > 1 and name_parts[0] == "app":
+                context = ".".join(name_parts[1:])
+            elif record.name != "root":
                 context = record.name
             else:
                 return ""
 
         if context:
-            return " " + self._colorize(f"[{context}]", 'context')
+            return " " + self._colorize(f"[{context}]", "context")
         return ""
 
     def _colorize_message(self, message: str, levelname: str) -> str:
         """Colorize message text (only for error level)"""
-        if levelname in ('ERROR', 'CRITICAL') and self.use_colors:
-            return self._colorize(message, 'error')
+        if levelname in ("ERROR", "CRITICAL") and self.use_colors:
+            return self._colorize(message, "error")
         return message
 
     def _parse_and_colorize_kvs(self, message: str) -> str:
         """Parse and colorize key=value pairs in the message"""
-        if not self.use_colors or '=' not in message:
+        if not self.use_colors or "=" not in message:
             return message
 
         # Split message into parts
@@ -143,12 +145,12 @@ class ColoredFormatter(logging.Formatter):
 
         while i < len(message):
             # Look for key=value pattern
-            if message[i:].find('=') != -1:
-                eq_pos = message[i:].find('=')
+            if message[i:].find("=") != -1:
+                eq_pos = message[i:].find("=")
                 # Find the start of the key (backtrack to find word boundary)
                 key_start = i
                 for j in range(i + eq_pos - 1, -1, -1):
-                    if message[j] in (' ', '\t', '\n'):
+                    if message[j] in (" ", "\t", "\n"):
                         key_start = j + 1
                         break
                     if j == 0:
@@ -156,10 +158,10 @@ class ColoredFormatter(logging.Formatter):
 
                 # Add text before key
                 if key_start > i:
-                    parts.append(''.join(current_part) + message[i:key_start])
+                    parts.append("".join(current_part) + message[i:key_start])
                     current_part = []
                 else:
-                    parts.append(''.join(current_part))
+                    parts.append("".join(current_part))
                     current_part = []
 
                 # Extract key
@@ -181,7 +183,7 @@ class ColoredFormatter(logging.Formatter):
                 else:
                     # Find end of unquoted value
                     for j in range(value_start, len(message)):
-                        if message[j] in (' ', '\t', '\n'):
+                        if message[j] in (" ", "\t", "\n"):
                             value_end = j
                             break
                     else:
@@ -190,7 +192,7 @@ class ColoredFormatter(logging.Formatter):
                 value = message[value_start:value_end]
 
                 # Colorize and add key=value
-                colored_kv = self._colorize(key, 'key') + '=' + value
+                colored_kv = self._colorize(key, "key") + "=" + value
                 parts.append(colored_kv)
 
                 i = value_end
@@ -200,20 +202,20 @@ class ColoredFormatter(logging.Formatter):
 
         # Add remaining text
         if current_part:
-            parts.append(''.join(current_part))
+            parts.append("".join(current_part))
 
-        return ''.join(parts)
+        return "".join(parts)
 
     def format(self, record: logging.LogRecord) -> str:
         """Format the log record"""
         # Build timestamp part
         timestamp_parts = []
-        if self.timestamp_mode in ('utc', 'both'):
+        if self.timestamp_mode in ("utc", "both"):
             timestamp_parts.append(self._format_timestamp_utc(record))
-        if self.timestamp_mode in ('ir', 'both'):
+        if self.timestamp_mode in ("ir", "both"):
             timestamp_parts.append(self._format_timestamp_ir(record))
 
-        timestamp_str = ''.join(timestamp_parts)
+        timestamp_str = "".join(timestamp_parts)
 
         # Build level part
         level_str = self._format_level(record.levelname)
@@ -252,40 +254,40 @@ class StructuredLogger:
         parts = []
         for key, value in kwargs.items():
             # Convert to snake_case if needed
-            key = key.replace('-', '_').replace(' ', '_').lower()
+            key = key.replace("-", "_").replace(" ", "_").lower()
 
             # Quote values with spaces or special characters
-            if isinstance(value, str) and (' ' in value or '"' in value or '=' in value):
+            if isinstance(value, str) and (" " in value or '"' in value or "=" in value):
                 value = f'"{value}"'
 
             parts.append(f"{key}={value}")
 
-        return ' '.join(parts)
+        return " ".join(parts)
 
     def debug(self, message: str, context: Optional[str] = None, **kwargs):
         """Log debug message with structured data"""
-        extra = {'context': context} if context else {}
+        extra = {"context": context} if context else {}
         kv_str = self._format_kvs(**kwargs) if kwargs else ""
         full_message = f"{message} {kv_str}".strip()
         self.logger.debug(full_message, extra=extra)
 
     def info(self, message: str, context: Optional[str] = None, **kwargs):
         """Log info message with structured data"""
-        extra = {'context': context} if context else {}
+        extra = {"context": context} if context else {}
         kv_str = self._format_kvs(**kwargs) if kwargs else ""
         full_message = f"{message} {kv_str}".strip()
         self.logger.info(full_message, extra=extra)
 
     def warning(self, message: str, context: Optional[str] = None, **kwargs):
         """Log warning message with structured data"""
-        extra = {'context': context} if context else {}
+        extra = {"context": context} if context else {}
         kv_str = self._format_kvs(**kwargs) if kwargs else ""
         full_message = f"{message} {kv_str}".strip()
         self.logger.warning(full_message, extra=extra)
 
     def error(self, message: str, context: Optional[str] = None, **kwargs):
         """Log error message with structured data"""
-        extra = {'context': context} if context else {}
+        extra = {"context": context} if context else {}
         kv_str = self._format_kvs(**kwargs) if kwargs else ""
         full_message = f"{message} {kv_str}".strip()
         self.logger.error(full_message, extra=extra)
@@ -310,7 +312,7 @@ def setup_logging():
     console_handler.setFormatter(console_formatter)
 
     # File handler
-    file_handler = logging.FileHandler(settings.LOG_FILE, encoding='utf-8')
+    file_handler = logging.FileHandler(settings.LOG_FILE, encoding="utf-8")
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(file_formatter)
 

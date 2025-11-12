@@ -26,23 +26,20 @@ WHAT THEY DON'T SEE:
 - Admin endpoints
 """
 
-from typing import Optional
-from datetime import datetime
 import logging
+from typing import Union
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends
 
-from app.models.schemas import (
-    IncomingMessage,
-    BotResponse,
-    HealthCheckResponse,
-)
-from app.models.database import APIKey
-from app.services.message_processor import message_processor
-from app.services.ai_client import ai_client
-from app.services.platform_manager import platform_manager
-from app.api.dependencies import require_team_access, optional_team_access
+from app.api.dependencies import require_chat_access
 from app.core.constants import COMMAND_DESCRIPTIONS
+from app.models.database import APIKey
+from app.models.schemas import (
+    BotResponse,
+    IncomingMessage,
+)
+from app.services.message_processor import message_processor
+from app.services.platform_manager import platform_manager
 
 logger = logging.getLogger(__name__)
 
@@ -50,89 +47,164 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/chat", response_model=BotResponse)
+@router.post(
+    "/chat",
+    response_model=BotResponse,
+    responses={
+        200: {
+            "description": "Successful chat response",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "successful_response": {
+                            "summary": "Successful chat response",
+                            "value": {
+                                "success": True,
+                                "response": "سلام! چطور می‌تونم کمکتون کنم؟",
+                                "conversation_id": "conv_67890",
+                                "model": "Gemini 2.0 Flash",
+                                "message_count": 1,
+                            },
+                        },
+                        "rate_limit_exceeded": {
+                            "summary": "Rate limit exceeded",
+                            "value": {
+                                "success": False,
+                                "error": "rate_limit_exceeded",
+                                "response": "⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: 60 پیام در دقیقه",
+                            },
+                        },
+                        "ai_service_error": {
+                            "summary": "AI service unavailable",
+                            "value": {
+                                "success": False,
+                                "error": "ai_service_unavailable",
+                                "response": "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست. لطفاً چند لحظه دیگر دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.",
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authentication required. Please provide an API key in the Authorization header."
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Invalid API key",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid API key. Please check your credentials."}
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {"application/json": {"example": {"detail": "Error validating API key"}}},
+        },
+    },
+)
 async def chat(
     message: IncomingMessage,
-    api_key: Optional[APIKey] = Depends(optional_team_access),
+    auth: Union[str, APIKey] = Depends(require_chat_access),
 ):
     """
-    Process a chat message - supports both public and private access (modular endpoint).
+    Process a chat message - **AUTHENTICATION REQUIRED**.
 
-    MODES:
-    1. PUBLIC MODE (Telegram bot - no authentication):
-       - No Authorization header required
-       - Uses platform="telegram" with no team_id
-       - Session keys: telegram:chat_id (no team isolation)
+    ## Security Update (CRITICAL)
+    **Authentication is now MANDATORY for all requests.**
+    - Telegram bot: Must use TELEGRAM_SERVICE_KEY
+    - External teams: Must use their team API keys
+    - Unauthenticated requests: REJECTED with 401
 
-    2. PRIVATE MODE (Authenticated teams):
-       - Requires valid API key in Authorization header
-       - Platform auto-detected from team.platform_name
-       - Session keys: platform_name:team_id:chat_id (team isolation enforced)
+    ## Authentication Modes
 
-    AUTHENTICATION:
-    - Optional: No auth header → Public Telegram bot
-    - Optional: Valid auth header → Private authenticated team
-    - Error: Invalid auth header → 403 Forbidden
+    ### 1. TELEGRAM MODE (Telegram bot service):
+    - Telegram bot uses TELEGRAM_SERVICE_KEY in Authorization header
+    - Platform="telegram", no team_id
+    - Session keys: telegram:conversation_id
 
-    PUBLIC REQUEST (Telegram):
+    ### 2. TEAM MODE (External authenticated teams):
+    - External teams use their team API keys
+    - Platform auto-detected from team.platform_name
+    - Session keys: platform_name:team_id:conversation_id (team isolation enforced)
+
+    ## Conversation ID Logic
+    - **No conversation_id provided**: NEW conversation (auto-generated UUID)
+    - **conversation_id provided**: CONTINUATION of existing conversation
+    - Conversation IDs uniquely identify each multi-message dialogue
+
+    ## Examples
+
+    ### TELEGRAM BOT REQUEST:
+    ```http
+    Authorization: Bearer <TELEGRAM_SERVICE_KEY>
+    ```
+    ```json
     {
-      "user_id": "telegram_user_id",
-      "text": "Hello",
-      "chat_id": "telegram_chat_id"
+      "user_id": "telegram_user_12345",
+      "text": "سلام، چطوری؟",
+      "conversation_id": "existing_conv_id_or_null_for_new"
     }
+    ```
 
-    PRIVATE REQUEST (Authenticated):
-    Authorization: Bearer <your-api-key>
+    ### EXTERNAL TEAM REQUEST:
+    ```http
+    Authorization: Bearer ark_1234567890abcdef
+    ```
+    ```json
     {
       "user_id": "user123",
-      "text": "Hello",
-      "chat_id": "optional-for-continuation"
+      "text": "چطور می‌تونم مدل رو عوض کنم؟",
+      "conversation_id": null
     }
+    ```
+    **Response includes conversation_id** - use it for continuing the conversation.
 
-    RESPONSE:
-    {
-      "success": true,
-      "response": "Hi! How can I help?",
-      "chat_id": "chat-id",
-      "session_id": "platform:chat_id OR platform:team_id:chat_id",
-      "model": "Model Name",
-      "message_count": 1
-    }
-
-    SECURITY:
-    - Public: No team isolation (Telegram only)
-    - Private: Complete team isolation via session tagging
-    - Invalid keys rejected (no fallback to public)
+    ## Security
+    - Telegram traffic: Authenticated and logged as [TELEGRAM]
+    - Team traffic: Authenticated and logged as [TEAM]
+    - Unauthorized traffic: Blocked with 401/403
+    - Super admins can now track ALL API usage
     """
     import uuid
 
-    # Auto-generate chat_id if not provided (new conversation)
-    chat_id = message.chat_id or str(uuid.uuid4())
+    # Auto-generate conversation_id if not provided (NEW conversation)
+    # If conversation_id is provided, it's a CONTINUATION of existing conversation
+    conversation_id = message.conversation_id or str(uuid.uuid4())
 
     # Auto-generate message_id internally
     message_id = str(uuid.uuid4())
 
-    # Determine mode based on API key presence
-    if api_key is None:
-        # PUBLIC MODE: Telegram bot (no authentication)
+    # Determine mode based on authentication type
+    if auth == "telegram":
+        # TELEGRAM MODE: Telegram bot service
         platform_name = "telegram"
         team_id = None
         api_key_id = None
         api_key_prefix = None
 
         logger.info(
-            f"[PUBLIC] telegram_request user_id={message.user_id} chat_id={chat_id}"
+            f"[TELEGRAM] bot_request user_id={message.user_id} conversation_id={conversation_id} "
+            f"new_conversation={message.conversation_id is None}"
         )
     else:
-        # PRIVATE MODE: Authenticated team
-        platform_name = api_key.team.platform_name
-        team_id = api_key.team_id
-        api_key_id = api_key.id
-        api_key_prefix = api_key.key_prefix
+        # TEAM MODE: Authenticated external team
+        platform_name = auth.team.platform_name
+        team_id = auth.team_id
+        api_key_id = auth.id
+        api_key_prefix = auth.key_prefix
 
         logger.info(
-            f"[PRIVATE] chat_request platform={platform_name} team_id={team_id} "
-            f"user_id={message.user_id} chat_id={chat_id}"
+            f"[TEAM] chat_request platform={platform_name} team_id={team_id} "
+            f"user_id={message.user_id} conversation_id={conversation_id} "
+            f"new_conversation={message.conversation_id is None}"
         )
 
     # Process message (handles both modes)
@@ -142,55 +214,158 @@ async def chat(
         api_key_id=api_key_id,
         api_key_prefix=api_key_prefix,
         user_id=message.user_id,
-        chat_id=chat_id,
+        conversation_id=conversation_id,
         message_id=message_id,
         text=message.text,
     )
 
 
-@router.get("/commands")
+@router.get(
+    "/commands",
+    responses={
+        200: {
+            "description": "List of available commands",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "telegram_commands": {
+                            "summary": "Telegram (public) commands",
+                            "value": {
+                                "success": True,
+                                "platform": "telegram",
+                                "commands": [
+                                    {
+                                        "command": "start",
+                                        "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
+                                        "usage": "/start",
+                                    },
+                                    {
+                                        "command": "help",
+                                        "description": "نمایش راهنمای استفاده و دستورات موجود",
+                                        "usage": "/help",
+                                    },
+                                    {
+                                        "command": "clear",
+                                        "description": "پاک کردن تاریخچه گفتگو و شروع مجدد",
+                                        "usage": "/clear",
+                                    },
+                                ],
+                            },
+                        },
+                        "internal_commands": {
+                            "summary": "Internal (private) commands",
+                            "value": {
+                                "success": True,
+                                "platform": "Internal-BI",
+                                "commands": [
+                                    {
+                                        "command": "start",
+                                        "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
+                                        "usage": "/start",
+                                    },
+                                    {
+                                        "command": "help",
+                                        "description": "نمایش راهنمای استفاده و دستورات موجود",
+                                        "usage": "/help",
+                                    },
+                                    {
+                                        "command": "model",
+                                        "description": "تغییر مدل هوش مصنوعی",
+                                        "usage": "/model",
+                                    },
+                                    {
+                                        "command": "models",
+                                        "description": "نمایش لیست تمام مدل‌های موجود",
+                                        "usage": "/models",
+                                    },
+                                    {
+                                        "command": "clear",
+                                        "description": "پاک کردن تاریخچه گفتگو و شروع مجدد",
+                                        "usage": "/clear",
+                                    },
+                                    {
+                                        "command": "status",
+                                        "description": "نمایش وضعیت نشست و اطلاعات جاری",
+                                        "usage": "/status",
+                                    },
+                                ],
+                            },
+                        },
+                    }
+                }
+            },
+        },
+        401: {
+            "description": "Authentication required",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Authentication required. Please provide an API key in the Authorization header."
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Invalid API key",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "Invalid API key. Please check your credentials."}
+                }
+            },
+        },
+    },
+)
 async def get_commands(
-    api_key: Optional[APIKey] = Depends(optional_team_access),
+    auth: Union[str, APIKey] = Depends(require_chat_access),
 ):
     """
-    Get available commands with Persian descriptions - supports both public and private access.
+    Get available commands with Persian descriptions - **AUTHENTICATION REQUIRED**.
 
-    MODES:
-    1. PUBLIC MODE (No authentication):
-       - Returns Telegram commands
-       - Platform: telegram
+    ## Security Update (CRITICAL)
+    **Authentication is now MANDATORY for all requests.**
+    - Telegram bot: Must use TELEGRAM_SERVICE_KEY
+    - External teams: Must use their team API keys
+    - Unauthenticated requests: REJECTED with 401
 
-    2. PRIVATE MODE (Authenticated):
-       - Returns commands for authenticated team's platform
-       - Platform: Based on team.platform_name
+    ## Authentication Modes
 
-    RESPONSE:
+    ### 1. TELEGRAM MODE:
+    - Telegram bot uses TELEGRAM_SERVICE_KEY
+    - Returns Telegram platform commands
+
+    ### 2. TEAM MODE:
+    - External teams use their team API keys
+    - Returns commands for authenticated team's platform
+
+    ## Response Format
+    ```json
     {
       "success": true,
-      "platform": "telegram" or "Internal-BI",
+      "platform": "telegram",
       "commands": [
         {
           "command": "start",
           "description": "شروع ربات و دریافت پیام خوش‌آمدگویی",
           "usage": "/start"
-        },
-        ...
+        }
       ]
     }
+    ```
 
-    SECURITY:
-    - Public: Returns Telegram commands only
-    - Private: Returns commands for user's platform
+    ## Security
+    - Telegram traffic: Logged as [TELEGRAM]
+    - Team traffic: Logged as [TEAM]
+    - Unauthorized traffic: Blocked with 401/403
     """
-    # Determine platform based on authentication
-    if api_key is None:
-        # PUBLIC MODE: Telegram bot
+    # Determine platform based on authentication type
+    if auth == "telegram":
+        # TELEGRAM MODE: Telegram bot service
         platform_name = "telegram"
-        logger.info("[PUBLIC] commands_request platform=telegram")
+        logger.info("[TELEGRAM] commands_request platform=telegram")
     else:
-        # PRIVATE MODE: Authenticated team
-        platform_name = api_key.team.platform_name
-        logger.info(f"[PRIVATE] commands_request platform={platform_name} team_id={api_key.team_id}")
+        # TEAM MODE: Authenticated external team
+        platform_name = auth.team.platform_name
+        logger.info(f"[TEAM] commands_request platform={platform_name} team_id={auth.team_id}")
 
     # Get allowed commands for this platform
     allowed_commands = platform_manager.get_allowed_commands(platform_name)
@@ -199,14 +374,8 @@ async def get_commands(
     commands_list = []
     for cmd in allowed_commands:
         if cmd in COMMAND_DESCRIPTIONS:
-            commands_list.append({
-                "command": cmd,
-                "description": COMMAND_DESCRIPTIONS[cmd],
-                "usage": f"/{cmd}"
-            })
+            commands_list.append(
+                {"command": cmd, "description": COMMAND_DESCRIPTIONS[cmd], "usage": f"/{cmd}"}
+            )
 
-    return {
-        "success": True,
-        "platform": platform_name,
-        "commands": commands_list
-    }
+    return {"success": True, "platform": platform_name, "commands": commands_list}

@@ -11,7 +11,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.name_mapping import get_friendly_model_name
-from app.models.database import APIKey, Team, UsageLog
+from app.models.database import APIKey, UsageLog
 
 logger = logging.getLogger(__name__)
 
@@ -100,12 +100,16 @@ class UsageTracker:
         """
         # Determine which quota to use
         if period == "daily":
-            quota_limit = api_key.daily_quota if api_key.daily_quota is not None else api_key.team.daily_quota
+            quota_limit = (
+                api_key.daily_quota if api_key.daily_quota is not None else api_key.team.daily_quota
+            )
             period_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
             reset_time = period_start + timedelta(days=1)
         elif period == "monthly":
             quota_limit = (
-                api_key.monthly_quota if api_key.monthly_quota is not None else api_key.team.monthly_quota
+                api_key.monthly_quota
+                if api_key.monthly_quota is not None
+                else api_key.team.monthly_quota
             )
             now = datetime.utcnow()
             period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -133,15 +137,19 @@ class UsageTracker:
             .filter(
                 UsageLog.api_key_id == api_key.id,
                 UsageLog.timestamp >= period_start,
-                UsageLog.success == True,  # Only count successful requests
+                UsageLog.success,  # Only count successful requests
             )
             .scalar()
         )
 
-        quota_source = "api_key" if (
-            (period == "daily" and api_key.daily_quota is not None) or
-            (period == "monthly" and api_key.monthly_quota is not None)
-        ) else "team"
+        quota_source = (
+            "api_key"
+            if (
+                (period == "daily" and api_key.daily_quota is not None)
+                or (period == "monthly" and api_key.monthly_quota is not None)
+            )
+            else "team"
+        )
 
         allowed = current_usage < quota_limit
 
@@ -201,7 +209,7 @@ class UsageTracker:
                 UsageLog.team_id == team_id,
                 UsageLog.timestamp >= start_date,
                 UsageLog.timestamp <= end_date,
-                UsageLog.success == True,
+                UsageLog.success,
             )
             .scalar()
         )
@@ -218,7 +226,8 @@ class UsageTracker:
                 UsageLog.timestamp <= end_date,
                 UsageLog.tokens_used.isnot(None),
             )
-            .scalar() or 0
+            .scalar()
+            or 0
         )
 
         # Total cost (if tracked)
@@ -230,7 +239,8 @@ class UsageTracker:
                 UsageLog.timestamp <= end_date,
                 UsageLog.estimated_cost.isnot(None),
             )
-            .scalar() or 0.0
+            .scalar()
+            or 0.0
         )
 
         # Average response time
@@ -242,7 +252,8 @@ class UsageTracker:
                 UsageLog.timestamp <= end_date,
                 UsageLog.response_time_ms.isnot(None),
             )
-            .scalar() or 0
+            .scalar()
+            or 0
         )
 
         # Most used models
@@ -269,11 +280,15 @@ class UsageTracker:
                 "total": total_requests,
                 "successful": successful_requests,
                 "failed": failed_requests,
-                "success_rate": (successful_requests / total_requests * 100) if total_requests > 0 else 0,
+                "success_rate": (
+                    (successful_requests / total_requests * 100) if total_requests > 0 else 0
+                ),
             },
             "tokens": {
                 "total": total_tokens,
-                "average_per_request": (total_tokens / successful_requests) if successful_requests > 0 else 0,
+                "average_per_request": (
+                    (total_tokens / successful_requests) if successful_requests > 0 else 0
+                ),
             },
             "cost": {
                 "total": round(total_cost, 4),
@@ -329,7 +344,7 @@ class UsageTracker:
                 UsageLog.api_key_id == api_key_id,
                 UsageLog.timestamp >= start_date,
                 UsageLog.timestamp <= end_date,
-                UsageLog.success == True,
+                UsageLog.success,
             )
             .scalar()
         )

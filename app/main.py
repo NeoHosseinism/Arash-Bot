@@ -1,23 +1,23 @@
 """
 FastAPI application entry point with integrated Telegram bot
 """
+
 import asyncio
-from datetime import datetime
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.core.config import settings
-from app.api.routes import router
 from app.api.admin_routes import router as admin_router
-from app.services.session_manager import session_manager
-from app.services.platform_manager import platform_manager
+from app.api.routes import router
+from app.core.config import settings
+from app.core.database_init import create_logs_directory, initialize_database
 from app.services.ai_client import ai_client
-from app.models.database import get_database
-from app.core.database_init import initialize_database, create_logs_directory
+from app.services.platform_manager import platform_manager
+from app.services.session_manager import session_manager
 from app.utils.logger import setup_logging
 
 # Setup logging
@@ -84,7 +84,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"    - Rate Limit: {internal_config.rate_limit}/min")
     logger.info(f"    - Commands: {len(internal_config.commands)}")
     logger.info(f"    - Max History: {internal_config.max_history}")
-    logger.info(f"    - Authentication: {'Required' if internal_config.requires_auth else 'Not required'}")
+    logger.info(
+        f"    - Authentication: {'Required' if internal_config.requires_auth else 'Not required'}"
+    )
     logger.info(f"AI Service: {settings.AI_SERVICE_URL}")
     logger.info(f"Environment: {settings.ENVIRONMENT}")
 
@@ -125,22 +127,22 @@ async def lifespan(app: FastAPI):
             await telegram_bot.application.stop()
             await telegram_bot.application.shutdown()
         logger.info("Telegram bot stopped")
-    
+
     # Cancel cleanup task
     cleanup_task.cancel()
     try:
         await cleanup_task
     except asyncio.CancelledError:
         pass
-    
+
     # Close HTTP client
     await ai_client.close()
-    
+
     # Log statistics
     total_sessions = len(session_manager.sessions)
     telegram_count = session_manager.get_session_count("telegram")
     internal_count = session_manager.get_session_count("internal")
-    
+
     logger.info(f"Sessions processed: {total_sessions}")
     logger.info(f"  - Telegram: {telegram_count}")
     logger.info(f"  - Internal: {internal_count}")
@@ -188,7 +190,7 @@ app = FastAPI(
     docs_url="/docs" if settings.ENABLE_API_DOCS else None,
     redoc_url="/redoc" if settings.ENABLE_API_DOCS else None,
     openapi_url="/openapi.json" if settings.ENABLE_API_DOCS else None,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 # Add CORS middleware
@@ -211,8 +213,8 @@ async def global_exception_handler(request, exc):
         content={
             "success": False,
             "error": "internal_server_error",
-            "detail": "An internal error occurred" if settings.is_production else str(exc)
-        }
+            "detail": "An internal error occurred" if settings.is_production else str(exc),
+        },
     )
 
 
@@ -240,14 +242,53 @@ async def health_check():
     }
 
 
-# Development server helper
+# Direct execution support (replaces run_service.py and run_telegram_bot.py)
 if __name__ == "__main__":
+    import argparse
+    import sys
     import uvicorn
-    
-    uvicorn.run(
-        "app.main:app",
-        host=settings.API_HOST,
-        port=settings.API_PORT,
-        reload=not settings.is_production,
-        log_level=settings.LOG_LEVEL.lower()
+
+    parser = argparse.ArgumentParser(
+        description="Arash Bot - FastAPI service with optional integrated Telegram bot",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run FastAPI service (production mode)
+  python -m app.main
+
+  # Run with auto-reload (development mode)
+  python -m app.main --reload
+
+Environment Variables:
+  RUN_TELEGRAM_BOT=true    Enable integrated Telegram bot (default: false)
+  API_HOST                 API host address (default: 0.0.0.0)
+  API_PORT                 API port (default: 3000)
+  ENVIRONMENT              Environment: development, staging, production
+        """
     )
+
+    parser.add_argument(
+        "--reload",
+        action="store_true",
+        help="Enable auto-reload for development"
+    )
+
+    args = parser.parse_args()
+
+    try:
+        # Run FastAPI service (Telegram bot controlled by RUN_TELEGRAM_BOT env var)
+        logger.info("Starting Arash External API Service...")
+        uvicorn.run(
+            "app.main:app",
+            host=settings.API_HOST,
+            port=settings.API_PORT,
+            reload=args.reload or settings.is_development,
+            log_level=settings.LOG_LEVEL.lower(),
+            access_log=True
+        )
+    except KeyboardInterrupt:
+        logger.info("\nShutdown requested by user")
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Fatal error: {e}", exc_info=True)
+        sys.exit(1)

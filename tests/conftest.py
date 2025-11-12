@@ -1,9 +1,11 @@
 """
 Pytest configuration and shared fixtures
 """
-import pytest
+
 import sys
 from pathlib import Path
+
+import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -15,10 +17,10 @@ def sample_user_message():
     return {
         "platform": "telegram",
         "user_id": "test_user_123",
-        "chat_id": "test_chat_456",
+        "conversation_id": "test_chat_456",
         "message_id": "test_msg_789",
         "text": "سلام، این یک تست است",
-        "type": "text"
+        "type": "text",
     }
 
 
@@ -29,8 +31,8 @@ def sample_session_data():
         "session_id": "test_session_abc",
         "platform": "telegram",
         "user_id": "test_user_123",
-        "chat_id": "test_chat_456",
-        "current_model": "google/gemini-2.0-flash-001"
+        "conversation_id": "test_chat_456",
+        "current_model": "google/gemini-2.0-flash-001",
     }
 
 
@@ -40,24 +42,16 @@ def mock_ai_service_response():
     return {
         "Response": "این یک پاسخ تستی است",
         "SessionId": "test_session",
-        "Model": "google/gemini-2.0-flash-001"
+        "Model": "google/gemini-2.0-flash-001",
     }
 
 
 def pytest_configure(config):
     """Configure pytest"""
-    config.addinivalue_line(
-        "markers", "slow: marks tests as slow"
-    )
-    config.addinivalue_line(
-        "markers", "integration: marks tests as integration tests"
-    )
-    config.addinivalue_line(
-        "markers", "unit: marks tests as unit tests"
-    )
-    config.addinivalue_line(
-        "markers", "ai_service: marks tests that require AI service"
-    )
+    config.addinivalue_line("markers", "slow: marks tests as slow")
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+    config.addinivalue_line("markers", "unit: marks tests as unit tests")
+    config.addinivalue_line("markers", "ai_service: marks tests that require AI service")
 
 
 def pytest_collection_modifyitems(config, items):

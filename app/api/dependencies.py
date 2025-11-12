@@ -23,10 +23,12 @@ SECURITY:
 - External teams don't know about super admins or access levels
 - Team isolation via session tagging
 """
-from typing import Optional, Union
+
 import logging
-from fastapi import HTTPException, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import Optional, Union
+
+from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.config import settings
 from app.models.database import APIKey, get_db_session
@@ -39,7 +41,7 @@ security = HTTPBearer(auto_error=False)
 
 
 def require_admin_access(
-    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> str:
     """
     Require SUPER ADMIN access - infrastructure level (environment-based authentication)
@@ -74,35 +76,26 @@ def require_admin_access(
     - Complete separation from client database
     """
     if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required"
-        )
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     # Check if super admin keys are configured
     super_admin_keys = settings.super_admin_keys_set
     if not super_admin_keys:
         logger.error("SUPER_ADMIN_API_KEYS not configured - admin endpoints unavailable")
-        raise HTTPException(
-            status_code=401,
-            detail="Super admin authentication not configured"
-        )
+        raise HTTPException(status_code=401, detail="Super admin authentication not configured")
 
     # Validate against environment-based super admin keys
     provided_key = authorization.credentials
     if provided_key not in super_admin_keys:
         logger.warning(f"Invalid super admin API key attempted: {provided_key[:12]}...")
-        raise HTTPException(
-            status_code=403,
-            detail="Invalid super admin API key"
-        )
+        raise HTTPException(status_code=403, detail="Invalid super admin API key")
 
     logger.info(f"Super admin access granted (key: {provided_key[:12]}...)")
     return provided_key
 
 
 def require_team_access(
-    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
+    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security),
 ) -> APIKey:
     """
     Require valid TEAM API key - application level (database-based authentication)
@@ -148,93 +141,95 @@ def require_team_access(
     - Team isolation enforced via team_id in sessions
     """
     if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required"
-        )
+        raise HTTPException(status_code=401, detail="Authentication required")
 
     db = get_db_session()
     try:
         api_key = APIKeyManager.validate_api_key(db, authorization.credentials)
 
         if not api_key:
-            raise HTTPException(
-                status_code=403,
-                detail="Invalid API key"
-            )
+            raise HTTPException(status_code=403, detail="Invalid API key")
 
-        logger.debug(f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})")
+        logger.debug(
+            f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})"
+        )
         return api_key
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error validating team API key: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error validating API key"
-        )
+        raise HTTPException(status_code=500, detail="Error validating API key") from e
 
 
-def optional_team_access(
-    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security)
-) -> Optional[APIKey]:
+def require_chat_access(
+    authorization: Optional[HTTPAuthorizationCredentials] = Depends(security),
+) -> Union[str, APIKey]:
     """
-    Optional TEAM API key authentication - supports both public and private access
+    Require authentication for chat and commands endpoints
 
-    MODES:
-    1. PUBLIC MODE (No auth header):
-       - Returns None
-       - Used for public Telegram bot
-       - No team isolation (platform:chat_id sessions)
+    AUTHENTICATION MODES:
+    1. TELEGRAM MODE (Telegram bot service):
+       - API key matches TELEGRAM_SERVICE_KEY environment variable
+       - Returns "telegram" string marker
+       - Used ONLY for the integrated Telegram bot service
 
-    2. PRIVATE MODE (Auth header provided):
+    2. TEAM MODE (External teams):
+       - API key validated against database
        - Returns APIKey object
-       - Used for authenticated teams
-       - Team isolation enforced (platform:team_id:chat_id sessions)
-
-    AUTHENTICATION:
-    - If auth header provided: Validates against database
-    - If no auth header: Returns None (public access allowed)
-    - If invalid auth header: Raises 403 error
-
-    USAGE:
-    - Used by: Modular /v1/chat endpoint
-    - Returns: APIKey object (private) OR None (public)
-
-    ERROR RESPONSES:
-    - 403: Invalid API key (only if auth header provided but invalid)
-    - No 401 error (public access allowed)
+       - Used for authenticated external teams
 
     SECURITY:
-    - Public access only for Telegram bot (no team isolation)
-    - Private access enforces team isolation via team_id
-    - Invalid keys are rejected (no fallback to public)
+    - NO unauthenticated access allowed
+    - Telegram bot must use TELEGRAM_SERVICE_KEY
+    - External teams must use their team API keys
+    - Super admins can distinguish Telegram traffic from external team traffic in logs
+
+    USAGE:
+    - Used by: /v1/chat and /v1/commands endpoints
+    - Returns: "telegram" (Telegram bot) OR APIKey object (external teams)
+
+    ERROR RESPONSES:
+    - 401: No authorization header provided
+    - 403: Invalid API key (neither Telegram service key nor team key)
+
+    WHY THIS CHANGE:
+    - Previous optional authentication allowed unauthenticated access
+    - Unauthorized users could pretend to be Telegram bot traffic
+    - Super admins couldn't track who was using the API
+    - This fix ensures ALL traffic is authenticated and traceable
     """
     if not authorization:
-        # Public access (Telegram bot)
-        logger.debug("Public access (no authentication)")
-        return None
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please provide an API key in the Authorization header.",
+        )
 
-    # Private access - validate API key
+    provided_key = authorization.credentials
+
+    # Check if it's the Telegram bot service key
+    if provided_key == settings.TELEGRAM_SERVICE_KEY:
+        logger.info("[TELEGRAM] Bot service access granted")
+        return "telegram"
+
+    # Check if it's a valid team API key
     db = get_db_session()
     try:
-        api_key = APIKeyManager.validate_api_key(db, authorization.credentials)
+        api_key = APIKeyManager.validate_api_key(db, provided_key)
 
         if not api_key:
+            logger.warning(f"Invalid API key attempted: {provided_key[:12]}...")
             raise HTTPException(
-                status_code=403,
-                detail="Invalid API key"
+                status_code=403, detail="Invalid API key. Please check your credentials."
             )
 
-        logger.debug(f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})")
+        logger.info(
+            f"[TEAM] API access granted to: {api_key.key_prefix} (Team: {api_key.team.platform_name})"
+        )
         return api_key
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error validating team API key: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail="Error validating API key"
-        )
+        logger.error(f"Error validating API key: {e}")
+        raise HTTPException(status_code=500, detail="Error validating API key") from e

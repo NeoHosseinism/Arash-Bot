@@ -1,13 +1,14 @@
 """
 Command processor with platform-aware access control
 """
-from typing import List, Tuple, Optional
-import logging
 
+import logging
+from typing import List, Optional, Tuple
+
+from app.core.constants import COMMAND_DESCRIPTIONS, MESSAGES_FA
+from app.core.name_mapping import get_friendly_model_name
 from app.models.session import ChatSession
 from app.services.platform_manager import platform_manager
-from app.core.constants import MESSAGES_FA, COMMAND_DESCRIPTIONS
-from app.core.name_mapping import get_friendly_model_name
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +66,7 @@ class CommandProcessor:
             allowed = platform_manager.get_allowed_commands(session.platform)
             commands_list = "\n".join([f"• /{c}" for c in allowed])
             return MESSAGES_FA["command_not_available_platform"].format(
-                command=command,
-                platform=session.platform.title(),
-                commands=commands_list
+                command=command, platform=session.platform.title(), commands=commands_list
             )
 
         # Execute command
@@ -93,8 +92,7 @@ class CommandProcessor:
             return welcome
         else:
             return MESSAGES_FA["welcome_telegram"].format(
-                model=friendly_model,  # ✓ Show friendly name
-                rate_limit=config.rate_limit
+                model=friendly_model, rate_limit=config.rate_limit  # ✓ Show friendly name
             )
 
     async def handle_help(self, session: ChatSession, args: List[str]) -> str:
@@ -115,20 +113,20 @@ class CommandProcessor:
 
         help_text += "\n📊 **اطلاعات پلتفرم:**\n"
         if session.platform == "internal":
-            help_text += f"• پلتفرم: داخلی (خصوصی)\n"
-            help_text += f"• تغییر مدل: ✅ فعال\n"
+            help_text += "• پلتفرم: داخلی (خصوصی)\n"
+            help_text += "• تغییر مدل: ✅ فعال\n"
             help_text += f"• مدل فعلی: {friendly_model}\n"  # ✓ Show friendly name
             help_text += f"• مدل‌های موجود: {len(config.available_models)}\n"
             help_text += f"• محدودیت سرعت: {config.rate_limit} پیام/دقیقه\n"
             help_text += f"• حداکثر تاریخچه: {config.max_history} پیام\n"
         else:
-            help_text += f"• پلتفرم: تلگرام (عمومی)\n"
-            help_text += f"• تغییر مدل: ✅ فعال\n"
+            help_text += "• پلتفرم: تلگرام (عمومی)\n"
+            help_text += "• تغییر مدل: ✅ فعال\n"
             help_text += f"• مدل فعلی: {friendly_model}\n"  # ✓ Show friendly name
             help_text += f"• مدل‌های موجود: {len(config.available_models)}\n"
             help_text += f"• محدودیت سرعت: {config.rate_limit} پیام/دقیقه\n"
             help_text += f"• حداکثر تاریخچه: {config.max_history} پیام\n"
-            help_text += f"\n💡 از /model برای تغییر مدل استفاده کنید"
+            help_text += "\n💡 از /model برای تغییر مدل استفاده کنید"
 
         return help_text
 
@@ -165,7 +163,7 @@ class CommandProcessor:
             current_friendly = session.current_model_friendly
 
             models_text = f"**مدل فعلی:** {current_friendly}\n\n"  # ✓ Friendly name
-            models_text += f"**مدل‌های موجود:**\n"
+            models_text += "**مدل‌های موجود:**\n"
 
             for model in friendly_models:  # ✓ All friendly names
                 if model == current_friendly:
@@ -173,7 +171,7 @@ class CommandProcessor:
                 else:
                     models_text += f"• {model}\n"
 
-            models_text += f"\n💡 **دستورات آماده (کپی کنید):**\n"
+            models_text += "\n💡 **دستورات آماده (کپی کنید):**\n"
 
             # Add copiable commands based on platform
             if session.platform == "telegram":
@@ -200,10 +198,10 @@ class CommandProcessor:
             # Invalid model - show available friendly names with copiable commands
             friendly_models = platform_manager.get_available_models_friendly(session.platform)
             error_text = MESSAGES_FA["model_invalid"].format(model=model_input) + "\n\n"
-            error_text += f"**مدل‌های موجود:**\n"
+            error_text += "**مدل‌های موجود:**\n"
             error_text += "\n".join([f"• {m}" for m in friendly_models])  # ✓ Friendly names
 
-            error_text += f"\n\n💡 **دستورات آماده (کپی کنید):**\n"
+            error_text += "\n\n💡 **دستورات آماده (کپی کنید):**\n"
             if session.platform == "telegram":
                 error_text += "• /model gemini\n• /model deepseek\n• /model mini\n• /model gemma"
             else:
@@ -218,7 +216,9 @@ class CommandProcessor:
 
     async def handle_models(self, session: ChatSession, args: List[str]) -> str:
         """Handle /models command - shows all as friendly names"""
-        friendly_models = platform_manager.get_available_models_friendly(session.platform)  # ✓ Get friendly names
+        friendly_models = platform_manager.get_available_models_friendly(
+            session.platform
+        )  # ✓ Get friendly names
         current_friendly = session.current_model_friendly
 
         if session.platform == "telegram":
@@ -232,7 +232,7 @@ class CommandProcessor:
             else:
                 models_text += f"• {model}\n"
 
-        models_text += f"\n💡 **دستورات آماده (کپی کنید):**\n"
+        models_text += "\n💡 **دستورات آماده (کپی کنید):**\n"
 
         # Add copiable commands based on platform
         if session.platform == "telegram":
