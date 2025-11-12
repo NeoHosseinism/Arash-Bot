@@ -483,3 +483,51 @@ class TestCommandProcessor:
 
         assert response is not None
         assert "خطا" in response  # Persian for "error"
+
+    @pytest.mark.asyncio
+    @patch("app.services.command_processor.platform_manager")
+    async def test_process_empty_command(self, mock_platform_manager, command_processor, telegram_session):
+        """Test processing empty command (line 62 coverage)"""
+        mock_platform_manager.get_allowed_commands.return_value = ["start", "help"]
+
+        # Send just the slash with no command
+        response = await command_processor.process_command(telegram_session, "/")
+
+        assert response is not None
+        assert len(response) > 0  # Should return unknown command message
+
+    @pytest.mark.asyncio
+    @patch("app.services.command_processor.platform_manager")
+    async def test_model_without_args_internal(self, mock_platform_manager, command_processor, internal_session):
+        """Test /model command without arguments on internal platform (lines 183-187 coverage)"""
+        mock_platform_manager.get_available_models_friendly.return_value = [
+            "Claude Sonnet 4",
+            "GPT-5",
+            "GPT-4.1",
+            "GPT-4o Mini",
+        ]
+
+        response = await command_processor.handle_model(internal_session, [])
+
+        assert response is not None
+        assert "Claude" in response or "claude" in response  # Should show models
+        # Should show internal platform model suggestions (lines 183-187)
+        assert "claude" in response.lower() or "gpt5" in response.lower()
+
+    @pytest.mark.asyncio
+    @patch("app.services.command_processor.platform_manager")
+    async def test_model_switch_invalid_internal(self, mock_platform_manager, command_processor, internal_session):
+        """Test switching to invalid model on internal platform (line 208 coverage)"""
+        mock_platform_manager.resolve_model_name.return_value = None
+        mock_platform_manager.get_available_models_friendly.return_value = [
+            "Claude Sonnet 4",
+            "GPT-5",
+        ]
+
+        response = await command_processor.handle_model(internal_session, ["invalid_model"])
+
+        assert response is not None
+        assert "invalid_model" in response.lower()  # Should mention invalid model
+        # Should show internal platform quick commands (line 208)
+        assert "claude" in response.lower() or "gpt" in response.lower()
+        assert internal_session.current_model == "anthropic/claude-sonnet-4-5"  # Should not change

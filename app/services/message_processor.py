@@ -67,8 +67,7 @@ class MessageProcessor:
             else:
                 response_text = await self._handle_chat(session, message)
 
-            # Update session
-            session.message_count += 1
+            # Update session activity (message_count is already incremented by add_message)
             session.update_activity()
 
             # Prepare response
@@ -78,7 +77,7 @@ class MessageProcessor:
                 data={
                     "session_id": session.session_id,
                     "platform": session.platform,
-                    "model": session.current_model,
+                    "model": session.current_model_friendly,
                     "message_count": session.message_count,
                 },
             )
@@ -98,8 +97,6 @@ class MessageProcessor:
         api_key_id: Optional[int],
         api_key_prefix: Optional[str],
         user_id: str,
-        conversation_id: str,
-        message_id: str,
         text: str,
     ) -> BotResponse:
         """
@@ -110,41 +107,35 @@ class MessageProcessor:
             team_id: Team ID (None for Telegram, required for authenticated platforms)
             api_key_id: API key ID (None for Telegram)
             api_key_prefix: API key prefix (None for Telegram)
-            user_id: User ID
-            conversation_id: Conversation ID (auto-generated if not provided by client)
-            message_id: Message ID (auto-generated)
+            user_id: User ID (client-provided)
             text: Message text
 
         Returns:
-            BotResponse with conversation_id for continuation
+            BotResponse with message_count showing total messages
         """
         start_time = time.time()
         db = get_db_session()
 
         try:
-            # Get or create session with platform_name
-            # This will raise PermissionError if API key doesn't own the conversation_id
+            # Get or create session (loads message history from DB)
             try:
                 session = session_manager.get_or_create_session(
-                    platform=platform_name,  # Now using platform_name instead of "internal"
+                    platform=platform_name,
                     user_id=user_id,
-                    conversation_id=conversation_id,
                     team_id=team_id,
                     api_key_id=api_key_id,
                     api_key_prefix=api_key_prefix,
                 )
             except PermissionError:
-                # API key doesn't own this conversation - return 403 error
+                # API key doesn't own this user's conversation
                 return BotResponse(
                     success=False,
                     error="access_denied",
                     response="❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.\n\nAccess denied. This conversation belongs to a different API key.",
-                    conversation_id=conversation_id,
                 )
 
-            # Check rate limit (use platform_name for rate limiting)
+            # Check rate limit
             if not session_manager.check_rate_limit(platform_name, user_id):
-                # Get rate limit for this platform from session config
                 rate_limit = session.platform_config.get("rate_limit", 60)
 
                 # Log rate limit failure (only for authenticated teams)
@@ -154,7 +145,7 @@ class MessageProcessor:
                         db=db,
                         api_key_id=api_key_id,
                         team_id=team_id,
-                        session_id=conversation_id,
+                        session_id=session.session_id,
                         platform=platform_name,
                         model_used=session.current_model,
                         success=False,
@@ -166,18 +157,32 @@ class MessageProcessor:
                     success=False,
                     error="rate_limit_exceeded",
                     response=f"⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: {rate_limit} پیام در دقیقه",
-                    conversation_id=conversation_id,
                 )
 
             # Process command or message
             if text and command_processor.is_command(text):
                 response_text = await self._handle_command(session, text)
             else:
-                response_text = await self._handle_chat_simple(session, text)
+                response_text = await self._handle_chat_simple(session, text, db)
 
-            # Update session
-            session.message_count += 1
+            # Update session activity
             session.update_activity()
+
+            # Reload message_count from DB (after messages were saved)
+            from sqlalchemy import func
+
+            from app.models.database import Message
+
+            session.message_count = (
+                db.query(func.count(Message.id))
+                .filter(
+                    Message.platform == platform_name,
+                    Message.user_id == user_id,
+                    Message.team_id == team_id if team_id else Message.team_id.is_(None),
+                )
+                .scalar()
+                or 0
+            )
 
             # Log successful usage (only for authenticated teams)
             if team_id and api_key_id:
@@ -186,19 +191,18 @@ class MessageProcessor:
                     db=db,
                     api_key_id=api_key_id,
                     team_id=team_id,
-                    session_id=conversation_id,
+                    session_id=session.session_id,
                     platform=platform_name,
                     model_used=session.current_model,
                     success=True,
                     response_time_ms=response_time_ms,
                 )
 
-            # Return simplified response with conversation_id
+            # Return response
             return BotResponse(
                 success=True,
                 response=response_text,
-                conversation_id=conversation_id,  # Only conversation_id needed for continuation
-                model=session.current_model,
+                model=session.current_model_friendly,
                 message_count=session.message_count,
             )
 
@@ -209,22 +213,18 @@ class MessageProcessor:
             if team_id and api_key_id:
                 response_time_ms = int((time.time() - start_time) * 1000)
                 try:
-                    # Get model from session if available
-                    session = session_manager.get_or_create_session(
-                        platform=platform_name,
-                        user_id=user_id,
-                        conversation_id=conversation_id,
-                        team_id=team_id,
-                        api_key_id=api_key_id,
-                        api_key_prefix=api_key_prefix,
-                    )
+                    # Get session for model info
+                    session = session_manager.get_session(platform_name, user_id, team_id)
+                    model_used = session.current_model if session else "unknown"
+                    session_id = session.session_id if session else "unknown"
+
                     UsageTracker.log_usage(
                         db=db,
                         api_key_id=api_key_id,
                         team_id=team_id,
-                        session_id=conversation_id,
+                        session_id=session_id,
                         platform=platform_name,
-                        model_used=session.current_model,
+                        model_used=model_used,
                         success=False,
                         response_time_ms=response_time_ms,
                         error_message=str(e),
@@ -236,11 +236,22 @@ class MessageProcessor:
                 success=False,
                 error="processing_error",
                 response="❌ متأسفم، خطایی در پردازش پیام شما رخ داد. لطفاً دوباره تلاش کنید.",
-                conversation_id=conversation_id,
             )
 
-    async def _handle_chat_simple(self, session: ChatSession, text: str) -> str:
-        """Handle chat message (simplified, text-only)"""
+    async def _handle_chat_simple(self, session: ChatSession, text: str, db) -> str:
+        """
+        Handle chat message (simplified, text-only) and persist to database.
+
+        Args:
+            session: Chat session with in-memory history
+            text: User message text
+            db: Database session for persisting messages
+
+        Returns:
+            AI response text
+        """
+        from app.models.database import Message
+
         try:
             # Get max history for platform
             max_history = platform_manager.get_max_history(session.platform)
@@ -255,15 +266,43 @@ class MessageProcessor:
                     files=[],  # No files in simplified version
                 )
 
-                # Update history
-                session.add_message("user", text)
-                session.add_message("assistant", response["Response"])
+                ai_response = response["Response"]
 
-                # Trim history if exceeds platform limit
+                # Add to in-memory history
+                session.add_message("user", text)
+                session.add_message("assistant", ai_response)
+
+                # Persist to database
+                try:
+                    user_msg = Message(
+                        team_id=session.team_id,
+                        api_key_id=session.api_key_id,
+                        platform=session.platform,
+                        user_id=session.user_id,
+                        role="user",
+                        content=text,
+                    )
+                    assistant_msg = Message(
+                        team_id=session.team_id,
+                        api_key_id=session.api_key_id,
+                        platform=session.platform,
+                        user_id=session.user_id,
+                        role="assistant",
+                        content=ai_response,
+                    )
+                    db.add(user_msg)
+                    db.add(assistant_msg)
+                    db.commit()
+                except Exception as db_error:
+                    logger.error(f"Error persisting messages to DB: {db_error}")
+                    db.rollback()
+                    # Continue anyway - in-memory history is intact
+
+                # Trim in-memory history if exceeds platform limit
                 if len(session.history) > max_history * 2:
                     session.history = session.history[-max_history * 2 :]
 
-                return response["Response"]
+                return ai_response
 
             except Exception as ai_service_error:
                 logger.error(f"AI service error: {ai_service_error}")

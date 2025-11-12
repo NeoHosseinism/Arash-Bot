@@ -58,17 +58,15 @@ class APIKeyManager:
     def create_team(
         db: Session,
         name: str,
-        description: Optional[str] = None,
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
     ) -> Team:
         """
-        Create a new team.
+        Create a new team (legacy method - prefer create_team_with_key).
 
         Args:
             db: Database session
-            name: Team name
-            description: Team description
+            name: Team name (will be used as both name and platform_name)
             monthly_quota: Monthly request quota (None = unlimited)
             daily_quota: Daily request quota (None = unlimited)
 
@@ -77,7 +75,7 @@ class APIKeyManager:
         """
         team = Team(
             name=name,
-            description=description,
+            platform_name=name,  # Use name as platform_name
             monthly_quota=monthly_quota,
             daily_quota=daily_quota,
         )

@@ -305,15 +305,38 @@ def get_db_session():
     return next(db.get_session())
 
 
-# Future: Chat history models would go here
-# Currently NOT implemented as chat history is handled by AI service
-# When implementing end-to-end chat history, add models here:
-#
-# class ChatHistory(Base):
-#     __tablename__ = "chat_history"
-#     id = Column(Integer, primary_key=True)
-#     session_id = Column(String(64), index=True)
-#     role = Column(String(20))  # "user" or "assistant"
-#     content = Column(Text)
-#     timestamp = Column(DateTime, default=datetime.utcnow)
-#     ...additional fields...
+class Message(Base):
+    """
+    Message model for storing conversation history.
+
+    Stores all messages (user and assistant) for each user on each platform/team.
+    Messages are never deleted - /clear command only marks them as "cleared"
+    so they're excluded from AI context but kept for analytics.
+    """
+
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    # Isolation fields
+    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)  # None for Telegram
+    api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=True, index=True)  # None for Telegram
+    platform = Column(String(50), nullable=False, index=True)  # "telegram", "Internal-BI", etc.
+    user_id = Column(String(255), nullable=False, index=True)  # User identifier from client
+
+    # Message content
+    role = Column(String(20), nullable=False)  # "user" or "assistant"
+    content = Column(Text, nullable=False)
+
+    # Clear tracking
+    cleared_at = Column(DateTime, nullable=True)  # Set when /clear is called
+
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+    # Relationships
+    team = relationship("Team", foreign_keys=[team_id])
+    api_key = relationship("APIKey", foreign_keys=[api_key_id])
+
+    def __repr__(self):
+        return f"<Message(id={self.id}, platform='{self.platform}', role='{self.role}')>"

@@ -242,6 +242,29 @@ class TestCheckQuota:
         assert result["current_usage"] == 20000
         assert result["quota_limit"] == 20000
 
+    @patch("app.services.usage_tracker.datetime")
+    def test_check_monthly_quota_december_year_rollover(self, mock_datetime, mock_db, mock_api_key):
+        """Test monthly quota reset time calculation in December (year rollover)"""
+        # Mock datetime to return December
+        december_date = datetime(2024, 12, 15, 10, 30, 0)
+        mock_datetime.utcnow.return_value = december_date
+        mock_datetime.side_effect = lambda *args, **kwargs: datetime(*args, **kwargs)
+
+        # Mock current usage count
+        mock_query = MagicMock()
+        mock_db.query.return_value = mock_query
+        mock_query.filter.return_value = mock_query
+        mock_query.scalar.return_value = 5000
+
+        result = UsageTracker.check_quota(mock_db, mock_api_key, period="monthly")
+
+        assert result["allowed"] is True
+        assert result["current_usage"] == 5000
+        # Verify reset_time is in January of next year
+        assert result["reset_time"] is not None
+        reset_time_str = result["reset_time"].isoformat() if hasattr(result["reset_time"], 'isoformat') else str(result["reset_time"])
+        assert "2025-01" in reset_time_str
+
     def test_check_quota_invalid_period(self, mock_db, mock_api_key):
         """Test invalid period raises ValueError"""
         with pytest.raises(ValueError) as exc_info:

@@ -56,14 +56,31 @@ router = APIRouter()
             "content": {
                 "application/json": {
                     "examples": {
-                        "successful_response": {
-                            "summary": "Successful chat response",
+                        "first_message": {
+                            "summary": "First message in conversation",
                             "value": {
                                 "success": True,
                                 "response": "سلام! چطور می‌تونم کمکتون کنم؟",
-                                "conversation_id": "conv_67890",
                                 "model": "Gemini 2.0 Flash",
-                                "message_count": 1,
+                                "message_count": 2,
+                            },
+                        },
+                        "continuing_conversation": {
+                            "summary": "Continuing an existing conversation",
+                            "value": {
+                                "success": True,
+                                "response": "البته! فرآیند خرید خیلی ساده است. ابتدا محصول مورد نظر را انتخاب کنید...",
+                                "model": "DeepSeek Chat V3",
+                                "message_count": 12,
+                            },
+                        },
+                        "after_clear": {
+                            "summary": "After using /clear command",
+                            "value": {
+                                "success": True,
+                                "response": "تاریخچه گفتگو پاک شد. چطور می‌تونم کمکتون کنم؟",
+                                "model": "GPT-4o Mini",
+                                "message_count": 26,
                             },
                         },
                         "rate_limit_exceeded": {
@@ -80,6 +97,14 @@ router = APIRouter()
                                 "success": False,
                                 "error": "ai_service_unavailable",
                                 "response": "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست. لطفاً چند لحظه دیگر دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.",
+                            },
+                        },
+                        "access_denied": {
+                            "summary": "API key trying to access another key's user",
+                            "value": {
+                                "success": False,
+                                "error": "access_denied",
+                                "response": "❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.",
                             },
                         },
                     }
@@ -135,10 +160,10 @@ async def chat(
     - Platform auto-detected from team.platform_name
     - Session keys: platform_name:team_id:conversation_id (team isolation enforced)
 
-    ## Conversation ID Logic
-    - **No conversation_id provided**: NEW conversation (auto-generated UUID)
-    - **conversation_id provided**: CONTINUATION of existing conversation
-    - Conversation IDs uniquely identify each multi-message dialogue
+    ## Single Conversation Per User
+    - Each user has ONE conversation per platform/team
+    - No conversation_id needed - sessions are based on user_id
+    - /clear command excludes previous messages from AI context but keeps in database
 
     ## Examples
 
@@ -149,8 +174,7 @@ async def chat(
     ```json
     {
       "user_id": "telegram_user_12345",
-      "text": "سلام، چطوری؟",
-      "conversation_id": "existing_conv_id_or_null_for_new"
+      "text": "سلام، چطوری؟"
     }
     ```
 
@@ -161,11 +185,10 @@ async def chat(
     ```json
     {
       "user_id": "user123",
-      "text": "چطور می‌تونم مدل رو عوض کنم؟",
-      "conversation_id": null
+      "text": "سلام، چطوری؟"
     }
     ```
-    **Response includes conversation_id** - use it for continuing the conversation.
+    **Each user has one continuous conversation** - no conversation_id needed.
 
     ## Security
     - Telegram traffic: Authenticated and logged as [TELEGRAM]
@@ -173,15 +196,6 @@ async def chat(
     - Unauthorized traffic: Blocked with 401/403
     - Super admins can now track ALL API usage
     """
-    import uuid
-
-    # Auto-generate conversation_id if not provided (NEW conversation)
-    # If conversation_id is provided, it's a CONTINUATION of existing conversation
-    conversation_id = message.conversation_id or str(uuid.uuid4())
-
-    # Auto-generate message_id internally
-    message_id = str(uuid.uuid4())
-
     # Determine mode based on authentication type
     if auth == "telegram":
         # TELEGRAM MODE: Telegram bot service
@@ -190,10 +204,7 @@ async def chat(
         api_key_id = None
         api_key_prefix = None
 
-        logger.info(
-            f"[TELEGRAM] bot_request user_id={message.user_id} conversation_id={conversation_id} "
-            f"new_conversation={message.conversation_id is None}"
-        )
+        logger.info(f"[TELEGRAM] bot_request user_id={message.user_id}")
     else:
         # TEAM MODE: Authenticated external team
         platform_name = auth.team.platform_name
@@ -202,9 +213,7 @@ async def chat(
         api_key_prefix = auth.key_prefix
 
         logger.info(
-            f"[TEAM] chat_request platform={platform_name} team_id={team_id} "
-            f"user_id={message.user_id} conversation_id={conversation_id} "
-            f"new_conversation={message.conversation_id is None}"
+            f"[TEAM] chat_request platform={platform_name} team_id={team_id} user_id={message.user_id}"
         )
 
     # Process message (handles both modes)
@@ -214,8 +223,6 @@ async def chat(
         api_key_id=api_key_id,
         api_key_prefix=api_key_prefix,
         user_id=message.user_id,
-        conversation_id=conversation_id,
-        message_id=message_id,
         text=message.text,
     )
 

@@ -6,9 +6,44 @@ import sys
 from pathlib import Path
 
 import pytest
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, sessionmaker
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from app.models.database import Base, Team
+
+
+@pytest.fixture(scope="function")
+def test_db():
+    """Create a test database session"""
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+
+    yield session
+
+    session.close()
+    Base.metadata.drop_all(engine)
+
+
+@pytest.fixture
+def test_team(test_db: Session):
+    """Create a test team"""
+    team = Team(
+        name="Test Team",
+        platform_name="Test-Platform",
+        monthly_quota=100000,
+        daily_quota=5000,
+        is_active=True,
+    )
+    test_db.add(team)
+    test_db.commit()
+    test_db.refresh(team)
+    return team
 
 
 @pytest.fixture

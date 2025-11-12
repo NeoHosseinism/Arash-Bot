@@ -409,6 +409,26 @@ class TestChatSession:
         assert session.team_id is None
         assert session.api_key_id is None
 
+    def test_session_get_uptime_seconds(self):
+        """Test getting session uptime in seconds"""
+        import time
+
+        session = ChatSession(
+            session_id="uptime_test",
+            platform="internal",
+            platform_config={"type": "private", "model": "gpt-4"},
+            user_id="user1",
+            conversation_id="chat1",
+            current_model="gpt-4",
+        )
+
+        # Wait a small amount
+        time.sleep(0.1)
+
+        uptime = session.get_uptime_seconds()
+        assert uptime >= 0.1
+        assert uptime < 1.0  # Should be less than 1 second
+
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
