@@ -49,7 +49,7 @@ class IncomingMessage(BaseModel):
     - Removed type (text-only in this version)
     - Removed attachments (text-only in this version)
     - Removed metadata (not needed)
-    - Made chat_id optional (auto-generated if not provided for new conversations)
+    - Made conversation_id optional (auto-generated if not provided for new conversations)
     """
     model_config = ConfigDict(
         json_schema_extra={
@@ -57,7 +57,7 @@ class IncomingMessage(BaseModel):
                 {
                     "user_id": "user_12345",
                     "text": "سلام، چطور می‌تونم مدل رو عوض کنم؟",
-                    "chat_id": "chat_67890"
+                    "conversation_id": "conv_67890"
                 },
                 {
                     "user_id": "telegram_987654",
@@ -69,14 +69,14 @@ class IncomingMessage(BaseModel):
 
     user_id: str = Field(..., description="Unique user identifier", examples=["user_12345", "telegram_987654"])
     text: str = Field(..., description="Message text content", examples=["سلام!", "Hello, how can I help?"])
-    chat_id: Optional[str] = Field(None, description="Chat ID for continuing conversation (auto-generated if not provided)", examples=["chat_67890", None])
+    conversation_id: Optional[str] = Field(None, description="Conversation ID for continuing conversation (auto-generated if not provided)", examples=["conv_67890", None])
 
 
 class BotResponse(BaseModel):
     """
     Bot response model for chat endpoint.
 
-    Use chat_id to continue conversations. Each API key can only access
+    Use conversation_id to continue conversations. Each API key can only access
     conversations started with that specific API key.
     """
     model_config = ConfigDict(
@@ -85,7 +85,7 @@ class BotResponse(BaseModel):
                 {
                     "success": True,
                     "response": "برای تغییر مدل، از دستور /model استفاده کنید. مدل‌های موجود: Gemini Flash، DeepSeek v3، GPT-5",
-                    "chat_id": "chat_67890",
+                    "conversation_id": "conv_67890",
                     "model": "Gemini 2.0 Flash",
                     "message_count": 3
                 },
@@ -100,7 +100,7 @@ class BotResponse(BaseModel):
 
     success: bool = Field(..., examples=[True, False])
     response: Optional[str] = Field(None, examples=["سلام! چطور می‌تونم کمکتون کنم؟"])
-    chat_id: Optional[str] = Field(None, examples=["chat_67890"])
+    conversation_id: Optional[str] = Field(None, examples=["conv_67890"])
     model: Optional[str] = Field(None, examples=["Gemini 2.0 Flash", "DeepSeek v3", "GPT-5 Chat"])
     message_count: Optional[int] = Field(None, examples=[1, 5, 10])
     error: Optional[str] = Field(None, examples=["rate_limit_exceeded", "ai_service_unavailable"])
@@ -138,7 +138,7 @@ class SessionStatusResponse(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "chat_id": "chat_67890",
+                    "conversation_id": "conv_67890",
                     "platform": "Internal-BI",
                     "platform_type": "private",
                     "current_model": "Gemini 2.0 Flash",
@@ -153,7 +153,7 @@ class SessionStatusResponse(BaseModel):
         }
     )
 
-    chat_id: str = Field(..., examples=["chat_67890"])
+    conversation_id: str = Field(..., examples=["conv_67890"])
     platform: str = Field(..., examples=["telegram", "Internal-BI"])
     platform_type: str = Field(..., examples=["public", "private"])
     current_model: str = Field(..., examples=["Gemini 2.0 Flash"])
@@ -175,7 +175,7 @@ class SessionListResponse(BaseModel):
                     "authenticated": True,
                     "sessions": [
                         {
-                            "chat_id": "chat_67890",
+                            "conversation_id": "conv_67890",
                             "platform": "Internal-BI",
                             "message_count": 5,
                             "last_activity": "2025-01-15T14:30:00"

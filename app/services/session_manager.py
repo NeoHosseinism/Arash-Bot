@@ -23,25 +23,25 @@ class SessionManager:
         self.sessions: Dict[str, ChatSession] = {}
         self.rate_limits: Dict[str, List[float]] = defaultdict(list)
     
-    def get_session_key(self, platform: str, chat_id: str, team_id: int | None = None) -> str:
+    def get_session_key(self, platform: str, conversation_id: str, team_id: int | None = None) -> str:
         """
         Generate unique session key with team isolation
 
         SECURITY: Includes team_id to prevent session collision between teams.
-        If Team A and Team B both use chat_id="user123", they get DIFFERENT sessions.
+        If Team A and Team B both use conversation_id="user123", they get DIFFERENT sessions.
 
-        For Telegram bot (no team_id), uses platform:chat_id
-        For internal API (has team_id), uses platform:team_id:chat_id
+        For Telegram bot (no team_id), uses platform:conversation_id
+        For internal API (has team_id), uses platform:team_id:conversation_id
         """
         if team_id is not None:
-            return f"{platform}:{team_id}:{chat_id}"
-        return f"{platform}:{chat_id}"
+            return f"{platform}:{team_id}:{conversation_id}"
+        return f"{platform}:{conversation_id}"
     
     def get_or_create_session(
         self,
         platform: str,
         user_id: str,
-        chat_id: str,
+        conversation_id: str,
         team_id: int | None = None,
         api_key_id: int | None = None,
         api_key_prefix: str | None = None
@@ -52,7 +52,7 @@ class SessionManager:
         SECURITY: API key isolation - each API key can only access sessions it created
         """
         # SECURITY: Include team_id in key to prevent session collision between teams
-        key = self.get_session_key(platform, chat_id, team_id)
+        key = self.get_session_key(platform, conversation_id, team_id)
 
         if key not in self.sessions:
             # Create new session
@@ -63,7 +63,7 @@ class SessionManager:
                 platform=platform,
                 platform_config=config.dict(),
                 user_id=user_id,
-                chat_id=chat_id,
+                conversation_id=conversation_id,
                 current_model=config.model,
                 is_admin=platform_manager.is_admin(platform, user_id),
                 # Team isolation - CRITICAL for security
@@ -83,11 +83,11 @@ class SessionManager:
             # SECURITY: API key isolation - verify this API key owns this session
             if api_key_id is not None and existing_session.api_key_id != api_key_id:
                 logger.warning(
-                    f"[SECURITY] API key {api_key_prefix} attempted to access chat_id={chat_id} "
+                    f"[SECURITY] API key {api_key_prefix} attempted to access conversation_id={conversation_id} "
                     f"owned by API key ID {existing_session.api_key_id}"
                 )
                 raise PermissionError(
-                    f"Access denied. This chat belongs to a different API key."
+                    f"Access denied. This conversation belongs to a different API key."
                 )
 
             # Update last activity
@@ -95,9 +95,9 @@ class SessionManager:
 
         return self.sessions[key]
     
-    def get_session(self, platform: str, chat_id: str, team_id: int | None = None) -> ChatSession:
-        """Get existing session by platform, chat_id, and team_id"""
-        key = self.get_session_key(platform, chat_id, team_id)
+    def get_session(self, platform: str, conversation_id: str, team_id: int | None = None) -> ChatSession:
+        """Get existing session by platform, conversation_id, and team_id"""
+        key = self.get_session_key(platform, conversation_id, team_id)
         return self.sessions.get(key)
 
     def get_session_by_id(self, session_id: str) -> ChatSession | None:
@@ -107,9 +107,9 @@ class SessionManager:
                 return session
         return None
 
-    def delete_session(self, platform: str, chat_id: str, team_id: int | None = None) -> bool:
+    def delete_session(self, platform: str, conversation_id: str, team_id: int | None = None) -> bool:
         """Delete a session"""
-        key = self.get_session_key(platform, chat_id, team_id)
+        key = self.get_session_key(platform, conversation_id, team_id)
         if key in self.sessions:
             del self.sessions[key]
             logger.info(f"Deleted session: {key}")

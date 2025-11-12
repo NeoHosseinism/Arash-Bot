@@ -35,7 +35,7 @@ class MessageProcessor:
             session = session_manager.get_or_create_session(
                 platform=message.platform,
                 user_id=message.user_id,
-                chat_id=message.chat_id,
+                conversation_id=message.conversation_id,
                 team_id=team_id,
                 api_key_id=api_key_id,
                 api_key_prefix=api_key_prefix
@@ -100,7 +100,7 @@ class MessageProcessor:
         api_key_id: Optional[int],
         api_key_prefix: Optional[str],
         user_id: str,
-        chat_id: str,
+        conversation_id: str,
         message_id: str,
         text: str,
     ) -> BotResponse:
@@ -113,35 +113,35 @@ class MessageProcessor:
             api_key_id: API key ID (None for Telegram)
             api_key_prefix: API key prefix (None for Telegram)
             user_id: User ID
-            chat_id: Chat ID (auto-generated if not provided by client)
+            conversation_id: Conversation ID (auto-generated if not provided by client)
             message_id: Message ID (auto-generated)
             text: Message text
 
         Returns:
-            BotResponse with chat_id for continuation
+            BotResponse with conversation_id for continuation
         """
         start_time = time.time()
         db = get_db_session()
 
         try:
             # Get or create session with platform_name
-            # This will raise PermissionError if API key doesn't own the chat_id
+            # This will raise PermissionError if API key doesn't own the conversation_id
             try:
                 session = session_manager.get_or_create_session(
                     platform=platform_name,  # Now using platform_name instead of "internal"
                     user_id=user_id,
-                    chat_id=chat_id,
+                    conversation_id=conversation_id,
                     team_id=team_id,
                     api_key_id=api_key_id,
                     api_key_prefix=api_key_prefix
                 )
             except PermissionError as e:
-                # API key doesn't own this chat - return 403 error
+                # API key doesn't own this conversation - return 403 error
                 return BotResponse(
                     success=False,
                     error="access_denied",
-                    response=f"❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.\n\nAccess denied. This chat belongs to a different API key.",
-                    chat_id=chat_id,
+                    response=f"❌ دسترسی رد شد. این مکالمه متعلق به API key دیگری است.\n\nAccess denied. This conversation belongs to a different API key.",
+                    conversation_id=conversation_id,
                 )
 
             # Check rate limit (use platform_name for rate limiting)
@@ -156,7 +156,7 @@ class MessageProcessor:
                         db=db,
                         api_key_id=api_key_id,
                         team_id=team_id,
-                        session_id=chat_id,
+                        session_id=conversation_id,
                         platform=platform_name,
                         model_used=session.current_model,
                         success=False,
@@ -168,7 +168,7 @@ class MessageProcessor:
                     success=False,
                     error="rate_limit_exceeded",
                     response=f"⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: {rate_limit} پیام در دقیقه",
-                    chat_id=chat_id,
+                    conversation_id=conversation_id,
                 )
 
             # Process command or message
@@ -188,18 +188,18 @@ class MessageProcessor:
                     db=db,
                     api_key_id=api_key_id,
                     team_id=team_id,
-                    session_id=chat_id,
+                    session_id=conversation_id,
                     platform=platform_name,
                     model_used=session.current_model,
                     success=True,
                     response_time_ms=response_time_ms,
                 )
 
-            # Return simplified response with chat_id (NO session_id)
+            # Return simplified response with conversation_id
             return BotResponse(
                 success=True,
                 response=response_text,
-                chat_id=chat_id,  # Only chat_id needed for continuation
+                conversation_id=conversation_id,  # Only conversation_id needed for continuation
                 model=session.current_model,
                 message_count=session.message_count,
             )
@@ -215,7 +215,7 @@ class MessageProcessor:
                     session = session_manager.get_or_create_session(
                         platform=platform_name,
                         user_id=user_id,
-                        chat_id=chat_id,
+                        conversation_id=conversation_id,
                         team_id=team_id,
                         api_key_id=api_key_id,
                         api_key_prefix=api_key_prefix
@@ -224,7 +224,7 @@ class MessageProcessor:
                         db=db,
                         api_key_id=api_key_id,
                         team_id=team_id,
-                        session_id=chat_id,
+                        session_id=conversation_id,
                         platform=platform_name,
                         model_used=session.current_model,
                         success=False,
@@ -238,7 +238,7 @@ class MessageProcessor:
                 success=False,
                 error="processing_error",
                 response="❌ متأسفم، خطایی در پردازش پیام شما رخ داد. لطفاً دوباره تلاش کنید.",
-                chat_id=chat_id,
+                conversation_id=conversation_id,
             )
 
     async def _handle_chat_simple(self, session: ChatSession, text: str) -> str:

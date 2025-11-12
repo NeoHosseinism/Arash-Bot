@@ -13,7 +13,7 @@ class ChatSession(BaseModel):
     platform: str
     platform_config: Dict[str, Any]
     user_id: str
-    chat_id: str
+    conversation_id: str
     current_model: str
     history: List[Dict[str, str]] = Field(default_factory=list)
     context: Dict[str, Any] = Field(default_factory=dict)
