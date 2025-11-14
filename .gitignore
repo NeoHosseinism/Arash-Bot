@@ -71,3 +71,6 @@ htmlcov/
 *.tmp
 tmp/
 temp/
+
+# Migration backups
+*.poetry-backup
