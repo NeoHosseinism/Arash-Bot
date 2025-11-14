@@ -16,6 +16,7 @@
 8. [API Development](#api-development)
 9. [Code Quality](#code-quality)
 10. [Deployment](#deployment)
+11. [Architecture Decision Records](#architecture-decision-records)
 
 ---
 
@@ -514,3 +515,38 @@ Each environment (dev/stage/prod) has separate:
 ---
 
 **Last Updated:** January 2025 | **Version:** 1.1.0
+
+---
+
+## Architecture Decision Records
+
+### Overview
+
+We maintain Architecture Decision Records (ADRs) to document significant architectural and design decisions made throughout the project lifecycle.
+
+**Location:** [`docs/adr/`](docs/adr/)
+
+### Why ADRs?
+
+- **Historical Context:** Understand why decisions were made
+- **Knowledge Transfer:** Onboard new team members faster
+- **Avoid Repetition:** Don't revisit settled debates
+- **Track Evolution:** See how architecture evolved over time
+
+### Key Decisions
+
+| ADR | Title | Status | Date | Impact |
+|-----|-------|--------|------|--------|
+| [001](docs/adr/001-dependency-management-uv.md) | Migration from Poetry to uv | Accepted | 2025-01-14 | High |
+| [002](docs/adr/002-test-coverage-strategy.md) | Test Coverage Improvement Strategy | Accepted | 2025-01-14 | Medium |
+
+### How to Use
+
+- **Read ADRs:** Understand past decisions before proposing changes
+- **Create ADRs:** Document significant architectural choices
+- **Update ADRs:** Keep records current with implementation
+- **Reference ADRs:** Link to ADRs in code comments and PRs
+
+**Full documentation:** See [docs/adr/README.md](docs/adr/README.md)
+
+---
