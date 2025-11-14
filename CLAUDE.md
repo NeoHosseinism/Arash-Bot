@@ -33,7 +33,7 @@ Arash Bot is a multi-platform AI chatbot service with team-based access control,
 - PostgreSQL (teams, API keys, usage logs)
 - SQLAlchemy + Alembic (ORM and migrations)
 - Python Telegram Bot (Telegram integration)
-- Poetry (dependency management)
+- uv (ultra-fast dependency management)
 - Docker + Kubernetes (deployment)
 
 ---
@@ -194,7 +194,7 @@ Arash-Bot/
 │
 ├── Dockerfile                   # Multi-stage Docker build
 ├── Makefile                     # Development automation
-├── pyproject.toml               # Poetry dependencies
+├── pyproject.toml               # uv dependencies
 ├── pytest.ini                   # Pytest configuration
 └── README.md                    # Project documentation
 ```
@@ -206,7 +206,7 @@ Arash-Bot/
 ### Prerequisites
 
 - Python 3.11+
-- Poetry 1.8+
+- uv 0.8+
 - PostgreSQL 14+
 - Docker (for containerized deployment)
 
@@ -218,7 +218,7 @@ git clone <repo-url>
 cd Arash-Bot
 
 # 2. Install dependencies
-poetry install
+uv sync --all-extras
 
 # 3. Configure environment
 cp .env.example .env
@@ -292,14 +292,14 @@ API_PORT=3000
 make test
 
 # Run with coverage
-poetry run pytest --cov=app --cov-report=html
+uv run pytest --cov=app --cov-report=html
 
 # Run specific test file
-poetry run pytest tests/test_api.py -v
+uv run pytest tests/test_api.py -v
 
 # Run tests with markers
-poetry run pytest -m "not slow"  # Skip slow tests
-poetry run pytest -m "integration"  # Run only integration tests
+uv run pytest -m "not slow"  # Skip slow tests
+uv run pytest -m "integration"  # Run only integration tests
 ```
 
 ### Test Fixtures
@@ -436,10 +436,10 @@ make lint
 make format
 
 # Manual linting
-poetry run ruff check app/ tests/
+uv run ruff check app/ tests/
 
 # Manual formatting
-poetry run black app/ tests/
+uv run black app/ tests/
 ```
 
 ### Code Style Guidelines

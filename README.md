@@ -79,7 +79,7 @@ sequenceDiagram
 
 ```bash
 # 1. Install dependencies
-poetry install
+uv sync --all-extras
 
 # 2. Configure environment
 cp .env.example .env  # Edit: DB, AI_SERVICE_URL, tokens
