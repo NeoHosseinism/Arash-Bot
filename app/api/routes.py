@@ -62,7 +62,7 @@ router = APIRouter()
                                 "success": True,
                                 "response": "سلام! چطور می‌تونم کمکتون کنم؟",
                                 "model": "Gemini 2.0 Flash",
-                                "message_count": 2,
+                                "total_message_count": 2,
                             },
                         },
                         "continuing_conversation": {
@@ -71,7 +71,7 @@ router = APIRouter()
                                 "success": True,
                                 "response": "البته! فرآیند خرید خیلی ساده است. ابتدا محصول مورد نظر را انتخاب کنید...",
                                 "model": "DeepSeek Chat V3",
-                                "message_count": 12,
+                                "total_message_count": 12,
                             },
                         },
                         "after_clear": {
@@ -80,7 +80,7 @@ router = APIRouter()
                                 "success": True,
                                 "response": "تاریخچه گفتگو پاک شد. چطور می‌تونم کمکتون کنم؟",
                                 "model": "GPT-4o Mini",
-                                "message_count": 26,
+                                "total_message_count": 26,
                             },
                         },
                         "rate_limit_exceeded": {

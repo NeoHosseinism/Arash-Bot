@@ -91,8 +91,9 @@ class BotResponse(BaseModel):
 
     Architecture:
     - Each user has ONE conversation per platform/team (no conversation_id)
-    - message_count shows total messages in history (persists through /clear)
+    - total_message_count shows total messages in history (persists through /clear)
     - /clear removes messages from AI context but keeps in database
+    - Commands (e.g., /model, /help, /clear) are NOT counted in total_message_count
     """
 
     model_config = ConfigDict(
@@ -102,13 +103,13 @@ class BotResponse(BaseModel):
                     "success": True,
                     "response": "سلام! چطور می‌تونم کمکتون کنم؟",
                     "model": "Gemini 2.0 Flash",
-                    "message_count": 2,
+                    "total_message_count": 2,
                 },
                 {
                     "success": True,
                     "response": "برای تغییر مدل، از دستور /model استفاده کنید.",
                     "model": "DeepSeek Chat V3",
-                    "message_count": 10,
+                    "total_message_count": 10,
                 },
                 {
                     "success": False,
@@ -135,9 +136,9 @@ class BotResponse(BaseModel):
         description="User-friendly AI model name currently in use",
         examples=["Gemini 2.0 Flash", "DeepSeek Chat V3", "GPT-4o Mini"],
     )
-    message_count: Optional[int] = Field(
+    total_message_count: Optional[int] = Field(
         None,
-        description="Total messages in conversation history (user + assistant, persists through /clear)",
+        description="Total messages in conversation history (user + assistant). Persists through /clear. NOTE: Commands (e.g., /model, /help, /clear) are NOT included in this count - only actual chat messages and AI responses.",
         examples=[2, 10, 24],
     )
     error: Optional[str] = Field(
@@ -189,7 +190,7 @@ class SessionStatusResponse(BaseModel):
                     "platform": "Internal-BI",
                     "platform_type": "private",
                     "current_model": "Gemini 2.0 Flash",
-                    "message_count": 24,
+                    "total_message_count": 24,
                     "history_length": 10,
                     "last_activity": "2025-01-15T14:30:00",
                     "uptime_seconds": 3600.5,
@@ -204,8 +205,8 @@ class SessionStatusResponse(BaseModel):
     platform: str = Field(..., examples=["telegram", "Internal-BI"])
     platform_type: str = Field(..., examples=["public", "private"])
     current_model: str = Field(..., examples=["Gemini 2.0 Flash", "DeepSeek Chat V3"])
-    message_count: int = Field(
-        ..., examples=[24], description="Total messages ever (persists through /clear)"
+    total_message_count: int = Field(
+        ..., examples=[24], description="Total messages ever (persists through /clear). Commands are NOT counted - only chat messages and AI responses."
     )
     history_length: int = Field(
         ..., examples=[10], description="Messages currently in AI context (resets after /clear)"
@@ -229,7 +230,7 @@ class SessionListResponse(BaseModel):
                         {
                             "user_id": "user_12345",
                             "platform": "Internal-BI",
-                            "message_count": 24,
+                            "total_message_count": 24,
                             "last_activity": "2025-01-15T14:30:00",
                         }
                     ],

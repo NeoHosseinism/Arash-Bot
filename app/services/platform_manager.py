@@ -68,7 +68,7 @@ class PlatformManager:
             available_models=settings.telegram_models_list,
             rate_limit=settings.TELEGRAM_RATE_LIMIT,
             commands=settings.telegram_commands_list,
-            allow_model_switch=True,  # ✅ NOW ENABLED for Telegram
+            allow_model_switch=settings.TELEGRAM_ALLOW_MODEL_SWITCH,  # ✅ Configurable via ENV
             requires_auth=False,
             max_history=settings.TELEGRAM_MAX_HISTORY,
         )

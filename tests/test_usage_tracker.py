@@ -27,7 +27,7 @@ def mock_team():
     """Mock team object"""
     team = Mock(spec=Team)
     team.id = 1
-    team.name = "Test Team"
+    team.display_name = "Test Team"
     team.platform_name = "test_platform"
     team.daily_quota = 1000
     team.monthly_quota = 20000

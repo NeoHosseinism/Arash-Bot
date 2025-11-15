@@ -105,7 +105,7 @@ class TestRequireTeamAccess:
         mock_api_key = Mock()
         mock_api_key.key_prefix = "ak_team_"
         mock_api_key.team = Mock()
-        mock_api_key.team.name = "Test Team"
+        mock_api_key.team.display_name = "Test Team"
 
         mock_api_key_mgr.validate_api_key.return_value = mock_api_key
 

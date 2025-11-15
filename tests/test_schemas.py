@@ -100,8 +100,8 @@ class TestBotResponse:
             success=True,
             response="Response text",
             model="gpt-4",
-            message_count=5
+            total_message_count=5
         )
         assert response.model == "gpt-4"
-        assert response.message_count == 5
+        assert response.total_message_count == 5
         assert response.success is True

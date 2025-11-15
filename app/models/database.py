@@ -34,15 +34,23 @@ class Team(Base):
 
     Each team represents a platform (e.g., "Internal-BI", "External-Telegram")
     and has exactly ONE API key auto-generated on creation.
+
+    Field Distinction:
+    - display_name: Human-friendly name for admin UI, reports, internal tools
+                    (e.g., "Internal BI Team", "Marketing Platform")
+    - platform_name: System identifier for routing, session isolation, API operations
+                     (e.g., "Internal-BI", "Marketing-Platform")
     """
 
     __tablename__ = "teams"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(255), unique=True, nullable=False, index=True)  # Internal name
+    display_name = Column(
+        String(255), unique=True, nullable=False, index=True
+    )  # Human-friendly display name
     platform_name = Column(
         String(255), unique=True, nullable=False, index=True
-    )  # Public platform identifier
+    )  # System identifier for platform routing
     monthly_quota = Column(Integer, nullable=True)  # Requests per month, None = unlimited
     daily_quota = Column(Integer, nullable=True)  # Requests per day, None = unlimited
     is_active = Column(Boolean, default=True, nullable=False)

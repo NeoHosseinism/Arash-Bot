@@ -34,7 +34,7 @@ def test_db():
 def test_team(test_db: Session):
     """Create a test team"""
     team = Team(
-        name="Test Team",
+        display_name="Test Team",
         platform_name="Test-Platform",
         monthly_quota=100000,
         daily_quota=5000,

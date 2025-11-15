@@ -123,4 +123,30 @@ LOG_LEVEL=INFO
 
 ---
 
+## Key Architecture Behaviors
+
+### Message Counting
+
+The `total_message_count` field returned in API responses tracks the total number of **conversation messages** (user messages + AI responses) stored in the database.
+
+**Important Notes:**
+
+- ✅ **Counted:** User chat messages and AI assistant responses
+- ❌ **NOT Counted:** Commands (e.g., `/model`, `/help`, `/clear`, `/status`)
+- **Persistence:** `total_message_count` persists through `/clear` command
+- **Purpose:** Used for analytics and tracking conversation depth
+
+**Example:**
+
+```json
+{
+  "success": true,
+  "response": "مدل شما به GPT-4 تغییر کرد.",
+  "model": "GPT-4",
+  "total_message_count": 10  // Only counts actual messages, not this /model command
+}
+```
+
+---
+
 **Version:** 1.1.0 | **API Docs:** [Apidog](https://app.apidog.com/project/1110139) | **Development:** See [CLAUDE.md](CLAUDE.md)

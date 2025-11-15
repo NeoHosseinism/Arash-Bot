@@ -696,7 +696,7 @@ class TestDatabaseErrorHandling:
         )
 
         assert session is not None
-        assert session.message_count == 0
+        assert session.total_message_count == 0
         assert len(session.history) == 0
 
 

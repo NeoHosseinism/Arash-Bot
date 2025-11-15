@@ -55,7 +55,7 @@ class SessionManager:
 
         Architecture:
         - One session per user per platform/team (no conversation_id)
-        - Loads message_count from database
+        - Loads total_message_count from database
         - Loads uncleared messages into history for AI context
 
         SECURITY: API key isolation - each API key can only access sessions it created
@@ -110,7 +110,7 @@ class SessionManager:
                 user_id=user_id,
                 current_model=config.model,
                 history=history,  # Pre-loaded from DB
-                message_count=total_count,  # Total messages including cleared
+                total_message_count=total_count,  # Total messages including cleared
                 is_admin=platform_manager.is_admin(platform, user_id),
                 # Team isolation - CRITICAL for security
                 team_id=team_id,

@@ -27,6 +27,7 @@ def mock_team():
     """Mock team with API key"""
     team = Mock()
     team.id = 1
+    team.display_name = "Internal BI Team"
     team.platform_name = "Internal-BI"
     team.monthly_quota = 100000
     team.daily_quota = 5000
@@ -158,7 +159,7 @@ class TestChatEndpoint:
             "response": "سلام! چطور می‌تونم کمکتون کنم؟",
             "conversation_id": "chat_123",
             "model": "Gemini 2.0 Flash",
-            "message_count": 1,
+            "total_message_count": 1,
         }
 
         response = client.post(
@@ -285,7 +286,10 @@ class TestAdminTeamEndpoints:
         response = client.get("/v1/admin/teams", headers={"Authorization": "Bearer admin_key"})
         assert response.status_code == 200
         data = response.json()
-        assert isinstance(data, list)
+        # New response structure includes "teams" list and optional "total_report"
+        assert "teams" in data
+        assert isinstance(data["teams"], list)
+        assert len(data["teams"]) > 0
 
     @patch("app.api.dependencies.settings")
     @patch("app.services.api_key_manager.APIKeyManager.get_team_by_platform_name")
@@ -313,18 +317,25 @@ class TestAdminTeamEndpoints:
         mock_settings.super_admin_keys_set = {"admin_key"}
         mock_get.return_value = mock_team
 
-        response = client.get("/v1/admin/teams/1", headers={"Authorization": "Bearer admin_key"})
+        # New endpoint uses query parameter instead of path parameter
+        response = client.get("/v1/admin/teams?team_id=1", headers={"Authorization": "Bearer admin_key"})
         assert response.status_code == 200
         data = response.json()
-        assert data["id"] == 1
-        assert data["platform_name"] == "Internal-BI"
+        # Response now includes "teams" list with single item
+        assert "teams" in data
+        assert len(data["teams"]) == 1
+        assert data["teams"][0]["id"] == 1
+        assert data["teams"][0]["platform_name"] == "Internal-BI"
 
     @patch("app.api.dependencies.settings")
-    def test_get_team_not_found(self, mock_settings, client):
+    @patch("app.services.api_key_manager.APIKeyManager.get_team_by_id")
+    def test_get_team_not_found(self, mock_get, mock_settings, client):
         """Admin gets 404 for non-existent team"""
         mock_settings.super_admin_keys_set = {"admin_key"}
+        mock_get.return_value = None  # Team not found
 
-        response = client.get("/v1/admin/teams/999", headers={"Authorization": "Bearer admin_key"})
+        # New endpoint uses query parameter instead of path parameter
+        response = client.get("/v1/admin/teams?team_id=999", headers={"Authorization": "Bearer admin_key"})
         assert response.status_code == 404
 
 
@@ -339,32 +350,29 @@ class TestAdminStatsEndpoints:
         mock_session_mgr.sessions = {}
         mock_session_mgr.get_active_session_count.return_value = 0
 
-        response = client.get("/v1/admin/stats", headers={"Authorization": "Bearer admin_key"})
+        # Test new unified admin dashboard endpoint
+        response = client.get("/v1/admin/", headers={"Authorization": "Bearer admin_key"})
         assert response.status_code == 200
         data = response.json()
-        assert "total_sessions" in data
-        assert "active_sessions" in data
-        assert "telegram" in data
-        assert "internal" in data
+        # Check for service info
+        assert "service" in data
+        assert "version" in data
+        assert "status" in data
+        # Check for platforms
+        assert "platforms" in data
+        # Check for statistics
+        assert "statistics" in data
+        assert "total_sessions" in data["statistics"]
+        assert "active_sessions" in data["statistics"]
+        assert "telegram" in data["statistics"]
+        assert "internal" in data["statistics"]
 
 
 class TestSessionManagement:
     """Test session management functionality"""
 
-    @patch("app.api.dependencies.settings")
-    @patch("app.services.session_manager.session_manager")
-    def test_clear_sessions(self, mock_session_mgr, mock_settings, client):
-        """Admin can clear sessions"""
-        mock_settings.super_admin_keys_set = {"admin_key"}
-        mock_session_mgr.sessions = {"test_key": Mock()}
-
-        response = client.post(
-            "/v1/admin/clear-sessions", headers={"Authorization": "Bearer admin_key"}
-        )
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
-        assert "cleared" in data
+    # Note: clear_sessions endpoint has been removed as part of admin refactoring
+    # Session clearing is now handled through other mechanisms
 
 
 class TestErrorHandling:

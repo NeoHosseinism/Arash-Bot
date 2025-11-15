@@ -18,7 +18,7 @@ def mock_session():
     session.platform = "test-platform"
     session.current_model = "test-model"
     session.current_model_friendly = "Test Model"  # Add friendly name
-    session.message_count = 5
+    session.total_message_count = 5
     session.history = []
     session.platform_config = {"rate_limit": 60, "max_history": 10}
     session.get_recent_history = Mock(return_value=[])
@@ -31,7 +31,7 @@ def mock_session():
 
     # Make add_message increment count like the real implementation
     def add_message_side_effect(role, content):
-        session.message_count += 1
+        session.total_message_count += 1
 
     session.add_message = Mock(side_effect=add_message_side_effect)
     session.update_activity = Mock()
@@ -59,7 +59,7 @@ class TestProcessMessageSimple:
         mock_session_mgr.check_rate_limit.return_value = True
         mock_cmd_proc.is_command.return_value = False
 
-        # Mock DB query for message_count reload
+        # Mock DB query for total_message_count reload
         mock_query = Mock()
         mock_query.filter.return_value = mock_query
         mock_query.scalar.return_value = 7  # 5 initial + 2 new
@@ -82,8 +82,8 @@ class TestProcessMessageSimple:
             assert result.success is True
             assert result.response == "Test response"
             assert result.model == "Test Model"  # Friendly name
-            # message_count reloaded from DB
-            assert result.message_count == 7
+            # total_message_count reloaded from DB
+            assert result.total_message_count == 7
 
     @pytest.mark.asyncio
     @patch("app.services.message_processor.session_manager")
@@ -496,10 +496,10 @@ class TestProcessMessageSimpleEdgeCases:
     @patch("app.services.message_processor.session_manager")
     @patch("app.services.message_processor.command_processor")
     @patch("app.services.message_processor.get_db_session")
-    async def test_message_count_reload_from_db(
+    async def test_total_message_count_reload_from_db(
         self, mock_db, mock_cmd_proc, mock_session_mgr, processor, mock_session
     ):
-        """Test that message_count is correctly reloaded from database"""
+        """Test that total_message_count is correctly reloaded from database"""
         mock_session_mgr.get_or_create_session.return_value = mock_session
         mock_session_mgr.check_rate_limit.return_value = True
         mock_cmd_proc.is_command.return_value = False
@@ -524,17 +524,17 @@ class TestProcessMessageSimpleEdgeCases:
                 text="Hello",
             )
 
-            # Verify message_count was reloaded from DB
-            assert result.message_count == 42
+            # Verify total_message_count was reloaded from DB
+            assert result.total_message_count == 42
 
     @pytest.mark.asyncio
     @patch("app.services.message_processor.session_manager")
     @patch("app.services.message_processor.command_processor")
     @patch("app.services.message_processor.get_db_session")
-    async def test_message_count_defaults_to_zero_if_none(
+    async def test_total_message_count_defaults_to_zero_if_none(
         self, mock_db, mock_cmd_proc, mock_session_mgr, processor, mock_session
     ):
-        """Test that message_count defaults to 0 if DB returns None"""
+        """Test that total_message_count defaults to 0 if DB returns None"""
         mock_session_mgr.get_or_create_session.return_value = mock_session
         mock_session_mgr.check_rate_limit.return_value = True
         mock_cmd_proc.is_command.return_value = False
@@ -560,7 +560,7 @@ class TestProcessMessageSimpleEdgeCases:
             )
 
             # Should default to 0
-            assert result.message_count == 0
+            assert result.total_message_count == 0
 
 
 class TestLegacyProcessMessage:

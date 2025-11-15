@@ -44,7 +44,7 @@ def create_team(name: str, daily_quota: int = None, monthly_quota: int = None):
         )
         print(f"[OK] Team created successfully!")
         print(f"  ID: {team.id}")
-        print(f"  Name: {team.name}")
+        print(f"  Display Name: {team.display_name}")
         print(f"  Platform: {team.platform_name}")
         print(f"  Daily Quota: {team.daily_quota or 'Unlimited'}")
         print(f"  Monthly Quota: {team.monthly_quota or 'Unlimited'}")
@@ -68,7 +68,7 @@ def list_teams():
     for team in teams:
         table_data.append([
             team.id,
-            team.name,
+            team.display_name,
             team.platform_name,
             team.daily_quota or "unlimited",
             team.monthly_quota or "unlimited",
@@ -76,7 +76,7 @@ def list_teams():
             team.created_at.strftime("%Y-%m-%d"),
         ])
 
-    headers = ["ID", "Name", "Platform", "Daily Quota", "Monthly Quota", "Active", "Created"]
+    headers = ["ID", "Display Name", "Platform", "Daily Quota", "Monthly Quota", "Active", "Created"]
     print(tabulate(table_data, headers=headers, tablefmt="grid"))
 
 
@@ -92,7 +92,7 @@ def delete_team(team_id: int, force: bool = False):
             print(f"[ERROR] Team with ID {team_id} not found")
             sys.exit(1)
 
-        team_name = team.name
+        team_name = team.display_name
 
         # Confirm deletion
         if not force:
@@ -170,7 +170,7 @@ def create_api_key(
         print()
         print(f"  Key Prefix: {api_key_obj.key_prefix}")
         print(f"  Name: {api_key_obj.name}")
-        print(f"  Team: {team.name} (ID: {team_id})")
+        print(f"  Team: {team.display_name} (ID: {team_id})")
         print(f"  Expires: {api_key_obj.expires_at or 'Never'}")
         print()
         print("  ℹ️  ACCESS: /api/v1/chat endpoint only (external team)")
@@ -207,7 +207,7 @@ def list_api_keys(team_id: int = None):
             key.id,
             key.key_prefix,
             key.name,
-            key.team.name,
+            key.team.display_name,
             "active" if key.is_active else "inactive",
             key.last_used_at.strftime("%Y-%m-%d %H:%M") if key.last_used_at else "Never",
             key.expires_at.strftime("%Y-%m-%d") if key.expires_at else "Never",

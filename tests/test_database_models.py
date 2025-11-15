@@ -20,7 +20,7 @@ class TestTeamModel:
         """Test Team __repr__ method (line 58 coverage)"""
         team = Team(
             id=1,
-            name="Test Team",
+            display_name="Test Team",
             platform_name="test-platform"
         )
 

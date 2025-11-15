@@ -304,7 +304,7 @@ class TestStatusCommand:
     async def test_status_telegram(self, mock_platform_manager, command_processor, telegram_session):
         """Test /status command on Telegram"""
         mock_platform_manager.get_config.return_value = Mock(type="public", rate_limit=20)
-        telegram_session.message_count = 5
+        telegram_session.total_message_count = 5
 
         response = await command_processor.handle_status(telegram_session, [])
 
@@ -344,8 +344,8 @@ class TestClearCommand:
         assert response is not None
         # History (AI context) should be cleared
         assert len(telegram_session.history) == 0
-        # message_count persists (tracks DB messages, not affected by /clear)
-        # This is expected per architecture: message_count tracks all messages ever
+        # total_message_count persists (tracks DB messages, not affected by /clear)
+        # This is expected per architecture: total_message_count tracks all messages ever
 
 
 class TestModelCommand:

@@ -15,7 +15,7 @@ class ChatSession(BaseModel):
     Architecture:
     - One conversation per user per platform/team (no conversation_id)
     - session_id format: "platform:team_id:user_id" or "platform:user_id"
-    - message_count tracks ALL messages ever (persists through /clear)
+    - total_message_count tracks ALL messages ever (persists through /clear)
     - history is in-memory cache (resets after /clear, server restart)
     - Actual messages stored in database
     """
@@ -31,7 +31,7 @@ class ChatSession(BaseModel):
     context: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_activity: datetime = Field(default_factory=datetime.utcnow)
-    message_count: int = 0  # Total messages ever (loaded from DB)
+    total_message_count: int = 0  # Total messages ever (loaded from DB). Excludes commands - only actual chat messages
     is_admin: bool = False
 
     # Team isolation fields - CRITICAL for security
@@ -42,7 +42,7 @@ class ChatSession(BaseModel):
     def add_message(self, role: str, content: str):
         """
         Add message to in-memory history (AI context cache).
-        Note: message_count is managed separately and loaded from database.
+        Note: total_message_count is managed separately and loaded from database.
         """
         self.history.append({"role": role, "content": content})
         self.last_activity = datetime.utcnow()
@@ -51,7 +51,7 @@ class ChatSession(BaseModel):
         """
         Clear in-memory conversation history (for AI context).
         Note: Actual messages remain in database, only AI context is cleared.
-        message_count is NOT reset (tracks all messages ever).
+        total_message_count is NOT reset (tracks all messages ever).
         """
         self.history.clear()
 

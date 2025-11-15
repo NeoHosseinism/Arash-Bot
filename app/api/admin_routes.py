@@ -21,7 +21,7 @@ SECURITY:
 import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
@@ -29,7 +29,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.api.dependencies import require_admin_access
 from app.core.name_mapping import get_friendly_model_name
 from app.models.database import APIKey, get_db_session
-from app.models.schemas import HealthCheckResponse, StatsResponse
 from app.services.api_key_manager import APIKeyManager
 from app.services.platform_manager import platform_manager
 from app.services.session_manager import session_manager
@@ -49,29 +48,44 @@ class TeamCreate(BaseModel):
     """
     Request model for creating a team.
 
-    Changes:
-    - Uses platform_name instead of name/description (e.g., "Internal-BI", "External-Telegram")
-    - Removed webhooks (not supported)
+    Field Distinction:
+    - display_name: Human-friendly name (supports Persian/Farsi) for admin UI and chat
+    - platform_name: System identifier for routing (ASCII, no spaces)
     - Auto-generates API key on creation
     """
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
-                {"platform_name": "Internal-BI", "monthly_quota": 100000, "daily_quota": 5000},
                 {
+                    "display_name": "تیم هوش مصنوعی داخلی",
+                    "platform_name": "Internal-BI",
+                    "monthly_quota": 100000,
+                    "daily_quota": 5000,
+                },
+                {
+                    "display_name": "پلتفرم بازاریابی",
                     "platform_name": "External-Marketing",
                     "monthly_quota": 50000,
                     "daily_quota": 2000,
+                },
+                {
+                    "platform_name": "Data-Analytics",
+                    "monthly_quota": 75000,
                 },
             ]
         }
     )
 
+    display_name: Optional[str] = Field(
+        None,
+        description="Human-friendly display name (supports Persian/Farsi). Defaults to platform_name if not provided.",
+        examples=["تیم هوش مصنوعی داخلی", "Internal BI Team", "پلتفرم بازاریابی"],
+    )
     platform_name: str = Field(
         ...,
-        description="Platform name (e.g., 'Internal-BI', 'External-Marketing')",
-        examples=["Internal-BI", "External-Marketing"],
+        description="System identifier for routing (ASCII, no spaces, e.g., 'Internal-BI', 'External-Marketing')",
+        examples=["Internal-BI", "External-Marketing", "Data-Analytics"],
     )
     monthly_quota: Optional[int] = Field(
         None, description="Monthly request quota (None = unlimited)", examples=[100000, None]
@@ -85,25 +99,31 @@ class TeamUpdate(BaseModel):
     """
     Request model for updating a team.
 
-    Changes:
-    - Uses platform_name instead of name/description
-    - Removed webhooks (not supported)
+    Field Distinction:
+    - display_name: Human-friendly name for admin UI and reports
+    - platform_name: System identifier for routing and session isolation
     """
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
+                    "display_name": "Internal BI Team",
                     "platform_name": "Internal-BI-Updated",
                     "monthly_quota": 150000,
                     "daily_quota": 7000,
                     "is_active": True,
                 },
                 {"is_active": False},
+                {
+                    "display_name": "Marketing Platform",
+                    "platform_name": "Marketing-Platform",
+                },
             ]
         }
     )
 
+    display_name: Optional[str] = Field(None, examples=["Internal BI Team"])
     platform_name: Optional[str] = Field(None, examples=["Internal-BI-Updated"])
     monthly_quota: Optional[int] = Field(None, examples=[150000])
     daily_quota: Optional[int] = Field(None, examples=[7000])
@@ -112,9 +132,14 @@ class TeamUpdate(BaseModel):
 
 class TeamResponse(BaseModel):
     """
-    Response model for team.
+    Response model for team with usage statistics.
 
-    Includes API key prefix (one key per team).
+    Includes API key prefix and usage data (one key per team).
+
+    Field Distinction:
+    - display_name: Human-friendly name for display purposes
+    - platform_name: System identifier for routing/operations
+    - usage: Recent usage statistics (last 30 days by default)
     """
 
     model_config = ConfigDict(
@@ -123,6 +148,7 @@ class TeamResponse(BaseModel):
             "examples": [
                 {
                     "id": 1,
+                    "display_name": "Internal BI Team",
                     "platform_name": "Internal-BI",
                     "monthly_quota": 100000,
                     "daily_quota": 5000,
@@ -131,12 +157,23 @@ class TeamResponse(BaseModel):
                     "api_key_last_used": "2025-01-15T14:30:00",
                     "created_at": "2025-01-01T10:00:00",
                     "updated_at": "2025-01-15T14:30:00",
+                    "usage": {
+                        "period": {
+                            "start": "2025-01-01T00:00:00",
+                            "end": "2025-01-31T23:59:59",
+                            "days": 30,
+                        },
+                        "requests": {"total": 15000, "successful": 14850, "failed": 150},
+                        "tokens": {"total": 1500000, "average_per_request": 100},
+                        "cost": {"total": 15.50, "currency": "USD"},
+                    },
                 }
             ]
         },
     )
 
     id: int = Field(..., examples=[1])
+    display_name: str = Field(..., examples=["Internal BI Team"])
     platform_name: str = Field(..., examples=["Internal-BI"])
     monthly_quota: Optional[int] = Field(None, examples=[100000])
     daily_quota: Optional[int] = Field(None, examples=[5000])
@@ -145,6 +182,10 @@ class TeamResponse(BaseModel):
     api_key_last_used: Optional[datetime] = Field(None, examples=["2025-01-15T14:30:00"])
     created_at: datetime
     updated_at: datetime
+    usage: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Usage statistics for the team (last 30 days by default)",
+    )
 
 
 class TeamCreateResponse(BaseModel):
@@ -159,6 +200,7 @@ class TeamCreateResponse(BaseModel):
             "examples": [
                 {
                     "id": 1,
+                    "display_name": "تیم هوش مصنوعی داخلی",
                     "platform_name": "Internal-BI",
                     "monthly_quota": 100000,
                     "daily_quota": 5000,
@@ -172,6 +214,7 @@ class TeamCreateResponse(BaseModel):
     )
 
     id: int = Field(..., examples=[1])
+    display_name: str = Field(..., examples=["تیم هوش مصنوعی داخلی", "Internal BI Team"])
     platform_name: str = Field(..., examples=["Internal-BI"])
     monthly_quota: Optional[int] = Field(None, examples=[100000])
     daily_quota: Optional[int] = Field(None, examples=[5000])
@@ -186,14 +229,17 @@ class TeamCreateResponse(BaseModel):
 
 
 class UsageStatsResponse(BaseModel):
-    """Response model for usage statistics (team-based only, no api_key_id)"""
+    """Response model for usage statistics (team-based only, no api_key_id)
+
+    Note: team_name contains the team's display_name (supports Persian/Farsi)
+    """
 
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
                 {
                     "team_id": 1,
-                    "team_name": "Internal-BI",
+                    "team_name": "تیم هوش مصنوعی داخلی",
                     "period": {
                         "start": "2025-01-01T00:00:00",
                         "end": "2025-01-31T23:59:59",
@@ -214,7 +260,11 @@ class UsageStatsResponse(BaseModel):
     )
 
     team_id: Optional[int] = Field(None, examples=[1])
-    team_name: Optional[str] = Field(None, examples=["Internal-BI"])
+    team_name: Optional[str] = Field(
+        None,
+        description="Team display name (supports Persian/Farsi)",
+        examples=["تیم هوش مصنوعی داخلی", "Internal BI Team"],
+    )
     period: dict
     requests: dict
     tokens: dict
@@ -224,103 +274,125 @@ class UsageStatsResponse(BaseModel):
 
 
 # ===========================
-# Platform Information Endpoints (Admin Only)
+# Platform Information & Statistics (Admin Only)
 # ===========================
 
 
-@router.get("/", response_model=HealthCheckResponse)
-async def admin_root(
-    api_key=Depends(require_admin_access),
-):
+class AdminDashboardResponse(BaseModel):
     """
-    Root endpoint with platform information (ADMIN ONLY)
+    Unified admin dashboard response with platform info and statistics
 
-    SECURITY: Exposes Telegram platform details - Admin access required
+    Combines health check, platform configurations, and statistics into a single endpoint
     """
-    telegram_config = platform_manager.get_config("telegram")
-    internal_config = platform_manager.get_config("internal")
-
-    return HealthCheckResponse(
-        service="Arash External API Service",
-        version="1.0.0",
-        status="healthy",
-        platforms={
-            "telegram": {
-                "type": "public",
-                "model": get_friendly_model_name(telegram_config.model),
-                "rate_limit": telegram_config.rate_limit,
-                "model_switching": False,
-            },
-            "internal": {
-                "type": "private",
-                "models": [get_friendly_model_name(m) for m in internal_config.available_models],
-                "rate_limit": internal_config.rate_limit,
-                "model_switching": True,
-            },
-        },
-        active_sessions=len(session_manager.sessions),
-        timestamp=datetime.now(),
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "service": "Arash External API Service",
+                    "version": "1.1.0",
+                    "status": "healthy",
+                    "timestamp": "2025-01-15T14:30:00",
+                    "platforms": {
+                        "telegram": {
+                            "type": "public",
+                            "model": "Gemini 2.0 Flash",
+                            "rate_limit": 20,
+                            "commands": ["start", "help", "model", "clear"],
+                            "max_history": 10,
+                            "features": {
+                                "model_switching": False,
+                                "requires_auth": True
+                            }
+                        },
+                        "internal": {
+                            "type": "private",
+                            "default_model": "Gemini 2.0 Flash",
+                            "available_models": ["Gemini 2.0 Flash", "GPT-5 Chat", "DeepSeek v3"],
+                            "rate_limit": 60,
+                            "commands": ["start", "help", "model", "models", "clear", "status"],
+                            "max_history": 30,
+                            "features": {
+                                "model_switching": True,
+                                "requires_auth": True
+                            }
+                        }
+                    },
+                    "statistics": {
+                        "total_sessions": 150,
+                        "active_sessions": 25,
+                        "telegram": {
+                            "sessions": 10,
+                            "messages": 500,
+                            "active": 5,
+                            "model": "Gemini 2.0 Flash"
+                        },
+                        "internal": {
+                            "sessions": 140,
+                            "messages": 5000,
+                            "active": 20,
+                            "models_used": {
+                                "Gemini 2.0 Flash": 80,
+                                "GPT-5 Chat": 40,
+                                "DeepSeek v3": 20
+                            },
+                            "team_breakdown": [
+                                {
+                                    "team_id": 1,
+                                    "team_name": "Internal BI",
+                                    "sessions": 100,
+                                    "messages": 3000,
+                                    "active": 15,
+                                    "models_used": {"Gemini 2.0 Flash": 60}
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
     )
 
+    service: str = Field(..., examples=["Arash External API Service"])
+    version: str = Field(..., examples=["1.1.0"])
+    status: str = Field(..., examples=["healthy"])
+    timestamp: datetime
+    platforms: Dict[str, Dict[str, Any]]
+    statistics: Dict[str, Any]
 
-@router.get("/platforms")
-async def get_platforms(
+
+@router.get("/", response_model=AdminDashboardResponse)
+async def admin_dashboard(
     api_key=Depends(require_admin_access),
 ):
     """
-    Get ALL platform configurations (ADMIN ONLY)
+    Unified admin dashboard with platform info and statistics (ADMIN ONLY)
+
+    Returns comprehensive information including:
+    - Service health and version
+    - Platform configurations (Telegram + Internal)
+    - Session statistics (overall + per team)
 
     SECURITY: Exposes Telegram platform details - Admin access required
     """
+    db = get_db_session()
+
+    # Get platform configurations
     telegram_config = platform_manager.get_config("telegram")
     internal_config = platform_manager.get_config("internal")
 
-    return {
-        "telegram": {
-            "type": "public",
-            "model": get_friendly_model_name(telegram_config.model),
-            "rate_limit": telegram_config.rate_limit,
-            "commands": telegram_config.commands,
-            "max_history": telegram_config.max_history,
-            "features": {"model_switching": False, "requires_auth": False},
-        },
-        "internal": {
-            "type": "private",
-            "default_model": get_friendly_model_name(internal_config.model),
-            "available_models": [
-                get_friendly_model_name(m) for m in internal_config.available_models
-            ],
-            "rate_limit": internal_config.rate_limit,
-            "commands": internal_config.commands,
-            "max_history": internal_config.max_history,
-            "features": {"model_switching": True, "requires_auth": True},
-        },
-    }
+    # Get team name mapping for statistics
+    teams = APIKeyManager.list_all_teams(db)
+    team_name_map = {team.id: team.display_name for team in teams}
 
-
-@router.get("/stats", response_model=StatsResponse)
-async def get_statistics(
-    api_key=Depends(require_admin_access),
-):
-    """
-    Get ALL service statistics (ADMIN ONLY)
-
-    SECURITY: Exposes stats for ALL platforms including Telegram - Admin access required
-    """
-    db = get_db_session()
+    # Calculate statistics
     total_sessions = len(session_manager.sessions)
     active_sessions = session_manager.get_active_session_count(minutes=5)
 
-    # Get team name mapping for internal stats
-    teams = APIKeyManager.list_all_teams(db)
-    team_name_map = {team.id: team.name for team in teams}
-
-    # Statistics by platform
     telegram_stats = {
         "sessions": 0,
         "messages": 0,
         "active": 0,
-        "model": get_friendly_model_name(platform_manager.get_config("telegram").model),
+        "model": get_friendly_model_name(telegram_config.model),
     }
 
     internal_stats = {
@@ -330,7 +402,6 @@ async def get_statistics(
         "models_used": defaultdict(int),
     }
 
-    # Statistics by team (for internal platform)
     team_stats = defaultdict(
         lambda: {
             "team_id": None,
@@ -346,33 +417,29 @@ async def get_statistics(
         is_active = not session.is_expired(5)
 
         if session.platform == "telegram":
-            # Telegram bot sessions
             telegram_stats["sessions"] += 1
-            telegram_stats["messages"] += session.message_count
+            telegram_stats["messages"] += session.total_message_count
             if is_active:
                 telegram_stats["active"] += 1
         elif session.team_id is not None:
-            # Team-based sessions (any platform with team_id)
             internal_stats["sessions"] += 1
-            internal_stats["messages"] += session.message_count
+            internal_stats["messages"] += session.total_message_count
             friendly_model = get_friendly_model_name(session.current_model)
             internal_stats["models_used"][friendly_model] += 1
             if is_active:
                 internal_stats["active"] += 1
 
-            # Aggregate by team
             team_id = session.team_id
             if team_id not in team_stats:
                 team_stats[team_id]["team_id"] = team_id
                 team_stats[team_id]["team_name"] = team_name_map.get(team_id, f"Team {team_id}")
 
             team_stats[team_id]["sessions"] += 1
-            team_stats[team_id]["messages"] += session.message_count
+            team_stats[team_id]["messages"] += session.total_message_count
             team_stats[team_id]["models_used"][friendly_model] += 1
             if is_active:
                 team_stats[team_id]["active"] += 1
 
-    # Convert team stats to list
     team_breakdown = [
         {
             "team_id": stats["team_id"],
@@ -384,52 +451,51 @@ async def get_statistics(
         }
         for stats in team_stats.values()
     ]
-    # Sort by sessions descending
     team_breakdown.sort(key=lambda x: x["sessions"], reverse=True)
 
-    return StatsResponse(
-        total_sessions=total_sessions,
-        active_sessions=active_sessions,
-        telegram=telegram_stats,
-        internal={
-            **internal_stats,
-            "models_used": dict(internal_stats["models_used"]),
-            "team_breakdown": team_breakdown,  # Add team breakdown
+    return AdminDashboardResponse(
+        service="Arash External API Service",
+        version="1.1.0",
+        status="healthy",
+        timestamp=datetime.now(),
+        platforms={
+            "telegram": {
+                "type": "public",
+                "model": get_friendly_model_name(telegram_config.model),
+                "rate_limit": telegram_config.rate_limit,
+                "commands": telegram_config.commands,
+                "max_history": telegram_config.max_history,
+                "features": {
+                    "model_switching": telegram_config.allow_model_switch,
+                    "requires_auth": telegram_config.requires_auth,
+                },
+            },
+            "internal": {
+                "type": "private",
+                "default_model": get_friendly_model_name(internal_config.model),
+                "available_models": [
+                    get_friendly_model_name(m) for m in internal_config.available_models
+                ],
+                "rate_limit": internal_config.rate_limit,
+                "commands": internal_config.commands,
+                "max_history": internal_config.max_history,
+                "features": {
+                    "model_switching": internal_config.allow_model_switch,
+                    "requires_auth": internal_config.requires_auth,
+                },
+            },
         },
-        uptime_seconds=0,  # Will be set by main app
+        statistics={
+            "total_sessions": total_sessions,
+            "active_sessions": active_sessions,
+            "telegram": telegram_stats,
+            "internal": {
+                **internal_stats,
+                "models_used": dict(internal_stats["models_used"]),
+                "team_breakdown": team_breakdown,
+            },
+        },
     )
-
-
-@router.post("/clear-sessions")
-async def clear_sessions(
-    team_id: Optional[int] = None,
-    api_key=Depends(require_admin_access),
-):
-    """
-    Clear sessions (ADMIN ONLY)
-
-    SECURITY:
-    - Admin-only endpoint
-    - Can clear all sessions or filter by team_id
-    - No team isolation needed (admin has full access)
-    """
-    if team_id:
-        keys_to_remove = [
-            key for key, session in session_manager.sessions.items() if session.team_id == team_id
-        ]
-    else:
-        keys_to_remove = list(session_manager.sessions.keys())
-
-    for key in keys_to_remove:
-        del session_manager.sessions[key]
-
-    logger.info(f"Admin cleared {len(keys_to_remove)} sessions (team_id: {team_id or 'all'})")
-
-    return {
-        "success": True,
-        "cleared": len(keys_to_remove),
-        "message": f"Cleared {len(keys_to_remove)} sessions",
-    }
 
 
 # ===========================
@@ -510,12 +576,14 @@ async def create_team(
     team, api_key_string = APIKeyManager.create_team_with_key(
         db=db,
         platform_name=team_data.platform_name,
+        display_name=team_data.display_name,
         monthly_quota=team_data.monthly_quota,
         daily_quota=team_data.daily_quota,
     )
 
     return TeamCreateResponse(
         id=team.id,
+        display_name=team.display_name,
         platform_name=team.platform_name,
         monthly_quota=team.monthly_quota,
         daily_quota=team.daily_quota,
@@ -525,24 +593,120 @@ async def create_team(
     )
 
 
-@router.get("/teams", response_model=List[TeamResponse])
-async def list_teams(
+class TeamsListResponse(BaseModel):
+    """Response model for teams listing with optional total report"""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {
+                    "teams": [
+                        {
+                            "id": 1,
+                            "display_name": "Internal BI Team",
+                            "platform_name": "Internal-BI",
+                            "monthly_quota": 100000,
+                            "daily_quota": 5000,
+                            "is_active": True,
+                            "api_key_prefix": "ark_1234",
+                            "usage": {
+                                "requests": {"total": 15000, "successful": 14850}
+                            }
+                        }
+                    ],
+                    "total_report": {
+                        "total_teams": 5,
+                        "active_teams": 4,
+                        "total_requests": 75000,
+                        "total_successful": 74250,
+                        "total_failed": 750,
+                        "total_cost": 75.50
+                    }
+                }
+            ]
+        }
+    )
+
+    teams: List[TeamResponse]
+    total_report: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Total aggregated report across all teams (included when totally=true)",
+    )
+
+
+@router.get("/teams")
+async def get_teams(
+    team_id: Optional[int] = None,
     active_only: bool = True,
+    days: int = 30,
+    totally: bool = False,
     api_key=Depends(require_admin_access),
 ):
-    """List all teams (Admin only) with API key prefix"""
-    db = get_db_session()
-    teams = APIKeyManager.list_all_teams(db, active_only=active_only)
+    """
+    Get teams with usage statistics (Admin only)
 
-    # Build response with API key prefix for each team
+    Parameters:
+    - team_id: Optional team ID to get specific team (returns single item list)
+    - active_only: Filter active teams only (default: True)
+    - days: Number of days for usage statistics (default: 30)
+    - totally: Include total aggregated report across all teams (default: False)
+
+    Returns:
+    - List of teams with usage data
+    - Optional total report when totally=true
+
+    Examples:
+    - GET /admin/teams - List all active teams with usage
+    - GET /admin/teams?team_id=1 - Get specific team with usage
+    - GET /admin/teams?totally=true - List all teams with total report
+    - GET /admin/teams?active_only=false&days=7 - All teams with 7-day usage
+    """
+    db = get_db_session()
+
+    # Get teams based on filter
+    if team_id:
+        team = APIKeyManager.get_team_by_id(db, team_id)
+        if not team:
+            raise HTTPException(status_code=404, detail="Team not found")
+        teams = [team]
+    else:
+        teams = APIKeyManager.list_all_teams(db, active_only=active_only)
+
+    # Calculate start date for usage statistics
+    start_date = datetime.utcnow() - timedelta(days=days)
+
+    # Build response with API key prefix and usage for each team
     responses = []
+    total_requests = 0
+    total_successful = 0
+    total_failed = 0
+    total_cost = 0.0
+
     for team in teams:
         # Get the team's API key (one per team)
         api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
 
+        # Get usage statistics for the team
+        try:
+            usage_stats = UsageTracker.get_team_usage_stats(db, team.id, start_date)
+            # Remove team_id and team_name from usage stats (already in TeamResponse)
+            usage_stats.pop("team_id", None)
+            usage_stats.pop("team_name", None)
+
+            # Aggregate for total report
+            if totally:
+                total_requests += usage_stats.get("requests", {}).get("total", 0)
+                total_successful += usage_stats.get("requests", {}).get("successful", 0)
+                total_failed += usage_stats.get("requests", {}).get("failed", 0)
+                total_cost += usage_stats.get("cost", {}).get("total", 0.0)
+        except Exception as e:
+            logger.warning(f"Failed to get usage stats for team {team.id}: {e}")
+            usage_stats = None
+
         responses.append(
             TeamResponse(
                 id=team.id,
+                display_name=team.display_name,
                 platform_name=team.platform_name,
                 monthly_quota=team.monthly_quota,
                 daily_quota=team.daily_quota,
@@ -551,37 +715,31 @@ async def list_teams(
                 api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
                 created_at=team.created_at,
                 updated_at=team.updated_at,
+                usage=usage_stats,
             )
         )
 
-    return responses
+    # Build total report if requested
+    total_report = None
+    if totally:
+        total_report = {
+            "total_teams": len(responses),
+            "active_teams": sum(1 for r in responses if r.is_active),
+            "total_requests": total_requests,
+            "total_successful": total_successful,
+            "total_failed": total_failed,
+            "total_cost": round(total_cost, 2),
+            "currency": "USD",
+            "period": {
+                "start": start_date.isoformat(),
+                "end": datetime.utcnow().isoformat(),
+                "days": days,
+            },
+        }
 
-
-@router.get("/teams/{team_id}", response_model=TeamResponse)
-async def get_team(
-    team_id: int,
-    api_key=Depends(require_admin_access),
-):
-    """Get team details (Admin only) with API key prefix"""
-    db = get_db_session()
-    team = APIKeyManager.get_team_by_id(db, team_id)
-
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-
-    # Get the team's API key
-    api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
-
-    return TeamResponse(
-        id=team.id,
-        platform_name=team.platform_name,
-        monthly_quota=team.monthly_quota,
-        daily_quota=team.daily_quota,
-        is_active=team.is_active,
-        api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
-        api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
-        created_at=team.created_at,
-        updated_at=team.updated_at,
+    return TeamsListResponse(
+        teams=responses,
+        total_report=total_report,
     )
 
 
@@ -589,14 +747,23 @@ async def get_team(
 async def update_team(
     team_id: int,
     team_data: TeamUpdate,
+    days: int = 30,
     api_key=Depends(require_admin_access),
 ):
-    """Update team settings (Admin only)"""
+    """
+    Update team settings (Admin only)
+
+    Returns updated team with usage statistics.
+
+    Parameters:
+    - days: Number of days for usage statistics (default: 30)
+    """
     db = get_db_session()
 
     team = APIKeyManager.update_team(
         db=db,
         team_id=team_id,
+        display_name=team_data.display_name,
         platform_name=team_data.platform_name,
         monthly_quota=team_data.monthly_quota,
         daily_quota=team_data.daily_quota,
@@ -609,8 +776,19 @@ async def update_team(
     # Get the team's API key
     api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
 
+    # Get usage statistics
+    start_date = datetime.utcnow() - timedelta(days=days)
+    try:
+        usage_stats = UsageTracker.get_team_usage_stats(db, team.id, start_date)
+        usage_stats.pop("team_id", None)
+        usage_stats.pop("team_name", None)
+    except Exception as e:
+        logger.warning(f"Failed to get usage stats for team {team.id}: {e}")
+        usage_stats = None
+
     return TeamResponse(
         id=team.id,
+        display_name=team.display_name,
         platform_name=team.platform_name,
         monthly_quota=team.monthly_quota,
         daily_quota=team.daily_quota,
@@ -619,78 +797,5 @@ async def update_team(
         api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
         created_at=team.created_at,
         updated_at=team.updated_at,
+        usage=usage_stats,
     )
-
-
-# ===========================
-# Usage Tracking Endpoints
-# ===========================
-
-
-@router.get("/usage/team/{team_id}", response_model=UsageStatsResponse)
-async def get_team_usage(
-    team_id: int,
-    days: int = 30,
-    api_key=Depends(require_admin_access),
-):
-    """
-    Get usage statistics for a team (Admin only)
-
-    SECURITY: Only admins can access team usage statistics
-    """
-    db = get_db_session()
-
-    # Verify team exists
-    team = APIKeyManager.get_team_by_id(db, team_id)
-    if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
-
-    start_date = datetime.utcnow() - timedelta(days=days)
-    stats = UsageTracker.get_team_usage_stats(db, team_id, start_date)
-
-    # Add team name for better UX
-    stats["team_name"] = team.name
-
-    return UsageStatsResponse(**stats)
-
-
-@router.get("/usage/recent")
-async def get_recent_usage(
-    team_id: Optional[int] = None,
-    limit: int = 100,
-    api_key=Depends(require_admin_access),
-):
-    """
-    Get recent usage logs (Admin only, team-based tracking)
-
-    SECURITY: Only admins can view usage logs
-    """
-    db = get_db_session()
-
-    logs = UsageTracker.get_recent_usage(db=db, team_id=team_id, limit=limit)
-
-    # Build mapping for team names
-    team_ids = {log.team_id for log in logs if log.team_id}
-
-    team_name_map = {}
-    for tid in team_ids:
-        team = APIKeyManager.get_team_by_id(db, tid)
-        if team:
-            team_name_map[tid] = team.platform_name  # Use platform_name instead of name
-
-    return {
-        "count": len(logs),
-        "logs": [
-            {
-                "id": log.id,
-                "team_id": log.team_id,
-                "team_name": team_name_map.get(log.team_id, "Unknown"),
-                "session_id": log.session_id,
-                "platform": log.platform,
-                "model_used": log.model_used,
-                "success": log.success,
-                "timestamp": log.timestamp.isoformat(),
-            }
-            for log in logs
-        ],
-    }

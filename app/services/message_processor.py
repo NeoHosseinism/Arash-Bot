@@ -67,22 +67,16 @@ class MessageProcessor:
             else:
                 response_text = await self._handle_chat(session, message)
 
-            # Update session activity (message_count is already incremented by add_message)
+            # Update session activity (total_message_count is already incremented by add_message)
             session.update_activity()
 
-            # Prepare response
-            bot_response = BotResponse(
+            # Prepare response (only expose user-facing fields, no internal session_id)
+            return BotResponse(
                 success=True,
                 response=response_text,
-                data={
-                    "session_id": session.session_id,
-                    "platform": session.platform,
-                    "model": session.current_model_friendly,
-                    "message_count": session.message_count,
-                },
+                model=session.current_model_friendly,
+                total_message_count=session.total_message_count,
             )
-
-            return bot_response
 
         except Exception as e:
             logger.error(f"Error processing message: {e}", exc_info=True)
@@ -111,7 +105,7 @@ class MessageProcessor:
             text: Message text
 
         Returns:
-            BotResponse with message_count showing total messages
+            BotResponse with total_message_count showing total messages
         """
         start_time = time.time()
         db = get_db_session()
@@ -168,12 +162,15 @@ class MessageProcessor:
             # Update session activity
             session.update_activity()
 
-            # Reload message_count from DB (after messages were saved)
+            # Reload total_message_count from DB (after messages were saved)
+            # NOTE: total_message_count only counts actual chat messages (user + assistant)
+            # Commands (e.g., /model, /help, /clear) are NOT counted since they're
+            # not saved to the messages table. This count persists through /clear.
             from sqlalchemy import func
 
             from app.models.database import Message
 
-            session.message_count = (
+            session.total_message_count = (
                 db.query(func.count(Message.id))
                 .filter(
                     Message.platform == platform_name,
@@ -203,7 +200,7 @@ class MessageProcessor:
                 success=True,
                 response=response_text,
                 model=session.current_model_friendly,
-                message_count=session.message_count,
+                total_message_count=session.total_message_count,
             )
 
         except Exception as e:

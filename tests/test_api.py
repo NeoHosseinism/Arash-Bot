@@ -222,7 +222,7 @@ class TestMessageEndpointV1:
                 success=True,
                 response="Hello! How can I help?",
                 model="gpt-4",
-                message_count=2,
+                total_message_count=2,
             )
         )
 
@@ -237,7 +237,7 @@ class TestMessageEndpointV1:
         assert data["success"] is True
         assert data["response"] == "Hello! How can I help?"
         assert data["model"] == "gpt-4"
-        assert data["message_count"] == 2
+        assert data["total_message_count"] == 2
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")

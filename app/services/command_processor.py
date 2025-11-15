@@ -140,7 +140,7 @@ class CommandProcessor:
             f"• پلتفرم: {session.platform.title()}\n"
             f"• نوع: {'خصوصی (داخلی)' if config.type == 'private' else 'عمومی'}\n"
             f"• مدل فعلی: {friendly_model}\n"  # ✓ Show friendly name
-            f"• تعداد پیام‌ها: {session.message_count}\n"
+            f"• تعداد کل پیام‌ها: {session.total_message_count}\n"
             f"• محدودیت سرعت: {config.rate_limit}/دقیقه\n"
         )
 

@@ -65,7 +65,7 @@ class TestTeamManagement:
         )
 
         assert team.id is not None
-        assert team.name == "Test Team"
+        assert team.display_name == "Test Team"
         assert team.monthly_quota == 100000
         assert team.daily_quota == 5000
         assert team.is_active is True
@@ -75,7 +75,7 @@ class TestTeamManagement:
         team = APIKeyManager.create_team(db=test_db, name="Minimal Team")
 
         assert team.id is not None
-        assert team.name == "Minimal Team"
+        assert team.display_name == "Minimal Team"
         assert team.monthly_quota is None
         assert team.daily_quota is None
         assert team.is_active is True
@@ -86,7 +86,7 @@ class TestTeamManagement:
 
         assert team is not None
         assert team.id == test_team.id
-        assert team.name == test_team.name
+        assert team.display_name == test_team.display_name
 
     def test_get_team_by_id_not_found(self, test_db: Session):
         """Test retrieving non-existent team returns None"""
@@ -96,11 +96,11 @@ class TestTeamManagement:
 
     def test_get_team_by_name(self, test_db: Session, test_team: Team):
         """Test retrieving a team by name"""
-        team = APIKeyManager.get_team_by_name(db=test_db, name=test_team.name)
+        team = APIKeyManager.get_team_by_name(db=test_db, name=test_team.display_name)
 
         assert team is not None
         assert team.id == test_team.id
-        assert team.name == test_team.name
+        assert team.display_name == test_team.display_name
 
     def test_get_team_by_platform_name(self, test_db: Session):
         """Test retrieving a team by platform name"""
@@ -144,6 +144,8 @@ class TestTeamManagement:
 
     def test_update_team(self, test_db: Session, test_team: Team):
         """Test updating team settings"""
+        original_display_name = test_team.display_name
+
         updated_team = APIKeyManager.update_team(
             db=test_db,
             team_id=test_team.id,
@@ -155,7 +157,7 @@ class TestTeamManagement:
 
         assert updated_team is not None
         assert updated_team.platform_name == "Updated-Platform"
-        assert updated_team.name == "Updated-Platform"
+        assert updated_team.display_name == original_display_name  # display_name should NOT change when updating platform_name
         assert updated_team.monthly_quota == 200000
         assert updated_team.daily_quota == 10000
         assert updated_team.is_active is False
@@ -189,6 +191,27 @@ class TestTeamManagement:
         result = APIKeyManager.update_team(db=test_db, team_id=99999, monthly_quota=100000)
 
         assert result is None
+
+    def test_update_team_platform_name_independent_of_name(self, test_db: Session):
+        """Test that updating platform_name doesn't modify the name field (bug fix test)
+
+        This test verifies the fix for the bug where updating platform_name would
+        incorrectly sync the name field, causing unique constraint violations.
+        """
+        # Create a team - initially name and platform_name are the same
+        team = APIKeyManager.create_team(db=test_db, name="Original-Team")
+        assert team.display_name == "Original-Team"
+        assert team.platform_name == "Original-Team"
+
+        # Update only the platform_name
+        updated_team = APIKeyManager.update_team(
+            db=test_db, team_id=team.id, platform_name="Updated-Platform"
+        )
+
+        # Verify platform_name changed but name did NOT change
+        assert updated_team is not None
+        assert updated_team.platform_name == "Updated-Platform"
+        assert updated_team.display_name == "Original-Team"  # display_name should remain unchanged
 
     def test_delete_team_with_no_keys(self, test_db: Session):
         """Test deleting a team with no API keys"""
@@ -255,7 +278,7 @@ class TestTeamManagement:
         )
 
         assert team.id is not None
-        assert team.name == "Internal-Marketing"
+        assert team.display_name == "Internal-Marketing"
         assert team.platform_name == "Internal-Marketing"
         assert team.monthly_quota == 150000
         assert team.daily_quota == 7500

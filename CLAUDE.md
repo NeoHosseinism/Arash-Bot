@@ -409,6 +409,50 @@ class MyRequest(BaseModel):
     )
 ```
 
+### Important Response Field Behaviors
+
+#### total_message_count Field
+
+The `total_message_count` field in `BotResponse` and session-related responses tracks the total number of **conversation messages** stored in the database.
+
+**What is counted:**
+- ✅ User chat messages (text sent to AI)
+- ✅ AI assistant responses
+
+**What is NOT counted:**
+- ❌ Commands (e.g., `/model`, `/help`, `/clear`, `/status`)
+- ❌ Command responses
+
+**Key Characteristics:**
+- **Persistence:** Survives `/clear` command (messages marked as cleared but remain in DB)
+- **Purpose:** Analytics, conversation depth tracking, usage statistics
+- **Calculation:** Direct count from `messages` table in database
+
+**Implementation:**
+```python
+# In message_processor.py:176-185
+session.total_message_count = (
+    db.query(func.count(Message.id))
+    .filter(
+        Message.platform == platform_name,
+        Message.user_id == user_id,
+        Message.team_id == team_id if team_id else Message.team_id.is_(None),
+    )
+    .scalar()
+    or 0
+)
+```
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "response": "مدل شما به GPT-4 تغییر کرد.",
+  "model": "GPT-4",
+  "total_message_count": 10  // Excludes the /model command just executed
+}
+```
+
 ### Authentication
 
 **Two-tier access control:**
