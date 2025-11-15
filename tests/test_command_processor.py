@@ -292,20 +292,21 @@ class TestClearCommand:
 
     @pytest.mark.asyncio
     async def test_clear_history(self, command_processor, telegram_session):
-        """Test /clear command clears history"""
-        # Add some messages
+        """Test /clear command clears in-memory history (AI context)"""
+        # Add some messages to in-memory history
         telegram_session.add_message("user", "Test message 1")
         telegram_session.add_message("assistant", "Response 1")
         telegram_session.add_message("user", "Test message 2")
 
-        assert telegram_session.message_count == 3
         assert len(telegram_session.history) == 3
 
         response = await command_processor.handle_clear(telegram_session, [])
 
         assert response is not None
-        assert telegram_session.message_count == 0
+        # History (AI context) should be cleared
         assert len(telegram_session.history) == 0
+        # message_count persists (tracks DB messages, not affected by /clear)
+        # This is expected per architecture: message_count tracks all messages ever
 
 
 class TestModelCommand:

@@ -52,16 +52,22 @@ class TestIncomingMessage:
         )
         assert message.user_id == "user123"
         assert message.text == "Hello, world!"
-        assert message.conversation_id is None
 
-    def test_incoming_message_with_conversation_id(self):
-        """Test creating message with conversation ID"""
+    def test_incoming_message_with_user_id_formats(self):
+        """Test creating message with different user ID formats"""
+        # Telegram user ID
         message = IncomingMessage(
-            user_id="user123",
-            text="Hello",
-            conversation_id="conv456"
+            user_id="telegram_456",
+            text="Hello"
         )
-        assert message.conversation_id == "conv456"
+        assert message.user_id == "telegram_456"
+
+        # Email as user ID
+        message = IncomingMessage(
+            user_id="user@example.com",
+            text="Hello"
+        )
+        assert message.user_id == "user@example.com"
 
 
 class TestBotResponse:
@@ -93,10 +99,9 @@ class TestBotResponse:
         response = BotResponse(
             success=True,
             response="Response text",
-            conversation_id="conv123",
             model="gpt-4",
             message_count=5
         )
-        assert response.conversation_id == "conv123"
         assert response.model == "gpt-4"
         assert response.message_count == 5
+        assert response.success is True

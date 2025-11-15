@@ -221,23 +221,23 @@ class TestMessageEndpointV1:
             return_value=BotResponse(
                 success=True,
                 response="Hello! How can I help?",
-                conversation_id="chat1",
                 model="gpt-4",
+                message_count=2,
             )
         )
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
-            json={"user_id": "user1", "conversation_id": "chat1", "text": "Hello"},
+            json={"user_id": "user1", "text": "Hello"},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
         assert data["response"] == "Hello! How can I help?"
-        assert data["conversation_id"] == "chat1"
         assert data["model"] == "gpt-4"
+        assert data["message_count"] == 2
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
