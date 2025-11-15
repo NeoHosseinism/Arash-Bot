@@ -467,6 +467,26 @@ class TestRateLimiting:
         remaining = session_manager.get_rate_limit_remaining("telegram", "user1")
         assert remaining == 19  # 1 request used
 
+    def test_clear_rate_limits_removes_empty_entries(self, session_manager):
+        """Test that clear_rate_limits removes empty entries after cleanup (line 228)"""
+        import time
+        from unittest.mock import patch
+
+        # Add request
+        session_manager.check_rate_limit("telegram", "user1")
+        assert "telegram:user1" in session_manager.rate_limits
+
+        # Mock time to make entry old (more than 60 seconds ago)
+        with patch('app.services.session_manager.time') as mock_time:
+            # Current time is 100 seconds in the future
+            mock_time.time.return_value = time.time() + 100
+
+            # Clear old entries
+            session_manager.clear_rate_limits()
+
+            # Entry should be completely removed from rate_limits dict (line 228 coverage)
+            assert "telegram:user1" not in session_manager.rate_limits
+
 
 class TestSessionCleaning:
     """Test session cleaning functionality"""

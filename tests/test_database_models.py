@@ -202,6 +202,92 @@ class TestDatabaseClass:
             assert result is False
 
 
+    def test_table_exists_exception_returns_false(self):
+        """Test table_exists returns False on exception (line 211 coverage)"""
+        from unittest.mock import patch
+
+        test_url = "postgresql://test:test@localhost/test"
+        db = Database(database_url=test_url)
+
+        with patch("app.models.database.inspect") as mock_inspect:
+            mock_inspect.side_effect = Exception("Database error")
+
+            result = db.table_exists("some_table")
+
+            assert result is False
+
+    def test_test_connection_success_returns_version(self):
+        """Test test_connection success path (lines 250-253 coverage)"""
+        test_url = "postgresql://test:test@localhost/test"
+
+        with patch("app.models.database.create_engine") as mock_create:
+            mock_engine = Mock()
+            mock_conn = Mock()
+            mock_result = Mock()
+            mock_result.scalar.return_value = "PostgreSQL 14.5"
+
+            mock_conn.execute.return_value = mock_result
+            mock_conn.__enter__ = Mock(return_value=mock_conn)
+            mock_conn.__exit__ = Mock(return_value=False)
+            mock_engine.connect.return_value = mock_conn
+
+            mock_create.return_value = mock_engine
+
+            db = Database(database_url=test_url)
+            result = db.test_connection()
+
+            assert result is True
+            # Verify version was logged
+            mock_result.scalar.assert_called_once()
+
+
+class TestMessageModel:
+    """Tests for Message model"""
+
+    def test_message_repr(self):
+        """Test Message __repr__ method (line 342 coverage)"""
+        from app.models.database import Message
+
+        message = Message(
+            id=123,
+            platform="telegram",
+            user_id="user456",
+            role="user",
+            content="Test message"
+        )
+
+        repr_str = repr(message)
+
+        assert "Message" in repr_str
+        assert "id=123" in repr_str
+        assert "platform='telegram'" in repr_str
+        assert "role='user'" in repr_str
+
+
+class TestGetDatabaseGlobalFunction:
+    """Tests for get_database() global function with connection failure"""
+
+    @patch("app.models.database._db_instance", None)
+    @patch("app.models.database.Database")
+    @patch("app.core.config.settings")
+    def test_get_database_connection_failure(self, mock_settings, mock_db_class):
+        """Test get_database when connection fails (line 293 coverage)"""
+        from app.models.database import get_database
+
+        mock_settings.sync_database_url = "postgresql://test:test@localhost/test"
+
+        # Mock Database instance
+        mock_db_instance = Mock()
+        mock_db_instance.test_connection.return_value = False  # Connection fails
+        mock_db_class.return_value = mock_db_instance
+
+        # This should log error on line 293 but still return the instance
+        result = get_database()
+
+        assert result is mock_db_instance
+        mock_db_instance.test_connection.assert_called_once()
+
+
 class TestGetDatabaseInstance:
     """Tests for get_database() global function"""
 
