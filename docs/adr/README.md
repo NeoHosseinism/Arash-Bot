@@ -47,6 +47,7 @@ graph LR
 |-----|-------|--------|------|--------|
 | [001](./001-dependency-management-uv.md) | Migration from Poetry to uv | Accepted | 2025-01-14 | High |
 | [002](./002-test-coverage-strategy.md) | Test Coverage Improvement Strategy | Accepted | 2025-01-14 | Medium |
+| [003](./003-user-based-session-architecture.md) | User-Based Session Architecture | Accepted | 2025-01-15 | High |
 
 ### Deprecated/Superseded
 

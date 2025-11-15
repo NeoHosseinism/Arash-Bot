@@ -23,6 +23,12 @@ def mock_session():
     session.platform_config = {"rate_limit": 60, "max_history": 10}
     session.get_recent_history = Mock(return_value=[])
 
+    # Team isolation fields
+    session.team_id = 1
+    session.api_key_id = 1
+    session.api_key_prefix = "ak_test"
+    session.user_id = "user123"
+
     # Make add_message increment count like the real implementation
     def add_message_side_effect(role, content):
         session.message_count += 1
@@ -345,6 +351,216 @@ class TestHandleCommand:
 
         assert result == "Command result"
         mock_cmd_proc.process_command.assert_called_once_with(mock_session, "/help")
+
+
+class TestDatabasePersistence:
+    """Tests for database message persistence in _handle_chat_simple"""
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.ai_client")
+    @patch("app.models.database.Message")
+    async def test_handle_chat_simple_persists_to_db(
+        self, mock_message_class, mock_ai_client, mock_platform_mgr, processor, mock_session
+    ):
+        """Test that messages are persisted to database successfully"""
+        mock_platform_mgr.get_max_history.return_value = 10
+        mock_ai_client.send_chat_request = AsyncMock(
+            return_value={"Response": "AI response"}
+        )
+
+        # Mock database session
+        mock_db = Mock()
+        mock_db.add = Mock()
+        mock_db.commit = Mock()
+
+        # Mock Message class
+        mock_user_msg = Mock()
+        mock_assistant_msg = Mock()
+        mock_message_class.side_effect = [mock_user_msg, mock_assistant_msg]
+
+        result = await processor._handle_chat_simple(mock_session, "Test message", mock_db)
+
+        assert result == "AI response"
+
+        # Verify messages were added to DB
+        assert mock_db.add.call_count == 2
+        mock_db.add.assert_any_call(mock_user_msg)
+        mock_db.add.assert_any_call(mock_assistant_msg)
+        mock_db.commit.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.ai_client")
+    @patch("app.models.database.Message")
+    async def test_handle_chat_simple_db_error_continues(
+        self, mock_message_class, mock_ai_client, mock_platform_mgr, processor, mock_session
+    ):
+        """Test that DB errors don't break the flow - in-memory history intact"""
+        mock_platform_mgr.get_max_history.return_value = 10
+        mock_ai_client.send_chat_request = AsyncMock(
+            return_value={"Response": "AI response"}
+        )
+
+        # Mock database session that fails on commit
+        mock_db = Mock()
+        mock_db.commit.side_effect = Exception("Database connection lost")
+        mock_db.rollback = Mock()
+
+        result = await processor._handle_chat_simple(mock_session, "Test message", mock_db)
+
+        # Should still return AI response even though DB failed
+        assert result == "AI response"
+
+        # Verify rollback was called
+        mock_db.rollback.assert_called_once()
+
+        # In-memory history should still be updated
+        mock_session.add_message.assert_any_call("user", "Test message")
+        mock_session.add_message.assert_any_call("assistant", "AI response")
+
+
+class TestErrorLoggingEdgeCases:
+    """Tests for error logging edge cases in process_message_simple"""
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    @patch("app.services.message_processor.UsageTracker")
+    @patch("app.services.message_processor.get_db_session")
+    async def test_error_logging_when_session_retrieval_fails(
+        self, mock_db, mock_tracker, mock_session_mgr, processor
+    ):
+        """Test error logging when session retrieval fails during error handling"""
+        # First call succeeds, but throws exception later
+        mock_session_mgr.get_or_create_session.side_effect = Exception("Fatal error")
+
+        result = await processor.process_message_simple(
+            platform_name="Internal-BI",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_test",
+            user_id="user123",
+            text="Hello",
+        )
+
+        assert result.success is False
+        assert result.error == "processing_error"
+
+        # Should still attempt to log (even though it may fail internally)
+        # The error handler has a try-except that catches session retrieval failures
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    @patch("app.services.message_processor.command_processor")
+    @patch("app.services.message_processor.UsageTracker")
+    @patch("app.services.message_processor.get_db_session")
+    async def test_error_logging_handles_session_not_found(
+        self, mock_db, mock_tracker, mock_cmd_proc, mock_session_mgr, processor, mock_session
+    ):
+        """Test error logging when session can't be found during error recovery"""
+        mock_session_mgr.get_or_create_session.return_value = mock_session
+        mock_session_mgr.check_rate_limit.return_value = True
+        mock_cmd_proc.is_command.return_value = False
+
+        # Simulate error during message processing
+        with patch.object(
+            processor, "_handle_chat_simple", new_callable=AsyncMock
+        ) as mock_handle:
+            mock_handle.side_effect = Exception("Processing failed")
+
+            # When trying to get session for logging, return None
+            mock_session_mgr.get_session.return_value = None
+
+            result = await processor.process_message_simple(
+                platform_name="Internal-BI",
+                team_id=1,
+                api_key_id=1,
+                api_key_prefix="ak_test",
+                user_id="user123",
+                text="Hello",
+            )
+
+            assert result.success is False
+
+            # Should still log with "unknown" model
+            mock_tracker.log_usage.assert_called_once()
+            call_kwargs = mock_tracker.log_usage.call_args.kwargs
+            assert call_kwargs["model_used"] == "unknown"
+            assert call_kwargs["session_id"] == "unknown"
+
+
+class TestProcessMessageSimpleEdgeCases:
+    """Additional edge case tests for process_message_simple"""
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    @patch("app.services.message_processor.command_processor")
+    @patch("app.services.message_processor.get_db_session")
+    async def test_message_count_reload_from_db(
+        self, mock_db, mock_cmd_proc, mock_session_mgr, processor, mock_session
+    ):
+        """Test that message_count is correctly reloaded from database"""
+        mock_session_mgr.get_or_create_session.return_value = mock_session
+        mock_session_mgr.check_rate_limit.return_value = True
+        mock_cmd_proc.is_command.return_value = False
+
+        # Mock DB query to return specific message count
+        mock_query = Mock()
+        mock_query.filter.return_value = mock_query
+        mock_query.scalar.return_value = 42  # Specific count
+        mock_db.return_value.query.return_value = mock_query
+
+        with patch.object(
+            processor, "_handle_chat_simple", new_callable=AsyncMock
+        ) as mock_handle:
+            mock_handle.return_value = "Response"
+
+            result = await processor.process_message_simple(
+                platform_name="Internal-BI",
+                team_id=1,
+                api_key_id=1,
+                api_key_prefix="ak_test",
+                user_id="user123",
+                text="Hello",
+            )
+
+            # Verify message_count was reloaded from DB
+            assert result.message_count == 42
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    @patch("app.services.message_processor.command_processor")
+    @patch("app.services.message_processor.get_db_session")
+    async def test_message_count_defaults_to_zero_if_none(
+        self, mock_db, mock_cmd_proc, mock_session_mgr, processor, mock_session
+    ):
+        """Test that message_count defaults to 0 if DB returns None"""
+        mock_session_mgr.get_or_create_session.return_value = mock_session
+        mock_session_mgr.check_rate_limit.return_value = True
+        mock_cmd_proc.is_command.return_value = False
+
+        # Mock DB query to return None
+        mock_query = Mock()
+        mock_query.filter.return_value = mock_query
+        mock_query.scalar.return_value = None  # No messages yet
+        mock_db.return_value.query.return_value = mock_query
+
+        with patch.object(
+            processor, "_handle_chat_simple", new_callable=AsyncMock
+        ) as mock_handle:
+            mock_handle.return_value = "Response"
+
+            result = await processor.process_message_simple(
+                platform_name="Internal-BI",
+                team_id=1,
+                api_key_id=1,
+                api_key_prefix="ak_test",
+                user_id="user123",
+                text="Hello",
+            )
+
+            # Should default to 0
+            assert result.message_count == 0
 
 
 class TestGlobalInstance:

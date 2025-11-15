@@ -415,5 +415,284 @@ class TestChatSession:
         assert uptime < 1.0  # Should be less than 1 second
 
 
+class TestRateLimiting:
+    """Test rate limiting functionality"""
+
+    def test_check_rate_limit_allows_first_requests(self, session_manager):
+        """Test that rate limiting allows initial requests"""
+        result = session_manager.check_rate_limit("telegram", "user1")
+        assert result is True
+
+        # Should allow multiple requests under limit
+        for _ in range(5):
+            result = session_manager.check_rate_limit("telegram", "user1")
+            assert result is True
+
+    def test_check_rate_limit_blocks_when_exceeded(self, session_manager):
+        """Test that rate limiting blocks when limit exceeded"""
+        # Telegram has rate limit of 20 per minute
+        # Send 20 requests (at limit)
+        for _ in range(20):
+            result = session_manager.check_rate_limit("telegram", "user1")
+            assert result is True
+
+        # 21st request should fail
+        result = session_manager.check_rate_limit("telegram", "user1")
+        assert result is False
+
+    def test_get_rate_limit_remaining(self, session_manager):
+        """Test getting remaining rate limit"""
+        # Start with full limit (20 for telegram)
+        remaining = session_manager.get_rate_limit_remaining("telegram", "user1")
+        assert remaining == 20
+
+        # Use 5 requests
+        for _ in range(5):
+            session_manager.check_rate_limit("telegram", "user1")
+
+        # Should have 15 remaining
+        remaining = session_manager.get_rate_limit_remaining("telegram", "user1")
+        assert remaining == 15
+
+    def test_clear_rate_limits_removes_old_entries(self, session_manager):
+        """Test that clear_rate_limits removes old entries"""
+        # Add some requests
+        session_manager.check_rate_limit("telegram", "user1")
+        session_manager.check_rate_limit("telegram", "user2")
+
+        # Clear old entries
+        session_manager.clear_rate_limits()
+
+        # Rate limits should still exist (not old enough)
+        remaining = session_manager.get_rate_limit_remaining("telegram", "user1")
+        assert remaining == 19  # 1 request used
+
+
+class TestSessionCleaning:
+    """Test session cleaning functionality"""
+
+    def test_clear_old_sessions(self, session_manager):
+        """Test clearing expired sessions"""
+        from datetime import datetime, timedelta
+
+        # Create session
+        session = session_manager.get_or_create_session(
+            platform="internal",
+            user_id="user1",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_test"
+        )
+
+        # Manually set last_activity to old time (beyond timeout)
+        session.last_activity = datetime.utcnow() - timedelta(hours=2)
+
+        # Clear old sessions
+        count = session_manager.clear_old_sessions()
+
+        # Should have cleared 1 session
+        assert count == 1
+
+        # Session should be gone
+        result = session_manager.get_session("internal", "user1", team_id=1)
+        assert result is None
+
+    def test_clear_old_sessions_keeps_active(self, session_manager):
+        """Test that clear_old_sessions keeps active sessions"""
+        # Create active session
+        session_manager.get_or_create_session(
+            platform="internal",
+            user_id="user1",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_test"
+        )
+
+        # Clear old sessions
+        count = session_manager.clear_old_sessions()
+
+        # Should not have cleared any
+        assert count == 0
+
+        # Session should still exist
+        result = session_manager.get_session("internal", "user1", team_id=1)
+        assert result is not None
+
+
+class TestSessionQueries:
+    """Test session query methods"""
+
+    def test_get_all_sessions(self, session_manager):
+        """Test getting all sessions"""
+        # Create sessions on different platforms
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user2", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+
+        # Get all sessions
+        all_sessions = session_manager.get_all_sessions()
+        assert len(all_sessions) == 2
+
+    def test_get_all_sessions_filtered_by_platform(self, session_manager):
+        """Test getting sessions filtered by platform"""
+        # Create sessions on different platforms
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user2"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user3", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+
+        # Get telegram sessions only
+        telegram_sessions = session_manager.get_all_sessions(platform="telegram")
+        assert len(telegram_sessions) == 2
+
+        # Get internal sessions only
+        internal_sessions = session_manager.get_all_sessions(platform="internal")
+        assert len(internal_sessions) == 1
+
+    def test_get_session_count(self, session_manager):
+        """Test getting session count"""
+        # Create sessions
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user2"
+        )
+
+        count = session_manager.get_session_count()
+        assert count == 2
+
+    def test_get_session_count_by_platform(self, session_manager):
+        """Test getting session count filtered by platform"""
+        # Create sessions on different platforms
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user2", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+
+        telegram_count = session_manager.get_session_count(platform="telegram")
+        assert telegram_count == 1
+
+        internal_count = session_manager.get_session_count(platform="internal")
+        assert internal_count == 1
+
+    def test_get_active_session_count(self, session_manager):
+        """Test getting active session count"""
+        from datetime import datetime, timedelta
+
+        # Create session
+        session = session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+
+        # Should count as active (just created)
+        active_count = session_manager.get_active_session_count(minutes=5)
+        assert active_count == 1
+
+        # Make session old
+        session.last_activity = datetime.utcnow() - timedelta(minutes=10)
+
+        # Should not count as active
+        active_count = session_manager.get_active_session_count(minutes=5)
+        assert active_count == 0
+
+    def test_get_session_count_by_team(self, session_manager):
+        """Test getting session count for a specific team"""
+        # Create sessions for different teams
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user1", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user2", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user3", team_id=2, api_key_id=2, api_key_prefix="ak_other"
+        )
+
+        # Count for team 1
+        team1_count = session_manager.get_session_count_by_team(team_id=1)
+        assert team1_count == 2
+
+        # Count for team 2
+        team2_count = session_manager.get_session_count_by_team(team_id=2)
+        assert team2_count == 1
+
+
+class TestAPIKeyOwnership:
+    """Test API key ownership validation"""
+
+    def test_get_or_create_session_blocks_different_api_key(self, session_manager):
+        """Test that different API key cannot access session"""
+        # Create session with API key 1
+        session_manager.get_or_create_session(
+            platform="internal",
+            user_id="user1",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_first"
+        )
+
+        # Try to access with API key 2 - should raise PermissionError
+        with pytest.raises(PermissionError) as exc_info:
+            session_manager.get_or_create_session(
+                platform="internal",
+                user_id="user1",
+                team_id=1,
+                api_key_id=2,
+                api_key_prefix="ak_second"
+            )
+
+        assert "Access denied" in str(exc_info.value)
+
+
+class TestDatabaseErrorHandling:
+    """Test database error handling"""
+
+    @patch("app.services.session_manager.get_db_session")
+    def test_handle_db_error_gracefully(self, mock_db_session, session_manager):
+        """Test that DB errors are handled gracefully during session creation"""
+        # Mock DB session to raise exception
+        mock_db = MagicMock()
+        mock_db.query.side_effect = Exception("Database connection failed")
+        mock_db_session.return_value = mock_db
+
+        # Should still create session with empty history
+        session = session_manager.get_or_create_session(
+            platform="internal",
+            user_id="user1",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_test"
+        )
+
+        assert session is not None
+        assert session.message_count == 0
+        assert len(session.history) == 0
+
+
+class TestSessionReturnNone:
+    """Test cases where methods return None"""
+
+    def test_get_session_returns_none_when_not_found(self, session_manager):
+        """Test that get_session returns None for non-existent session"""
+        result = session_manager.get_session("internal", "nonexistent_user", team_id=1)
+        assert result is None
+
+    def test_delete_session_returns_false_when_not_found(self, session_manager):
+        """Test that delete_session returns False for non-existent session"""
+        result = session_manager.delete_session("internal", "nonexistent_user", team_id=1)
+        assert result is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
