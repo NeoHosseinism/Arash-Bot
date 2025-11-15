@@ -172,6 +172,18 @@ class TestTeamManagement:
         assert updated_team.platform_name == original_platform
         assert updated_team.monthly_quota == 500000
 
+    def test_update_team_without_monthly_quota(self, test_db: Session, test_team: Team):
+        """Test updating team without changing monthly_quota (line 406 branch)"""
+        original_monthly = test_team.monthly_quota
+
+        updated_team = APIKeyManager.update_team(
+            db=test_db, team_id=test_team.id, daily_quota=3000
+        )
+
+        assert updated_team is not None
+        assert updated_team.monthly_quota == original_monthly
+        assert updated_team.daily_quota == 3000
+
     def test_update_team_not_found(self, test_db: Session):
         """Test updating non-existent team returns None"""
         result = APIKeyManager.update_team(db=test_db, team_id=99999, monthly_quota=100000)

@@ -224,6 +224,51 @@ class TestSendChatRequest:
         assert result == {"Response": "Success after generic error"}
         assert ai_client.client.post.call_count == 2
 
+    @pytest.mark.asyncio
+    async def test_send_chat_request_5xx_all_retries_failed(self, ai_client):
+        """Test 5xx error on all retries (line 105 branch coverage)"""
+        mock_response = Mock()
+        mock_response.status_code = 503
+
+        error = httpx.HTTPStatusError(
+            "Service Unavailable",
+            request=Mock(),
+            response=mock_response
+        )
+
+        # All 3 attempts fail with 5xx error
+        ai_client.client.post = AsyncMock(side_effect=error)
+
+        with pytest.raises(Exception) as exc_info:
+            await ai_client.send_chat_request(
+                session_id="test_session",
+                query="Hello",
+                history=[],
+                pipeline="google/gemini-2.0-flash-001"
+            )
+
+        assert "Failed after 3 attempts" in str(exc_info.value)
+        assert ai_client.client.post.call_count == 3
+
+    @pytest.mark.asyncio
+    async def test_send_chat_request_generic_exception_all_retries_failed(self, ai_client):
+        """Test generic exception on all retries (line 114 branch coverage)"""
+        # All 3 attempts fail with generic exception
+        ai_client.client.post = AsyncMock(
+            side_effect=Exception("Connection refused")
+        )
+
+        with pytest.raises(Exception) as exc_info:
+            await ai_client.send_chat_request(
+                session_id="test_session",
+                query="Hello",
+                history=[],
+                pipeline="google/gemini-2.0-flash-001"
+            )
+
+        assert "Failed after 3 attempts" in str(exc_info.value)
+        assert ai_client.client.post.call_count == 3
+
 
 class TestHealthCheck:
     """Tests for health_check method"""

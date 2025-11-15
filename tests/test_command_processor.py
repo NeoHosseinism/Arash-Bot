@@ -197,6 +197,22 @@ class TestStartCommand:
 
     @pytest.mark.asyncio
     @patch("app.services.command_processor.platform_manager")
+    async def test_start_internal_non_admin(
+        self, mock_platform_manager, command_processor, internal_session
+    ):
+        """Test /start for non-admin internal user (line 90->92 branch)"""
+        mock_platform_manager.get_config.return_value = Mock(rate_limit=60)
+        internal_session.is_admin = False  # Explicitly test False branch
+
+        response = await command_processor.handle_start(internal_session, [])
+
+        assert response is not None
+        assert "Claude" in response  # Should show current model
+        # Should NOT contain admin message
+        assert "ادمین" not in response
+
+    @pytest.mark.asyncio
+    @patch("app.services.command_processor.platform_manager")
     async def test_start_internal_admin(
         self, mock_platform_manager, command_processor, internal_session
     ):
@@ -255,6 +271,29 @@ class TestHelpCommand:
         assert response is not None
         assert "دستورات" in response
         assert "/settings" in response  # Internal-only command
+
+    @pytest.mark.asyncio
+    @patch("app.services.command_processor.platform_manager")
+    async def test_help_with_unknown_command(
+        self, mock_platform_manager, command_processor, telegram_session
+    ):
+        """Test /help with unknown command not in COMMAND_DESCRIPTIONS (line 106 branch)"""
+        # Include a command that's not in COMMAND_DESCRIPTIONS
+        mock_platform_manager.get_allowed_commands.return_value = [
+            "start",
+            "help",
+            "unknown_cmd",  # This command is not in COMMAND_DESCRIPTIONS
+        ]
+        mock_platform_manager.get_config.return_value = Mock(
+            rate_limit=20, max_history=10, available_models=["model1"]
+        )
+
+        response = await command_processor.handle_help(telegram_session, [])
+
+        assert response is not None
+        assert "دستورات" in response
+        # Should still show the unknown command in the copy-ready section
+        assert "/unknown_cmd" in response
 
 
 class TestStatusCommand:
