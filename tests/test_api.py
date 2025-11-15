@@ -374,5 +374,42 @@ class TestQuotaEnforcement:
         pass
 
 
+class TestFixtureUsage:
+    """Test that all fixtures are properly configured"""
+
+    def test_mock_db_session_fixture(self, mock_db_session):
+        """Test mock_db_session fixture (line 33)"""
+        assert mock_db_session is not None
+
+    def test_mock_api_key_team_fixture(self, mock_api_key_team):
+        """Test mock_api_key_team fixture (lines 45-51)"""
+        assert mock_api_key_team.id == 1
+        assert mock_api_key_team.team_id == 100
+        assert mock_api_key_team.key_prefix == "sk_test_"
+        assert mock_api_key_team.is_active is True
+
+    def test_mock_super_admin_key_fixture(self, mock_super_admin_key):
+        """Test mock_super_admin_key fixture (line 64)"""
+        assert mock_super_admin_key == "test_super_admin_key_12345"
+
+    def test_mock_api_key_internal_fixture(self, mock_api_key_internal):
+        """Test mock_api_key_internal fixture (lines 88-94)"""
+        assert mock_api_key_internal.id == 2
+        assert mock_api_key_internal.team_id == 101
+        assert mock_api_key_internal.team.platform_name == "internal"
+
+    def test_mock_api_key_external_fixture(self, mock_api_key_external):
+        """Test mock_api_key_external fixture (lines 102-108)"""
+        assert mock_api_key_external.id == 3
+        assert mock_api_key_external.team_id == 102
+        assert mock_api_key_external.team.platform_name == "telegram"
+
+    def test_mock_api_key_admin_fixture(self, mock_api_key_admin):
+        """Test mock_api_key_admin fixture (lines 119-125)"""
+        assert mock_api_key_admin.id == 4
+        assert mock_api_key_admin.team_id == 103
+        assert mock_api_key_admin.key_prefix == "sk_admin_"
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
