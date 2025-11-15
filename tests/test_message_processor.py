@@ -563,6 +563,290 @@ class TestProcessMessageSimpleEdgeCases:
             assert result.message_count == 0
 
 
+class TestLegacyProcessMessage:
+    """Tests for legacy process_message method (webhook-based)"""
+
+    @pytest.fixture
+    def legacy_incoming_message(self):
+        """Create a mock IncomingMessage with legacy fields"""
+        msg = Mock(spec=IncomingMessage)
+        msg.platform = "telegram"
+        msg.user_id = "user123"
+        msg.conversation_id = "conv456"
+        msg.text = "Hello"
+        msg.auth_token = None
+        msg.metadata = {"team_id": 1, "api_key_id": 1, "api_key_prefix": "ak_test"}
+        msg.attachments = []
+        return msg
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.command_processor")
+    async def test_legacy_process_message_success(
+        self, mock_cmd_proc, mock_platform_mgr, mock_session_mgr, processor, mock_session, legacy_incoming_message
+    ):
+        """Test legacy process_message with successful response"""
+        mock_session_mgr.get_or_create_session.return_value = mock_session
+        mock_session_mgr.check_rate_limit.return_value = True
+        mock_platform_mgr.requires_auth.return_value = False
+        mock_cmd_proc.is_command.return_value = False
+
+        with patch.object(processor, "_handle_chat", new_callable=AsyncMock) as mock_handle:
+            mock_handle.return_value = "AI response"
+
+            result = await processor.process_message(legacy_incoming_message)
+
+            assert result.success is True
+            assert result.response == "AI response"
+            # Note: data field doesn't exist in current BotResponse schema (legacy code)
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    @patch("app.services.message_processor.platform_manager")
+    async def test_legacy_process_message_auth_failed(
+        self, mock_platform_mgr, mock_session_mgr, processor, mock_session, legacy_incoming_message
+    ):
+        """Test legacy process_message with authentication failure"""
+        mock_session_mgr.get_or_create_session.return_value = mock_session
+        mock_platform_mgr.requires_auth.return_value = True
+        mock_platform_mgr.validate_auth.return_value = False
+
+        legacy_incoming_message.auth_token = "invalid_token"
+
+        result = await processor.process_message(legacy_incoming_message)
+
+        assert result.success is False
+        assert result.error == "authentication_failed"
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    @patch("app.services.message_processor.platform_manager")
+    async def test_legacy_process_message_rate_limit(
+        self, mock_platform_mgr, mock_session_mgr, processor, mock_session, legacy_incoming_message
+    ):
+        """Test legacy process_message with rate limit exceeded"""
+        mock_session_mgr.get_or_create_session.return_value = mock_session
+        mock_session_mgr.check_rate_limit.return_value = False
+        mock_platform_mgr.requires_auth.return_value = False  # Skip auth check
+        mock_platform_mgr.get_rate_limit.return_value = 60
+
+        result = await processor.process_message(legacy_incoming_message)
+
+        assert result.success is False
+        assert result.error == "rate_limit"
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.command_processor")
+    async def test_legacy_process_message_command(
+        self, mock_cmd_proc, mock_platform_mgr, mock_session_mgr, processor, mock_session, legacy_incoming_message
+    ):
+        """Test legacy process_message with command"""
+        mock_session_mgr.get_or_create_session.return_value = mock_session
+        mock_session_mgr.check_rate_limit.return_value = True
+        mock_platform_mgr.requires_auth.return_value = False
+        mock_cmd_proc.is_command.return_value = True
+
+        legacy_incoming_message.text = "/help"
+
+        with patch.object(processor, "_handle_command", new_callable=AsyncMock) as mock_handle:
+            mock_handle.return_value = "Command response"
+
+            result = await processor.process_message(legacy_incoming_message)
+
+            assert result.success is True
+            assert result.response == "Command response"
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.session_manager")
+    async def test_legacy_process_message_exception(
+        self, mock_session_mgr, processor, legacy_incoming_message
+    ):
+        """Test legacy process_message with exception"""
+        mock_session_mgr.get_or_create_session.side_effect = Exception("Test error")
+
+        result = await processor.process_message(legacy_incoming_message)
+
+        assert result.success is False
+        assert result.error == "processing_error"
+
+
+class TestHandleChatWithAttachments:
+    """Tests for _handle_chat method (handles attachments/files)"""
+
+    @pytest.fixture
+    def message_with_image(self):
+        """Create mock message with image attachment"""
+        from app.core.constants import MessageType
+
+        msg = Mock(spec=IncomingMessage)
+        msg.text = "Check this image"
+
+        # Create mock attachment (avoid Pydantic validation)
+        attachment = Mock()
+        attachment.type = MessageType.IMAGE
+        attachment.data = "SGVsbG8gV29ybGQ="  # Valid base64 for "Hello World"
+        attachment.mime_type = "image/png"
+
+        msg.attachments = [attachment]
+        return msg
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.ai_client")
+    async def test_handle_chat_with_image_attachment(
+        self, mock_ai_client, mock_platform_mgr, processor, mock_session, message_with_image
+    ):
+        """Test _handle_chat with image attachment"""
+        mock_platform_mgr.get_max_history.return_value = 10
+        mock_ai_client.send_chat_request = AsyncMock(return_value={"Response": "I see the image"})
+
+        mock_session.history = []
+
+        result = await processor._handle_chat(mock_session, message_with_image)
+
+        assert result == "I see the image"
+        # Verify files were passed to AI client
+        call_args = mock_ai_client.send_chat_request.call_args
+        assert call_args.kwargs["files"] == [{"Data": "SGVsbG8gV29ybGQ=", "MIMEType": "image/png"}]
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.ai_client")
+    async def test_handle_chat_image_without_text(
+        self, mock_ai_client, mock_platform_mgr, processor, mock_session, message_with_image
+    ):
+        """Test _handle_chat with image but no text (uses default Persian question)"""
+        mock_platform_mgr.get_max_history.return_value = 10
+        mock_ai_client.send_chat_request = AsyncMock(return_value={"Response": "تصویری زیبا"})
+
+        mock_session.history = []
+        message_with_image.text = None  # No text
+
+        result = await processor._handle_chat(mock_session, message_with_image)
+
+        # Verify default Persian question was used
+        call_args = mock_ai_client.send_chat_request.call_args
+        assert call_args.kwargs["query"] == "این تصویر را توضیح بده؟"
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.ai_client")
+    async def test_handle_chat_trims_history(
+        self, mock_ai_client, mock_platform_mgr, processor, mock_session
+    ):
+        """Test _handle_chat trims history when it exceeds limit"""
+        mock_platform_mgr.get_max_history.return_value = 5
+        mock_ai_client.send_chat_request = AsyncMock(return_value={"Response": "OK"})
+
+        # Create history that exceeds limit (5 * 2 = 10)
+        mock_session.history = [{"role": "user", "content": f"Message {i}"} for i in range(15)]
+
+        msg = Mock(spec=IncomingMessage)
+        msg.text = "New message"
+        msg.attachments = []
+
+        await processor._handle_chat(mock_session, msg)
+
+        # History should be trimmed to max_history * 2 = 10
+        assert len(mock_session.history) == 10
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.ai_client")
+    async def test_handle_chat_ai_service_error(
+        self, mock_ai_client, mock_platform_mgr, processor, mock_session
+    ):
+        """Test _handle_chat with AI service error (returns fallback message)"""
+        mock_platform_mgr.get_max_history.return_value = 10
+        mock_ai_client.send_chat_request = AsyncMock(side_effect=Exception("AI service down"))
+
+        mock_session.history = []
+
+        msg = Mock(spec=IncomingMessage)
+        msg.text = "Test message"
+        msg.attachments = []
+
+        result = await processor._handle_chat(mock_session, msg)
+
+        # Should return fallback message
+        assert "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست" in result
+        assert "Test message" in result
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    async def test_handle_chat_general_exception(
+        self, mock_platform_mgr, processor, mock_session
+    ):
+        """Test _handle_chat with general exception"""
+        mock_platform_mgr.get_max_history.side_effect = Exception("Unexpected error")
+
+        msg = Mock(spec=IncomingMessage)
+        msg.text = "Test"
+        msg.attachments = []
+
+        result = await processor._handle_chat(mock_session, msg)
+
+        # Should return error message from MESSAGES_FA
+        assert result != ""  # Should return some error message
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.ai_client")
+    async def test_handle_chat_no_attachments(
+        self, mock_ai_client, mock_platform_mgr, processor, mock_session
+    ):
+        """Test _handle_chat with no attachments (empty files list)"""
+        mock_platform_mgr.get_max_history.return_value = 10
+        mock_ai_client.send_chat_request = AsyncMock(return_value={"Response": "OK"})
+
+        mock_session.history = []
+
+        msg = Mock(spec=IncomingMessage)
+        msg.text = "Simple text message"
+        msg.attachments = []
+
+        result = await processor._handle_chat(mock_session, msg)
+
+        assert result == "OK"
+        # Verify empty files list was passed
+        call_args = mock_ai_client.send_chat_request.call_args
+        assert call_args.kwargs["files"] == []
+
+    @pytest.mark.asyncio
+    @patch("app.services.message_processor.platform_manager")
+    @patch("app.services.message_processor.ai_client")
+    async def test_handle_chat_attachment_without_data(
+        self, mock_ai_client, mock_platform_mgr, processor, mock_session
+    ):
+        """Test _handle_chat with attachment but no data field"""
+        from app.core.constants import MessageType
+
+        mock_platform_mgr.get_max_history.return_value = 10
+        mock_ai_client.send_chat_request = AsyncMock(return_value={"Response": "OK"})
+
+        mock_session.history = []
+
+        msg = Mock(spec=IncomingMessage)
+        msg.text = "Message"
+
+        # Create mock attachment without data
+        attachment = Mock()
+        attachment.type = MessageType.IMAGE
+        attachment.data = None  # No data
+        attachment.mime_type = "image/png"
+
+        msg.attachments = [attachment]
+
+        result = await processor._handle_chat(mock_session, msg)
+
+        # Attachment without data should be skipped
+        call_args = mock_ai_client.send_chat_request.call_args
+        assert call_args.kwargs["files"] == []
+
+
 class TestGlobalInstance:
     """Tests for global message_processor instance"""
 

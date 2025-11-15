@@ -274,6 +274,208 @@ class TestColoredFormatter:
             assert "Test message" in result
             assert "ValueError" in result or "Traceback" in result
 
+    def test_should_use_colors_tty_detection(self):
+        """Test TTY detection for auto mode (line 68)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "auto"
+            mock_settings.NO_COLOR = "0"
+
+            # Ensure no Docker/K8s env vars
+            with patch.dict(os.environ, {}, clear=True):
+                # Mock os.path.exists to return False for /.dockerenv
+                with patch("os.path.exists", return_value=False):
+                    # Mock stdout to have isatty and return True
+                    with patch("sys.stdout") as mock_stdout:
+                        mock_stdout.isatty.return_value = True
+                        formatter = ColoredFormatter(use_colors=True)
+                        assert formatter.use_colors is True
+
+    def test_should_use_colors_kubernetes_env(self):
+        """Test colors disabled in Kubernetes (line 64)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "auto"
+            mock_settings.NO_COLOR = "0"
+            with patch.dict(os.environ, {"KUBERNETES_SERVICE_HOST": "10.0.0.1"}):
+                formatter = ColoredFormatter(use_colors=True)
+                assert formatter.use_colors is False
+
+    def test_format_timestamp_ir_microseconds(self, mock_record):
+        """Test Iranian timestamp with microsecond precision (line 100)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_TIMESTAMP = "ir"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 6  # 6 digits
+            mock_settings.LOG_COLOR = "false"
+            mock_settings.NO_COLOR = "0"
+            formatter = ColoredFormatter(use_colors=False)
+
+            result = formatter._format_timestamp_ir(mock_record)
+            assert " IR" in result
+            # Should have 6-digit precision
+            assert "." in result
+
+    def test_format_context_non_app_logger(self, mock_record):
+        """Test context for non-app logger names (line 122, 127)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "false"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=False)
+
+            mock_record.name = "custom_module.submodule"
+            result = formatter._format_context(mock_record)
+            assert "custom_module.submodule" in result
+
+    def test_format_context_empty_context_attribute(self, mock_record):
+        """Test context when context attribute is empty string (line 128)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "false"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=False)
+
+            # Set context to empty string
+            mock_record.context = ""
+            result = formatter._format_context(mock_record)
+            assert result == ""
+
+    def test_parse_and_colorize_kvs_basic(self):
+        """Test parsing and colorizing basic key=value pairs (lines 142-207)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "true"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=True)
+
+            message = "Processing request user_id=123 status=success"
+            result = formatter._parse_and_colorize_kvs(message)
+            assert "user_id" in result
+            assert "123" in result
+            assert "status" in result
+            assert "success" in result
+
+    def test_parse_and_colorize_kvs_quoted_values(self):
+        """Test parsing key=value with quoted values (lines 176-182)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "true"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=True)
+
+            message = 'Processing message="Hello World" user="John Doe"'
+            result = formatter._parse_and_colorize_kvs(message)
+            assert "message" in result
+            assert "Hello World" in result
+            assert "user" in result
+            assert "John Doe" in result
+
+    def test_parse_and_colorize_kvs_single_quotes(self):
+        """Test parsing key=value with single quotes"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "true"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=True)
+
+            message = "Processing name='Test User' id='456'"
+            result = formatter._parse_and_colorize_kvs(message)
+            assert "name" in result
+            assert "Test User" in result
+
+    def test_parse_and_colorize_kvs_no_equals(self):
+        """Test message without key=value pairs (line 138)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "true"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=True)
+
+            message = "Simple message without key value pairs"
+            result = formatter._parse_and_colorize_kvs(message)
+            assert result == message
+
+    def test_parse_and_colorize_kvs_colors_disabled(self):
+        """Test kv parsing with colors disabled"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "false"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=False)
+
+            message = "Processing user_id=123 status=ok"
+            result = formatter._parse_and_colorize_kvs(message)
+            assert result == message  # Should remain unchanged
+
+    def test_parse_and_colorize_kvs_unclosed_quote(self):
+        """Test parsing with unclosed quoted value (line 179-180)"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "true"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=True)
+
+            message = 'message="Unclosed quote status=ok'
+            result = formatter._parse_and_colorize_kvs(message)
+            # Should handle gracefully
+            assert "message" in result
+
+    def test_parse_and_colorize_kvs_multiple_on_line(self):
+        """Test multiple key=value pairs on one line"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "true"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=True)
+
+            message = "Request id=1 user=john status=200 time=123ms"
+            result = formatter._parse_and_colorize_kvs(message)
+            assert "id" in result
+            assert "user" in result
+            assert "status" in result
+            assert "time" in result
+
+    def test_parse_and_colorize_kvs_with_spaces_in_text(self):
+        """Test parsing with spaces before and after kv pairs"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_COLOR = "true"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP = "none"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=True)
+
+            message = "Start text user_id=123 middle text status=ok end text"
+            result = formatter._parse_and_colorize_kvs(message)
+            assert "Start text" in result
+            assert "middle text" in result
+            assert "end text" in result
+            assert "user_id" in result
+            assert "status" in result
+
+    def test_format_complete_log_with_kvs(self, mock_record):
+        """Test complete log formatting with key=value colorization"""
+        with patch("app.utils.logger.settings") as mock_settings:
+            mock_settings.LOG_TIMESTAMP = "utc"
+            mock_settings.LOG_COLOR = "true"
+            mock_settings.NO_COLOR = "0"
+            mock_settings.LOG_TIMESTAMP_PRECISION = 3
+            formatter = ColoredFormatter(use_colors=True)
+
+            mock_record.getMessage.return_value = "Processing request user_id=456 status=success"
+            mock_record.name = "app.api.routes"
+
+            result = formatter.format(mock_record)
+            assert "Processing request" in result
+            assert "user_id" in result or "456" in result  # Colorized
+            assert "api.routes" in result  # Context
+
 
 class TestStructuredLogger:
     """Tests for StructuredLogger"""
