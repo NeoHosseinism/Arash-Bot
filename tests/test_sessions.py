@@ -11,6 +11,7 @@ Tests for:
 import sys
 from datetime import datetime, timedelta
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -24,7 +25,12 @@ from app.services.session_manager import SessionManager
 @pytest.fixture
 def session_manager():
     """Create fresh session manager for each test"""
-    return SessionManager()
+    # Mock the database to avoid needing a real database in tests
+    with patch("app.services.session_manager.get_db_session") as mock_db:
+        mock_db.return_value = MagicMock()
+        mock_db.return_value.query.return_value.filter.return_value.scalar.return_value = 0
+        mock_db.return_value.query.return_value.filter.return_value.all.return_value = []
+        yield SessionManager()
 
 
 class TestSessionCreation:
@@ -35,7 +41,6 @@ class TestSessionCreation:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -44,7 +49,6 @@ class TestSessionCreation:
         assert session is not None
         assert session.platform == "internal"
         assert session.user_id == "user1"
-        assert session.conversation_id == "chat1"
         assert session.team_id == 100
         assert session.api_key_id == 1
         assert session.api_key_prefix == "sk_test_"
@@ -54,7 +58,6 @@ class TestSessionCreation:
         session = session_manager.get_or_create_session(
             platform="telegram",
             user_id="tg_user1",
-            conversation_id="tg_chat1",
             team_id=None,
             api_key_id=None,
             api_key_prefix=None,
@@ -72,27 +75,27 @@ class TestSessionKeyGeneration:
     def test_session_key_format_with_team(self, session_manager):
         """Test session key format includes team_id"""
         key = session_manager.get_session_key(
-            platform="internal", conversation_id="chat123", team_id=100
+            platform="internal", user_id="user123", team_id=100
         )
 
-        assert key == "internal:100:chat123"
+        assert key == "internal:100:user123"
 
     def test_session_key_format_without_team(self, session_manager):
         """Test session key format without team_id"""
         key = session_manager.get_session_key(
-            platform="telegram", conversation_id="chat123", team_id=None
+            platform="telegram", user_id="user123", team_id=None
         )
 
-        assert key == "telegram:chat123"
+        assert key == "telegram:user123"
 
     def test_session_key_collision_prevention(self, session_manager):
-        """Test that different teams with same conversation_id get different keys"""
-        key_team_1 = session_manager.get_session_key("internal", "chat123", team_id=1)
-        key_team_2 = session_manager.get_session_key("internal", "chat123", team_id=2)
+        """Test that different teams with same user_id get different keys"""
+        key_team_1 = session_manager.get_session_key("internal", "user123", team_id=1)
+        key_team_2 = session_manager.get_session_key("internal", "user123", team_id=2)
 
         assert key_team_1 != key_team_2
-        assert key_team_1 == "internal:1:chat123"
-        assert key_team_2 == "internal:2:chat123"
+        assert key_team_1 == "internal:1:user123"
+        assert key_team_2 == "internal:2:user123"
 
 
 class TestSessionIsolation:
@@ -100,21 +103,19 @@ class TestSessionIsolation:
 
     def test_different_teams_cannot_share_sessions(self, session_manager):
         """Test that sessions are isolated by team_id"""
-        # Team 1 creates session with conversation_id "user123"
+        # Team 1 creates session for user123
         session_team_1 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user123",
-            conversation_id="user123",
             team_id=1,
             api_key_id=10,
             api_key_prefix="sk_team1_",
         )
 
-        # Team 2 creates session with same conversation_id "user123"
+        # Team 2 creates session for same user123
         session_team_2 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user123",
-            conversation_id="user123",
             team_id=2,
             api_key_id=20,
             api_key_prefix="sk_team2_",
@@ -133,7 +134,6 @@ class TestSessionIsolation:
         session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_t100_",
@@ -142,7 +142,6 @@ class TestSessionIsolation:
         session_manager.get_or_create_session(
             platform="internal",
             user_id="user2",
-            conversation_id="chat2",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_t100_",
@@ -152,7 +151,6 @@ class TestSessionIsolation:
         session_manager.get_or_create_session(
             platform="internal",
             user_id="user3",
-            conversation_id="chat3",
             team_id=200,
             api_key_id=2,
             api_key_prefix="sk_t200_",
@@ -179,17 +177,15 @@ class TestSessionRetrieval:
         session1 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
         )
 
-        # Retrieve same session
+        # Retrieve same session (same user, platform, team)
         session2 = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -204,7 +200,6 @@ class TestSessionRetrieval:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -230,7 +225,6 @@ class TestSessionDeletion:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -238,7 +232,7 @@ class TestSessionDeletion:
 
         # Delete session
         success = session_manager.delete_session(
-            platform="internal", conversation_id="chat1", team_id=100
+            platform="internal", user_id="user1", team_id=100
         )
 
         assert success is True
@@ -253,7 +247,6 @@ class TestSessionDeletion:
         session_manager.get_or_create_session(
             platform="telegram",
             user_id="tg_user",
-            conversation_id="tg_chat",
             team_id=None,
             api_key_id=None,
             api_key_prefix=None,
@@ -261,7 +254,7 @@ class TestSessionDeletion:
 
         # Delete session
         success = session_manager.delete_session(
-            platform="telegram", conversation_id="tg_chat", team_id=None
+            platform="telegram", user_id="tg_user", team_id=None
         )
 
         assert success is True
@@ -275,7 +268,6 @@ class TestSessionHistory:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -298,7 +290,6 @@ class TestSessionHistory:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -318,7 +309,6 @@ class TestSessionHistory:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -342,7 +332,6 @@ class TestSessionExpiration:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -356,7 +345,6 @@ class TestSessionExpiration:
         session = session_manager.get_or_create_session(
             platform="internal",
             user_id="user1",
-            conversation_id="chat1",
             team_id=100,
             api_key_id=1,
             api_key_prefix="sk_test_",
@@ -379,7 +367,6 @@ class TestChatSession:
             platform="internal",
             platform_config={"type": "private", "model": "gpt-4"},
             user_id="user1",
-            conversation_id="chat1",
             current_model="gpt-4",
             team_id=100,
             api_key_id=1,
@@ -398,7 +385,6 @@ class TestChatSession:
             platform="telegram",
             platform_config={"type": "private", "model": "gemini-2.0-flash"},
             user_id="tg_user",
-            conversation_id="tg_chat",
             current_model="gemini-2.0-flash",
             team_id=None,
             api_key_id=None,
@@ -408,6 +394,324 @@ class TestChatSession:
         assert session.platform == "telegram"
         assert session.team_id is None
         assert session.api_key_id is None
+
+    def test_session_get_uptime_seconds(self):
+        """Test getting session uptime in seconds"""
+        import time
+
+        session = ChatSession(
+            session_id="uptime_test",
+            platform="internal",
+            platform_config={"type": "private", "model": "gpt-4"},
+            user_id="user1",
+            current_model="gpt-4",
+        )
+
+        # Wait a small amount
+        time.sleep(0.1)
+
+        uptime = session.get_uptime_seconds()
+        assert uptime >= 0.1
+        assert uptime < 1.0  # Should be less than 1 second
+
+
+class TestRateLimiting:
+    """Test rate limiting functionality"""
+
+    def test_check_rate_limit_allows_first_requests(self, session_manager):
+        """Test that rate limiting allows initial requests"""
+        result = session_manager.check_rate_limit("telegram", "user1")
+        assert result is True
+
+        # Should allow multiple requests under limit
+        for _ in range(5):
+            result = session_manager.check_rate_limit("telegram", "user1")
+            assert result is True
+
+    def test_check_rate_limit_blocks_when_exceeded(self, session_manager):
+        """Test that rate limiting blocks when limit exceeded"""
+        # Telegram has rate limit of 20 per minute
+        # Send 20 requests (at limit)
+        for _ in range(20):
+            result = session_manager.check_rate_limit("telegram", "user1")
+            assert result is True
+
+        # 21st request should fail
+        result = session_manager.check_rate_limit("telegram", "user1")
+        assert result is False
+
+    def test_get_rate_limit_remaining(self, session_manager):
+        """Test getting remaining rate limit"""
+        # Start with full limit (20 for telegram)
+        remaining = session_manager.get_rate_limit_remaining("telegram", "user1")
+        assert remaining == 20
+
+        # Use 5 requests
+        for _ in range(5):
+            session_manager.check_rate_limit("telegram", "user1")
+
+        # Should have 15 remaining
+        remaining = session_manager.get_rate_limit_remaining("telegram", "user1")
+        assert remaining == 15
+
+    def test_clear_rate_limits_removes_old_entries(self, session_manager):
+        """Test that clear_rate_limits removes old entries"""
+        # Add some requests
+        session_manager.check_rate_limit("telegram", "user1")
+        session_manager.check_rate_limit("telegram", "user2")
+
+        # Clear old entries
+        session_manager.clear_rate_limits()
+
+        # Rate limits should still exist (not old enough)
+        remaining = session_manager.get_rate_limit_remaining("telegram", "user1")
+        assert remaining == 19  # 1 request used
+
+    def test_clear_rate_limits_removes_empty_entries(self, session_manager):
+        """Test that clear_rate_limits removes empty entries after cleanup (line 228)"""
+        import time
+        from unittest.mock import patch
+
+        # Add request
+        session_manager.check_rate_limit("telegram", "user1")
+        assert "telegram:user1" in session_manager.rate_limits
+
+        # Mock time to make entry old (more than 60 seconds ago)
+        with patch('app.services.session_manager.time') as mock_time:
+            # Current time is 100 seconds in the future
+            mock_time.time.return_value = time.time() + 100
+
+            # Clear old entries
+            session_manager.clear_rate_limits()
+
+            # Entry should be completely removed from rate_limits dict (line 228 coverage)
+            assert "telegram:user1" not in session_manager.rate_limits
+
+
+class TestSessionCleaning:
+    """Test session cleaning functionality"""
+
+    def test_clear_old_sessions(self, session_manager):
+        """Test clearing expired sessions"""
+        from datetime import datetime, timedelta
+
+        # Create session
+        session = session_manager.get_or_create_session(
+            platform="internal",
+            user_id="user1",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_test"
+        )
+
+        # Manually set last_activity to old time (beyond timeout)
+        session.last_activity = datetime.utcnow() - timedelta(hours=2)
+
+        # Clear old sessions
+        count = session_manager.clear_old_sessions()
+
+        # Should have cleared 1 session
+        assert count == 1
+
+        # Session should be gone
+        result = session_manager.get_session("internal", "user1", team_id=1)
+        assert result is None
+
+    def test_clear_old_sessions_keeps_active(self, session_manager):
+        """Test that clear_old_sessions keeps active sessions"""
+        # Create active session
+        session_manager.get_or_create_session(
+            platform="internal",
+            user_id="user1",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_test"
+        )
+
+        # Clear old sessions
+        count = session_manager.clear_old_sessions()
+
+        # Should not have cleared any
+        assert count == 0
+
+        # Session should still exist
+        result = session_manager.get_session("internal", "user1", team_id=1)
+        assert result is not None
+
+
+class TestSessionQueries:
+    """Test session query methods"""
+
+    def test_get_all_sessions(self, session_manager):
+        """Test getting all sessions"""
+        # Create sessions on different platforms
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user2", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+
+        # Get all sessions
+        all_sessions = session_manager.get_all_sessions()
+        assert len(all_sessions) == 2
+
+    def test_get_all_sessions_filtered_by_platform(self, session_manager):
+        """Test getting sessions filtered by platform"""
+        # Create sessions on different platforms
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user2"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user3", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+
+        # Get telegram sessions only
+        telegram_sessions = session_manager.get_all_sessions(platform="telegram")
+        assert len(telegram_sessions) == 2
+
+        # Get internal sessions only
+        internal_sessions = session_manager.get_all_sessions(platform="internal")
+        assert len(internal_sessions) == 1
+
+    def test_get_session_count(self, session_manager):
+        """Test getting session count"""
+        # Create sessions
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user2"
+        )
+
+        count = session_manager.get_session_count()
+        assert count == 2
+
+    def test_get_session_count_by_platform(self, session_manager):
+        """Test getting session count filtered by platform"""
+        # Create sessions on different platforms
+        session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user2", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+
+        telegram_count = session_manager.get_session_count(platform="telegram")
+        assert telegram_count == 1
+
+        internal_count = session_manager.get_session_count(platform="internal")
+        assert internal_count == 1
+
+    def test_get_active_session_count(self, session_manager):
+        """Test getting active session count"""
+        from datetime import datetime, timedelta
+
+        # Create session
+        session = session_manager.get_or_create_session(
+            platform="telegram", user_id="user1"
+        )
+
+        # Should count as active (just created)
+        active_count = session_manager.get_active_session_count(minutes=5)
+        assert active_count == 1
+
+        # Make session old
+        session.last_activity = datetime.utcnow() - timedelta(minutes=10)
+
+        # Should not count as active
+        active_count = session_manager.get_active_session_count(minutes=5)
+        assert active_count == 0
+
+    def test_get_session_count_by_team(self, session_manager):
+        """Test getting session count for a specific team"""
+        # Create sessions for different teams
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user1", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user2", team_id=1, api_key_id=1, api_key_prefix="ak_test"
+        )
+        session_manager.get_or_create_session(
+            platform="internal", user_id="user3", team_id=2, api_key_id=2, api_key_prefix="ak_other"
+        )
+
+        # Count for team 1
+        team1_count = session_manager.get_session_count_by_team(team_id=1)
+        assert team1_count == 2
+
+        # Count for team 2
+        team2_count = session_manager.get_session_count_by_team(team_id=2)
+        assert team2_count == 1
+
+
+class TestAPIKeyOwnership:
+    """Test API key ownership validation"""
+
+    def test_get_or_create_session_blocks_different_api_key(self, session_manager):
+        """Test that different API key cannot access session"""
+        # Create session with API key 1
+        session_manager.get_or_create_session(
+            platform="internal",
+            user_id="user1",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_first"
+        )
+
+        # Try to access with API key 2 - should raise PermissionError
+        with pytest.raises(PermissionError) as exc_info:
+            session_manager.get_or_create_session(
+                platform="internal",
+                user_id="user1",
+                team_id=1,
+                api_key_id=2,
+                api_key_prefix="ak_second"
+            )
+
+        assert "Access denied" in str(exc_info.value)
+
+
+class TestDatabaseErrorHandling:
+    """Test database error handling"""
+
+    @patch("app.services.session_manager.get_db_session")
+    def test_handle_db_error_gracefully(self, mock_db_session, session_manager):
+        """Test that DB errors are handled gracefully during session creation"""
+        # Mock DB session to raise exception
+        mock_db = MagicMock()
+        mock_db.query.side_effect = Exception("Database connection failed")
+        mock_db_session.return_value = mock_db
+
+        # Should still create session with empty history
+        session = session_manager.get_or_create_session(
+            platform="internal",
+            user_id="user1",
+            team_id=1,
+            api_key_id=1,
+            api_key_prefix="ak_test"
+        )
+
+        assert session is not None
+        assert session.total_message_count == 0
+        assert len(session.history) == 0
+
+
+class TestSessionReturnNone:
+    """Test cases where methods return None"""
+
+    def test_get_session_returns_none_when_not_found(self, session_manager):
+        """Test that get_session returns None for non-existent session"""
+        result = session_manager.get_session("internal", "nonexistent_user", team_id=1)
+        assert result is None
+
+    def test_delete_session_returns_false_when_not_found(self, session_manager):
+        """Test that delete_session returns False for non-existent session"""
+        result = session_manager.delete_session("internal", "nonexistent_user", team_id=1)
+        assert result is False
 
 
 if __name__ == "__main__":

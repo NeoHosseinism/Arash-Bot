@@ -16,6 +16,7 @@
 8. [API Development](#api-development)
 9. [Code Quality](#code-quality)
 10. [Deployment](#deployment)
+11. [Architecture Decision Records](#architecture-decision-records)
 
 ---
 
@@ -33,7 +34,7 @@ Arash Bot is a multi-platform AI chatbot service with team-based access control,
 - PostgreSQL (teams, API keys, usage logs)
 - SQLAlchemy + Alembic (ORM and migrations)
 - Python Telegram Bot (Telegram integration)
-- Poetry (dependency management)
+- uv (ultra-fast dependency management)
 - Docker + Kubernetes (deployment)
 
 ---
@@ -194,7 +195,7 @@ Arash-Bot/
 │
 ├── Dockerfile                   # Multi-stage Docker build
 ├── Makefile                     # Development automation
-├── pyproject.toml               # Poetry dependencies
+├── pyproject.toml               # uv dependencies
 ├── pytest.ini                   # Pytest configuration
 └── README.md                    # Project documentation
 ```
@@ -206,7 +207,7 @@ Arash-Bot/
 ### Prerequisites
 
 - Python 3.11+
-- Poetry 1.8+
+- uv 0.8+
 - PostgreSQL 14+
 - Docker (for containerized deployment)
 
@@ -218,7 +219,7 @@ git clone <repo-url>
 cd Arash-Bot
 
 # 2. Install dependencies
-poetry install
+uv sync --all-extras
 
 # 3. Configure environment
 cp .env.example .env
@@ -292,14 +293,14 @@ API_PORT=3000
 make test
 
 # Run with coverage
-poetry run pytest --cov=app --cov-report=html
+uv run pytest --cov=app --cov-report=html
 
 # Run specific test file
-poetry run pytest tests/test_api.py -v
+uv run pytest tests/test_api.py -v
 
 # Run tests with markers
-poetry run pytest -m "not slow"  # Skip slow tests
-poetry run pytest -m "integration"  # Run only integration tests
+uv run pytest -m "not slow"  # Skip slow tests
+uv run pytest -m "integration"  # Run only integration tests
 ```
 
 ### Test Fixtures
@@ -408,6 +409,50 @@ class MyRequest(BaseModel):
     )
 ```
 
+### Important Response Field Behaviors
+
+#### total_message_count Field
+
+The `total_message_count` field in `BotResponse` and session-related responses tracks the total number of **conversation messages** stored in the database.
+
+**What is counted:**
+- ✅ User chat messages (text sent to AI)
+- ✅ AI assistant responses
+
+**What is NOT counted:**
+- ❌ Commands (e.g., `/model`, `/help`, `/clear`, `/status`)
+- ❌ Command responses
+
+**Key Characteristics:**
+- **Persistence:** Survives `/clear` command (messages marked as cleared but remain in DB)
+- **Purpose:** Analytics, conversation depth tracking, usage statistics
+- **Calculation:** Direct count from `messages` table in database
+
+**Implementation:**
+```python
+# In message_processor.py:176-185
+session.total_message_count = (
+    db.query(func.count(Message.id))
+    .filter(
+        Message.platform == platform_name,
+        Message.user_id == user_id,
+        Message.team_id == team_id if team_id else Message.team_id.is_(None),
+    )
+    .scalar()
+    or 0
+)
+```
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "response": "مدل شما به GPT-4 تغییر کرد.",
+  "model": "GPT-4",
+  "total_message_count": 10  // Excludes the /model command just executed
+}
+```
+
 ### Authentication
 
 **Two-tier access control:**
@@ -436,10 +481,10 @@ make lint
 make format
 
 # Manual linting
-poetry run ruff check app/ tests/
+uv run ruff check app/ tests/
 
 # Manual formatting
-poetry run black app/ tests/
+uv run black app/ tests/
 ```
 
 ### Code Style Guidelines
@@ -514,3 +559,38 @@ Each environment (dev/stage/prod) has separate:
 ---
 
 **Last Updated:** January 2025 | **Version:** 1.1.0
+
+---
+
+## Architecture Decision Records
+
+### Overview
+
+We maintain Architecture Decision Records (ADRs) to document significant architectural and design decisions made throughout the project lifecycle.
+
+**Location:** [`docs/adr/`](docs/adr/)
+
+### Why ADRs?
+
+- **Historical Context:** Understand why decisions were made
+- **Knowledge Transfer:** Onboard new team members faster
+- **Avoid Repetition:** Don't revisit settled debates
+- **Track Evolution:** See how architecture evolved over time
+
+### Key Decisions
+
+| ADR | Title | Status | Date | Impact |
+|-----|-------|--------|------|--------|
+| [001](docs/adr/001-dependency-management-uv.md) | Migration from Poetry to uv | Accepted | 2025-01-14 | High |
+| [002](docs/adr/002-test-coverage-strategy.md) | Test Coverage Improvement Strategy | Accepted | 2025-01-14 | Medium |
+
+### How to Use
+
+- **Read ADRs:** Understand past decisions before proposing changes
+- **Create ADRs:** Document significant architectural choices
+- **Update ADRs:** Keep records current with implementation
+- **Reference ADRs:** Link to ADRs in code comments and PRs
+
+**Full documentation:** See [docs/adr/README.md](docs/adr/README.md)
+
+---

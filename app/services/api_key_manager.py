@@ -58,26 +58,26 @@ class APIKeyManager:
     def create_team(
         db: Session,
         name: str,
-        description: Optional[str] = None,
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
+        display_name: Optional[str] = None,
     ) -> Team:
         """
-        Create a new team.
+        Create a new team (legacy method - prefer create_team_with_key).
 
         Args:
             db: Database session
-            name: Team name
-            description: Team description
+            name: Platform identifier (system name for routing/session isolation)
             monthly_quota: Monthly request quota (None = unlimited)
             daily_quota: Daily request quota (None = unlimited)
+            display_name: Human-friendly display name (defaults to name if not provided)
 
         Returns:
             Created team
         """
         team = Team(
-            name=name,
-            description=description,
+            display_name=display_name or name,  # Default display_name to name if not provided
+            platform_name=name,  # Use name parameter as platform_name for backward compatibility
             monthly_quota=monthly_quota,
             daily_quota=daily_quota,
         )
@@ -85,7 +85,7 @@ class APIKeyManager:
         db.commit()
         db.refresh(team)
 
-        logger.info(f"Created team: {name} (ID: {team.id})")
+        logger.info(f"Created team: {team.display_name} (Platform: {name}, ID: {team.id})")
         return team
 
     @staticmethod
@@ -182,7 +182,7 @@ class APIKeyManager:
         # Check if team is active
         if not db_key.team.is_active:
             logger.warning(
-                f"API key from inactive team attempted (prefix: {db_key.key_prefix}, team: {db_key.team.name})"
+                f"API key from inactive team attempted (prefix: {db_key.key_prefix}, team: {db_key.team.display_name})"
             )
             return None
 
@@ -190,7 +190,7 @@ class APIKeyManager:
         db_key.last_used_at = datetime.utcnow()
         db.commit()
 
-        logger.debug(f"API key validated (prefix: {db_key.key_prefix}, team: {db_key.team.name})")
+        logger.debug(f"API key validated (prefix: {db_key.key_prefix}, team: {db_key.team.display_name})")
         return db_key
 
     @staticmethod
@@ -257,16 +257,32 @@ class APIKeyManager:
     @staticmethod
     def get_team_by_name(db: Session, name: str) -> Optional[Team]:
         """
-        Get team by name (legacy - use get_team_by_platform_name instead).
+        Get team by display_name (legacy method for backward compatibility).
+
+        For new code, use get_team_by_platform_name() or get_team_by_display_name().
 
         Args:
             db: Database session
-            name: Team name
+            name: Team display name
 
         Returns:
             Team object if found, None otherwise
         """
-        return db.query(Team).filter(Team.name == name).first()
+        return db.query(Team).filter(Team.display_name == name).first()
+
+    @staticmethod
+    def get_team_by_display_name(db: Session, display_name: str) -> Optional[Team]:
+        """
+        Get team by human-friendly display name.
+
+        Args:
+            db: Database session
+            display_name: Team display name
+
+        Returns:
+            Team object if found, None otherwise
+        """
+        return db.query(Team).filter(Team.display_name == display_name).first()
 
     @staticmethod
     def get_team_by_platform_name(db: Session, platform_name: str) -> Optional[Team]:
@@ -288,6 +304,7 @@ class APIKeyManager:
         platform_name: str,
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
+        display_name: Optional[str] = None,
     ) -> Tuple[Team, str]:
         """
         Create a new team with auto-generated API key (one key per team).
@@ -297,18 +314,19 @@ class APIKeyManager:
 
         Args:
             db: Database session
-            platform_name: Platform name (e.g., "Internal-BI", "External-Telegram")
+            platform_name: System identifier for routing (e.g., "Internal-BI", "External-Telegram")
             monthly_quota: Monthly request quota (None = unlimited)
             daily_quota: Daily request quota (None = unlimited)
+            display_name: Human-friendly display name (defaults to platform_name if not provided)
 
         Returns:
             Tuple of (team, api_key_string)
             - team: Created team object
             - api_key_string: Full API key (show only once to user)
         """
-        # Create team (use platform_name as both name and platform_name)
+        # Create team
         team = Team(
-            name=platform_name,  # Internal name same as platform_name
+            display_name=display_name or platform_name,  # Default to platform_name if not provided
             platform_name=platform_name,
             monthly_quota=monthly_quota,
             daily_quota=daily_quota,
@@ -374,6 +392,7 @@ class APIKeyManager:
     def update_team(
         db: Session,
         team_id: int,
+        display_name: Optional[str] = None,
         platform_name: Optional[str] = None,
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
@@ -382,14 +401,15 @@ class APIKeyManager:
         """
         Update team settings.
 
-        Changes:
-        - Uses platform_name instead of name/description
-        - Removed webhook fields
+        Supports independent updates to display_name and platform_name:
+        - display_name: Human-friendly name for admin UI
+        - platform_name: System identifier for routing
 
         Args:
             db: Database session
             team_id: Team ID
-            platform_name: New platform name
+            display_name: New human-friendly display name
+            platform_name: New platform identifier
             monthly_quota: New monthly quota
             daily_quota: New daily quota
             is_active: Active status
@@ -402,9 +422,10 @@ class APIKeyManager:
         if not team:
             return None
 
+        if display_name is not None:
+            team.display_name = display_name
         if platform_name is not None:
             team.platform_name = platform_name
-            team.name = platform_name  # Keep name in sync
         if monthly_quota is not None:
             team.monthly_quota = monthly_quota
         if daily_quota is not None:
@@ -416,7 +437,9 @@ class APIKeyManager:
         db.commit()
         db.refresh(team)
 
-        logger.info(f"Updated team: {team.platform_name} (ID: {team.id})")
+        logger.info(
+            f"Updated team: {team.display_name} / {team.platform_name} (ID: {team.id})"
+        )
         return team
 
     @staticmethod
@@ -443,13 +466,13 @@ class APIKeyManager:
 
         if active_keys > 0 and not force:
             logger.warning(
-                f"Cannot delete team {team.name}: has {active_keys} active API keys. Use force=True to delete anyway."
+                f"Cannot delete team {team.display_name}: has {active_keys} active API keys. Use force=True to delete anyway."
             )
             raise ValueError(
                 f"Team has {active_keys} active API keys. Revoke them first or use --force flag."
             )
 
-        team_name = team.name
+        team_name = team.display_name
 
         # If force, delete all associated API keys and usage logs
         if force:

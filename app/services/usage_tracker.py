@@ -155,7 +155,7 @@ class UsageTracker:
 
         if not allowed:
             logger.warning(
-                f"Quota exceeded for API key {api_key.key_prefix} (team: {api_key.team.name}): "
+                f"Quota exceeded for API key {api_key.key_prefix} (team: {api_key.team.display_name}): "
                 f"{current_usage}/{quota_limit} {period} requests"
             )
 

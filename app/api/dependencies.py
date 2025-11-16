@@ -151,7 +151,7 @@ def require_team_access(
             raise HTTPException(status_code=403, detail="Invalid API key")
 
         logger.debug(
-            f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.name})"
+            f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.display_name})"
         )
         return api_key
 

@@ -79,7 +79,7 @@ sequenceDiagram
 
 ```bash
 # 1. Install dependencies
-poetry install
+uv sync --all-extras
 
 # 2. Configure environment
 cp .env.example .env  # Edit: DB, AI_SERVICE_URL, tokens
@@ -119,6 +119,32 @@ TELEGRAM_SERVICE_KEY=***  # For Telegram platform auth
 RUN_TELEGRAM_BOT=true  # Run bot integrated with API service
 ENVIRONMENT=production
 LOG_LEVEL=INFO
+```
+
+---
+
+## Key Architecture Behaviors
+
+### Message Counting
+
+The `total_message_count` field returned in API responses tracks the total number of **conversation messages** (user messages + AI responses) stored in the database.
+
+**Important Notes:**
+
+- ✅ **Counted:** User chat messages and AI assistant responses
+- ❌ **NOT Counted:** Commands (e.g., `/model`, `/help`, `/clear`, `/status`)
+- **Persistence:** `total_message_count` persists through `/clear` command
+- **Purpose:** Used for analytics and tracking conversation depth
+
+**Example:**
+
+```json
+{
+  "success": true,
+  "response": "مدل شما به GPT-4 تغییر کرد.",
+  "model": "GPT-4",
+  "total_message_count": 10  // Only counts actual messages, not this /model command
+}
 ```
 
 ---

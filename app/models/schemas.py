@@ -47,13 +47,11 @@ class IncomingMessage(BaseModel):
     """
     Simplified incoming message for chat endpoint.
 
-    Changes from previous version:
-    - Removed platform (auto-detected from API key's team.platform_name)
-    - Removed message_id (auto-generated internally)
-    - Removed type (text-only in this version)
-    - Removed attachments (text-only in this version)
-    - Removed metadata (not needed)
-    - Made conversation_id optional (auto-generated if not provided for new conversations)
+    Architecture:
+    - Each user has ONE conversation per platform/team (no conversation_id needed)
+    - Messages are persisted in database
+    - /clear command excludes previous messages from AI context (but keeps in DB)
+    - Platform auto-detected from API key's team.platform_name
     """
 
     model_config = ConfigDict(
@@ -61,24 +59,29 @@ class IncomingMessage(BaseModel):
             "examples": [
                 {
                     "user_id": "user_12345",
-                    "text": "سلام، چطور می‌تونم مدل رو عوض کنم؟",
-                    "conversation_id": "conv_67890",
+                    "text": "سلام، چطوری؟",
                 },
-                {"user_id": "telegram_987654", "text": "What is the weather like today?"},
+                {
+                    "user_id": "telegram_987654",
+                    "text": "What is the weather like today?",
+                },
+                {
+                    "user_id": "customer_001",
+                    "text": "Help me with my order",
+                },
             ]
         }
     )
 
     user_id: str = Field(
-        ..., description="Unique user identifier", examples=["user_12345", "telegram_987654"]
+        ...,
+        description="Unique user identifier (client-provided, e.g., telegram ID, customer ID, email)",
+        examples=["user_12345", "telegram_987654", "customer@example.com"],
     )
     text: str = Field(
-        ..., description="Message text content", examples=["سلام!", "Hello, how can I help?"]
-    )
-    conversation_id: Optional[str] = Field(
-        None,
-        description="Conversation ID for continuing conversation (auto-generated if not provided)",
-        examples=["conv_67890", None],
+        ...,
+        description="Message text content",
+        examples=["سلام!", "Hello, how can I help?", "/clear"],
     )
 
 
@@ -86,8 +89,11 @@ class BotResponse(BaseModel):
     """
     Bot response model for chat endpoint.
 
-    Use conversation_id to continue conversations. Each API key can only access
-    conversations started with that specific API key.
+    Architecture:
+    - Each user has ONE conversation per platform/team (no conversation_id)
+    - total_message_count shows total messages in history (persists through /clear)
+    - /clear removes messages from AI context but keeps in database
+    - Commands (e.g., /model, /help, /clear) are NOT counted in total_message_count
     """
 
     model_config = ConfigDict(
@@ -95,26 +101,51 @@ class BotResponse(BaseModel):
             "examples": [
                 {
                     "success": True,
-                    "response": "برای تغییر مدل، از دستور /model استفاده کنید. مدل‌های موجود: Gemini Flash، DeepSeek v3، GPT-5",
-                    "conversation_id": "conv_67890",
+                    "response": "سلام! چطور می‌تونم کمکتون کنم؟",
                     "model": "Gemini 2.0 Flash",
-                    "message_count": 3,
+                    "total_message_count": 2,
+                },
+                {
+                    "success": True,
+                    "response": "برای تغییر مدل، از دستور /model استفاده کنید.",
+                    "model": "DeepSeek Chat V3",
+                    "total_message_count": 10,
                 },
                 {
                     "success": False,
                     "error": "rate_limit_exceeded",
-                    "response": "⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: 20 پیام در دقیقه",
+                    "response": "⚠️ محدودیت سرعت. لطفاً قبل از ارسال پیام بعدی کمی صبر کنید.\n\nمحدودیت: 60 پیام در دقیقه",
+                },
+                {
+                    "success": False,
+                    "error": "ai_service_unavailable",
+                    "response": "متأسفم، سرویس هوش مصنوعی در حال حاضر در دسترس نیست.",
                 },
             ]
         }
     )
 
-    success: bool = Field(..., examples=[True, False])
-    response: Optional[str] = Field(None, examples=["سلام! چطور می‌تونم کمکتون کنم؟"])
-    conversation_id: Optional[str] = Field(None, examples=["conv_67890"])
-    model: Optional[str] = Field(None, examples=["Gemini 2.0 Flash", "DeepSeek v3", "GPT-5 Chat"])
-    message_count: Optional[int] = Field(None, examples=[1, 5, 10])
-    error: Optional[str] = Field(None, examples=["rate_limit_exceeded", "ai_service_unavailable"])
+    success: bool = Field(..., description="Request success status", examples=[True, False])
+    response: Optional[str] = Field(
+        None,
+        description="Response text from AI or error message",
+        examples=["سلام! چطور می‌تونم کمکتون کنم؟"],
+    )
+    model: Optional[str] = Field(
+        None,
+        description="User-friendly AI model name currently in use",
+        examples=["Gemini 2.0 Flash", "DeepSeek Chat V3", "GPT-4o Mini"],
+    )
+    total_message_count: Optional[int] = Field(
+        None,
+        description="Total messages in conversation history (user + assistant). Persists through /clear. NOTE: Commands (e.g., /model, /help, /clear) are NOT included in this count - only actual chat messages and AI responses.",
+        examples=[2, 10, 24],
+    )
+    error: Optional[str] = Field(
+        None,
+        description="Error code if success=false",
+        examples=["rate_limit_exceeded", "ai_service_unavailable", "authentication_failed"],
+    )
 
 
 class PlatformConfigResponse(BaseModel):
@@ -155,11 +186,11 @@ class SessionStatusResponse(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "conversation_id": "conv_67890",
+                    "user_id": "user_12345",
                     "platform": "Internal-BI",
                     "platform_type": "private",
                     "current_model": "Gemini 2.0 Flash",
-                    "message_count": 5,
+                    "total_message_count": 24,
                     "history_length": 10,
                     "last_activity": "2025-01-15T14:30:00",
                     "uptime_seconds": 3600.5,
@@ -170,12 +201,16 @@ class SessionStatusResponse(BaseModel):
         }
     )
 
-    conversation_id: str = Field(..., examples=["conv_67890"])
+    user_id: str = Field(..., examples=["user_12345", "telegram_987654"])
     platform: str = Field(..., examples=["telegram", "Internal-BI"])
     platform_type: str = Field(..., examples=["public", "private"])
-    current_model: str = Field(..., examples=["Gemini 2.0 Flash"])
-    message_count: int = Field(..., examples=[5])
-    history_length: int = Field(..., examples=[10])
+    current_model: str = Field(..., examples=["Gemini 2.0 Flash", "DeepSeek Chat V3"])
+    total_message_count: int = Field(
+        ..., examples=[24], description="Total messages ever (persists through /clear). Commands are NOT counted - only chat messages and AI responses."
+    )
+    history_length: int = Field(
+        ..., examples=[10], description="Messages currently in AI context (resets after /clear)"
+    )
     last_activity: datetime
     uptime_seconds: float = Field(..., examples=[3600.5])
     rate_limit: int = Field(..., examples=[60])
@@ -193,9 +228,9 @@ class SessionListResponse(BaseModel):
                     "authenticated": True,
                     "sessions": [
                         {
-                            "conversation_id": "conv_67890",
+                            "user_id": "user_12345",
                             "platform": "Internal-BI",
-                            "message_count": 5,
+                            "total_message_count": 24,
                             "last_activity": "2025-01-15T14:30:00",
                         }
                     ],
@@ -241,7 +276,7 @@ class HealthCheckResponse(BaseModel):
             "examples": [
                 {
                     "service": "Arash External API Service",
-                    "version": "1.1.0",
+                    "version": "1.0.0",
                     "status": "healthy",
                     "platforms": {
                         "telegram": {
@@ -263,7 +298,7 @@ class HealthCheckResponse(BaseModel):
     )
 
     service: str = Field(..., examples=["Arash External API Service"])
-    version: str = Field(..., examples=["1.1.0"])
+    version: str = Field(..., examples=["1.0.0"])
     status: str = Field(..., examples=["healthy", "degraded"])
     platforms: Dict[str, Dict[str, Any]]
     active_sessions: int = Field(..., examples=[25])

@@ -225,12 +225,64 @@ app.include_router(admin_router, prefix="/v1")
 
 
 # Health check endpoint (for monitoring systems)
-@app.get("/health")
+@app.get(
+    "/health",
+    tags=["Health & Monitoring"],
+    responses={
+        200: {
+            "description": "Service health status",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "healthy": {
+                            "summary": "Service is healthy",
+                            "value": {
+                                "status": "healthy",
+                                "service": "Arash External API Service",
+                                "version": "1.0.0",
+                                "timestamp": "2025-01-15T14:30:00"
+                            }
+                        },
+                        "degraded": {
+                            "summary": "Service is degraded (AI service unavailable)",
+                            "value": {
+                                "status": "degraded",
+                                "service": "Arash External API Service",
+                                "version": "1.0.0",
+                                "timestamp": "2025-01-15T14:30:00"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "success": False,
+                        "error": "internal_server_error",
+                        "detail": "An internal error occurred"
+                    }
+                }
+            }
+        }
+    }
+)
 async def health_check():
     """
     Health check endpoint (unversioned for monitoring compatibility)
 
-    SECURITY: Does NOT expose any internal details
+    Returns the service health status based on AI service availability.
+
+    **No authentication required** - designed for monitoring systems.
+
+    **Status values:**
+    - `healthy`: All services operational
+    - `degraded`: Service running but AI service unavailable
+
+    **SECURITY**: Does NOT expose any internal details or sensitive information
     """
     ai_service_healthy = await ai_client.health_check()
 

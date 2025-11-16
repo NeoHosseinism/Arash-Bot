@@ -1,33 +1,33 @@
 # Arash External API Service - Makefile
-# Essential commands for development and deployment
+# Essential commands for development and deployment (using uv)
 
-.PHONY: help check-poetry install run run-dev test lint format clean \
+.PHONY: help check-uv install run run-dev test lint format clean \
         migrate-up migrate-down migrate-status migrate-create \
         db-teams db-keys db-team-create db-key-create demo-logging show-config
 
-# Detect poetry location (allow override with POETRY=/path/to/poetry)
-POETRY ?= $(shell which poetry 2>/dev/null || echo "$$HOME/.local/bin/poetry")
+# Detect uv location (allow override with UV=/path/to/uv)
+UV ?= $(shell which uv 2>/dev/null)
 
-# Check if poetry is available
-check-poetry:
-	@if ! command -v $(POETRY) >/dev/null 2>&1; then \
-		echo "[ERROR] Poetry not found!"; \
+# Check if uv is available
+check-uv:
+	@if ! command -v $(UV) >/dev/null 2>&1; then \
+		echo "[ERROR] uv not found!"; \
 		echo ""; \
-		echo "Please install Poetry or add it to your PATH:"; \
-		echo "  export PATH=\"\$$HOME/.local/bin:\$$PATH\""; \
+		echo "Please install uv:"; \
+		echo "  curl -LsSf https://astral.sh/uv/install.sh | sh"; \
 		echo ""; \
-		echo "Or override poetry location:"; \
-		echo "  make test POETRY=/path/to/poetry"; \
+		echo "Or override uv location:"; \
+		echo "  make test UV=/path/to/uv"; \
 		exit 1; \
 	fi
 
 # Default target
 help:
 	@echo "========================================================================"
-	@echo "Arash External API Service v1.0 - Essential Commands"
+	@echo "Arash External API Service v1.1 - Essential Commands"
 	@echo "========================================================================"
 	@echo ""
-	@echo "Poetry: $(POETRY)"
+	@echo "Package Manager: uv ($(UV))"
 	@echo ""
 	@echo "[Development]"
 	@echo "  make install        Install dependencies"
@@ -61,34 +61,34 @@ help:
 # Development
 # ============================================================================
 
-install: check-poetry
-	@echo "[Installing dependencies...]"
-	$(POETRY) install --no-root
+install: check-uv
+	@echo "[Installing dependencies with uv...]"
+	$(UV) sync --all-extras
 
-run: check-poetry
+run: check-uv
 	@echo "[Starting Arash API Service...]"
 	@echo "API: http://localhost:3000"
 	@echo "Docs: http://localhost:3000/docs"
-	$(POETRY) run uvicorn app.main:app --host 0.0.0.0 --port 3000
+	$(UV) run uvicorn app.main:app --host 0.0.0.0 --port 3000
 
-run-dev: check-poetry
+run-dev: check-uv
 	@echo "[Starting Arash API Service (Development Mode)...]"
 	@echo "API: http://localhost:3000"
 	@echo "Docs: http://localhost:3000/docs"
 	@echo "Auto-reload: Enabled"
-	$(POETRY) run uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload
+	$(UV) run uvicorn app.main:app --host 0.0.0.0 --port 3000 --reload
 
-test: check-poetry
+test: check-uv
 	@echo "[Running tests...]"
-	$(POETRY) run pytest -v
+	$(UV) run pytest -v
 
-lint: check-poetry
+lint: check-uv
 	@echo "[Checking code quality...]"
-	$(POETRY) run ruff check app/ tests/
+	$(UV) run ruff check app/ tests/
 
-format: check-poetry
+format: check-uv
 	@echo "[Formatting code...]"
-	$(POETRY) run black app/ tests/
+	$(UV) run black app/ tests/
 
 clean:
 	@echo "[Cleaning cache...]"
@@ -98,7 +98,7 @@ clean:
 	find . -type f -name "*.pyc" -delete
 	@echo "[OK] Cache cleaned"
 
-show-config: check-poetry
+show-config: check-uv
 	@echo "[Current Configuration]"
 	@echo "Environment: $$(grep '^ENVIRONMENT=' .env | cut -d'=' -f2)"
 	@echo "Log Level: $$(grep '^LOG_LEVEL=' .env | cut -d'=' -f2)"
@@ -115,54 +115,54 @@ demo-logging:
 # Database Migrations
 # ============================================================================
 
-migrate-up: check-poetry
+migrate-up: check-uv
 	@echo "[Applying migrations...]"
-	$(POETRY) run alembic upgrade head
+	$(UV) run alembic upgrade head
 	@echo "[OK] Migrations applied"
 
-migrate-down: check-poetry
+migrate-down: check-uv
 	@echo "[Rolling back last migration...]"
-	$(POETRY) run alembic downgrade -1
+	$(UV) run alembic downgrade -1
 	@echo "[OK] Migration rolled back"
 
-migrate-status: check-poetry
+migrate-status: check-uv
 	@echo "[Migration Status]"
-	@$(POETRY) run alembic current
+	@$(UV) run alembic current
 	@echo ""
 	@echo "[Migration History]"
-	@$(POETRY) run alembic history
+	@$(UV) run alembic history
 
-migrate-create: check-poetry
+migrate-create: check-uv
 ifndef MSG
 	@echo "[ERROR] MSG is required"
 	@echo "Usage: make migrate-create MSG=\"Description of migration\""
 	@exit 1
 endif
 	@echo "[Creating new migration: $(MSG)]"
-	$(POETRY) run alembic revision --autogenerate -m "$(MSG)"
+	$(UV) run alembic revision --autogenerate -m "$(MSG)"
 	@echo "[OK] Migration created"
 
 # ============================================================================
 # Team & API Key Management
 # ============================================================================
 
-db-teams: check-poetry
-	@$(POETRY) run python scripts/manage_api_keys.py team list
+db-teams: check-uv
+	@$(UV) run python scripts/manage_api_keys.py team list
 
-db-keys: check-poetry
-	@$(POETRY) run python scripts/manage_api_keys.py key list
+db-keys: check-uv
+	@$(UV) run python scripts/manage_api_keys.py key list
 
-db-team-create: check-poetry
+db-team-create: check-uv
 ifndef NAME
 	@echo "[ERROR] NAME is required"
 	@echo "Usage: make db-team-create NAME=\"Team\" [DAILY=100] [MONTHLY=3000]"
 	@exit 1
 endif
-	$(POETRY) run python scripts/manage_api_keys.py team create "$(NAME)" \
+	$(UV) run python scripts/manage_api_keys.py team create "$(NAME)" \
 		$(if $(DAILY),--daily-quota $(DAILY)) \
 		$(if $(MONTHLY),--monthly-quota $(MONTHLY))
 
-db-key-create: check-poetry
+db-key-create: check-uv
 ifndef TEAM
 	@echo "[ERROR] TEAM and NAME are required"
 	@echo "Usage: make db-key-create TEAM=<id> NAME=\"Key\" [LEVEL=user]"
@@ -173,5 +173,5 @@ ifndef NAME
 	@echo "Usage: make db-key-create TEAM=<id> NAME=\"Key\" [LEVEL=user]"
 	@exit 1
 endif
-	$(POETRY) run python scripts/manage_api_keys.py key create $(TEAM) "$(NAME)" \
+	$(UV) run python scripts/manage_api_keys.py key create $(TEAM) "$(NAME)" \
 		$(if $(LEVEL),--level $(LEVEL))

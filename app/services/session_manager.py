@@ -1,5 +1,5 @@
 """
-Session manager with rate limiting
+Session manager with rate limiting and database-backed message persistence
 """
 
 import hashlib
@@ -9,8 +9,11 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Dict, List
 
+from sqlalchemy import func
+
 from app.core.config import settings
 from app.core.name_mapping import get_friendly_platform_name, mask_session_id
+from app.models.database import Message, get_db_session
 from app.models.session import ChatSession
 from app.services.platform_manager import platform_manager
 
@@ -24,50 +27,90 @@ class SessionManager:
         self.sessions: Dict[str, ChatSession] = {}
         self.rate_limits: Dict[str, List[float]] = defaultdict(list)
 
-    def get_session_key(
-        self, platform: str, conversation_id: str, team_id: int | None = None
-    ) -> str:
+    def get_session_key(self, platform: str, user_id: str, team_id: int | None = None) -> str:
         """
-        Generate unique session key with team isolation
+        Generate unique session key with team isolation.
 
         SECURITY: Includes team_id to prevent session collision between teams.
-        If Team A and Team B both use conversation_id="user123", they get DIFFERENT sessions.
+        If Team A and Team B both use user_id="user123", they get DIFFERENT sessions.
 
-        For Telegram bot (no team_id), uses platform:conversation_id
-        For internal API (has team_id), uses platform:team_id:conversation_id
+        Format:
+        - Telegram (no team): "telegram:user123"
+        - Team-based: "Internal-BI:5:user123"
         """
         if team_id is not None:
-            return f"{platform}:{team_id}:{conversation_id}"
-        return f"{platform}:{conversation_id}"
+            return f"{platform}:{team_id}:{user_id}"
+        return f"{platform}:{user_id}"
 
     def get_or_create_session(
         self,
         platform: str,
         user_id: str,
-        conversation_id: str,
         team_id: int | None = None,
         api_key_id: int | None = None,
         api_key_prefix: str | None = None,
     ) -> ChatSession:
         """
-        Get existing session or create new one with platform-specific config and team isolation
+        Get existing session or create new one with platform-specific config and team isolation.
+
+        Architecture:
+        - One session per user per platform/team (no conversation_id)
+        - Loads total_message_count from database
+        - Loads uncleared messages into history for AI context
 
         SECURITY: API key isolation - each API key can only access sessions it created
         """
         # SECURITY: Include team_id in key to prevent session collision between teams
-        key = self.get_session_key(platform, conversation_id, team_id)
+        key = self.get_session_key(platform, user_id, team_id)
 
         if key not in self.sessions:
             # Create new session
             config = platform_manager.get_config(platform)
+
+            # Load message history from database
+            db = get_db_session()
+            try:
+                # Count total messages for this user (including cleared)
+                total_count = (
+                    db.query(func.count(Message.id))
+                    .filter(
+                        Message.platform == platform,
+                        Message.user_id == user_id,
+                        Message.team_id == team_id if team_id else Message.team_id.is_(None),
+                    )
+                    .scalar()
+                    or 0
+                )
+
+                # Load uncleared messages for AI context
+                uncleared_messages = (
+                    db.query(Message)
+                    .filter(
+                        Message.platform == platform,
+                        Message.user_id == user_id,
+                        Message.team_id == team_id if team_id else Message.team_id.is_(None),
+                        Message.cleared_at.is_(None),  # Only uncleared messages
+                    )
+                    .order_by(Message.created_at)
+                    .all()
+                )
+
+                # Build history from DB messages
+                history = [{"role": msg.role, "content": msg.content} for msg in uncleared_messages]
+
+            except Exception as e:
+                logger.error(f"Error loading message history from DB: {e}")
+                total_count = 0
+                history = []
 
             self.sessions[key] = ChatSession(
                 session_id=hashlib.md5(key.encode()).hexdigest(),
                 platform=platform,
                 platform_config=config.dict(),
                 user_id=user_id,
-                conversation_id=conversation_id,
                 current_model=config.model,
+                history=history,  # Pre-loaded from DB
+                total_message_count=total_count,  # Total messages including cleared
                 is_admin=platform_manager.is_admin(platform, user_id),
                 # Team isolation - CRITICAL for security
                 team_id=team_id,
@@ -79,7 +122,8 @@ class SessionManager:
             masked_id = mask_session_id(self.sessions[key].session_id)
             team_info = f" (team: {team_id}, key: {api_key_prefix})" if team_id else ""
             logger.info(
-                f"Created new session for {friendly_platform} (session: {masked_id}){team_info}"
+                f"Created session for {friendly_platform} user={user_id} (session: {masked_id}){team_info} "
+                f"with {total_count} total messages ({len(history)} in context)"
             )
         else:
             # Existing session found - verify API key ownership
@@ -88,11 +132,11 @@ class SessionManager:
             # SECURITY: API key isolation - verify this API key owns this session
             if api_key_id is not None and existing_session.api_key_id != api_key_id:
                 logger.warning(
-                    f"[SECURITY] API key {api_key_prefix} attempted to access conversation_id={conversation_id} "
+                    f"[SECURITY] API key {api_key_prefix} attempted to access user_id={user_id} "
                     f"owned by API key ID {existing_session.api_key_id}"
                 )
                 raise PermissionError(
-                    "Access denied. This conversation belongs to a different API key."
+                    "Access denied. This user's conversation belongs to a different API key."
                 )
 
             # Update last activity
@@ -100,11 +144,9 @@ class SessionManager:
 
         return self.sessions[key]
 
-    def get_session(
-        self, platform: str, conversation_id: str, team_id: int | None = None
-    ) -> ChatSession:
-        """Get existing session by platform, conversation_id, and team_id"""
-        key = self.get_session_key(platform, conversation_id, team_id)
+    def get_session(self, platform: str, user_id: str, team_id: int | None = None) -> ChatSession:
+        """Get existing session by platform, user_id, and team_id"""
+        key = self.get_session_key(platform, user_id, team_id)
         return self.sessions.get(key)
 
     def get_session_by_id(self, session_id: str) -> ChatSession | None:
@@ -114,11 +156,9 @@ class SessionManager:
                 return session
         return None
 
-    def delete_session(
-        self, platform: str, conversation_id: str, team_id: int | None = None
-    ) -> bool:
-        """Delete a session"""
-        key = self.get_session_key(platform, conversation_id, team_id)
+    def delete_session(self, platform: str, user_id: str, team_id: int | None = None) -> bool:
+        """Delete a session (in-memory only - DB messages remain)"""
+        key = self.get_session_key(platform, user_id, team_id)
         if key in self.sessions:
             del self.sessions[key]
             logger.info(f"Deleted session: {key}")

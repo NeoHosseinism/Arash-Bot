@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     TELEGRAM_MAX_HISTORY: int = 10
     TELEGRAM_COMMANDS: str = "start,help,status,clear,model,models"
     TELEGRAM_ADMIN_USERS: str = ""
+    TELEGRAM_ALLOW_MODEL_SWITCH: bool = True  # Allow Telegram users to switch between models
 
     # Internal Configuration
     INTERNAL_DEFAULT_MODEL: str = "openai/gpt-5-chat"

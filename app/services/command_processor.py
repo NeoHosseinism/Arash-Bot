@@ -140,7 +140,7 @@ class CommandProcessor:
             f"• پلتفرم: {session.platform.title()}\n"
             f"• نوع: {'خصوصی (داخلی)' if config.type == 'private' else 'عمومی'}\n"
             f"• مدل فعلی: {friendly_model}\n"  # ✓ Show friendly name
-            f"• تعداد پیام‌ها: {session.message_count}\n"
+            f"• تعداد کل پیام‌ها: {session.total_message_count}\n"
             f"• محدودیت سرعت: {config.rate_limit}/دقیقه\n"
         )
 
@@ -150,8 +150,45 @@ class CommandProcessor:
         return status_text
 
     async def handle_clear(self, session: ChatSession, args: List[str]) -> str:
-        """Handle /clear command - clears conversation history"""
+        """
+        Handle /clear command - marks all messages as cleared in database.
+
+        Architecture:
+        - Messages remain in DB for analytics (not deleted)
+        - Sets cleared_at timestamp on all existing messages
+        - Clears in-memory history for AI context
+        - Future messages will not include cleared messages in context
+        """
+        from datetime import datetime
+
+        from app.models.database import Message, get_db_session
+
+        # Mark all messages as cleared in database
+        try:
+            db = get_db_session()
+            clear_time = datetime.utcnow()
+
+            # Update all uncleared messages for this user
+            db.query(Message).filter(
+                Message.platform == session.platform,
+                Message.user_id == session.user_id,
+                Message.team_id == session.team_id if session.team_id else Message.team_id.is_(None),
+                Message.cleared_at.is_(None),  # Only update uncleared messages
+            ).update({"cleared_at": clear_time})
+
+            db.commit()
+            logger.info(
+                f"Marked messages as cleared for user={session.user_id} "
+                f"platform={session.platform} team={session.team_id}"
+            )
+        except Exception as e:
+            logger.error(f"Error marking messages as cleared in DB: {e}")
+            db.rollback()
+            # Continue anyway - at least clear in-memory
+
+        # Clear in-memory history (for AI context)
         session.clear_history()
+
         return MESSAGES_FA["session_cleared"]
 
     async def handle_model(self, session: ChatSession, args: List[str]) -> str:

@@ -1,17 +1,17 @@
 # ============================================================================
 # Multi-stage Dockerfile for Arash External API Service v1.1
-# Optimized for production deployment with Poetry dependency management
+# Optimized for production deployment with uv dependency management
 # ============================================================================
 # Architecture: Single container running both FastAPI service + Telegram bot
 # Base Image: Python 3.11 slim (Debian-based)
-# Build System: Poetry for dependency management with virtual environments
+# Build System: uv for fast, reliable dependency management
 # Security: Non-root user, minimal attack surface, health checks enabled
 # ============================================================================
 
 # ============================================================================
-# Stage 1: Builder - Install dependencies with Poetry
+# Stage 1: Builder - Install dependencies with uv
 # ============================================================================
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Build arguments for versioning and metadata
 ARG VERSION=1.1.0
@@ -23,7 +23,7 @@ WORKDIR /build
 
 # Install system dependencies required for Python package compilation
 # gcc: C compiler for Python packages with native extensions
-# curl: Download Poetry installer
+# curl: Download uv installer
 # libpq-dev: PostgreSQL client library headers (for psycopg2)
 # postgresql-client: PostgreSQL command-line tools (for migrations)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -33,33 +33,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry with pinned version for reproducible builds
-# Poetry manages Python dependencies and creates isolated virtual environments
-ENV POETRY_VERSION=1.8.3
-ENV POETRY_HOME=/opt/poetry
-ENV POETRY_NO_INTERACTION=1
-ENV POETRY_VIRTUALENVS_IN_PROJECT=true
-ENV POETRY_VIRTUALENVS_CREATE=true
-RUN curl -sSL https://install.python-poetry.org | python3 -
-
-# Add Poetry to PATH
-ENV PATH="$POETRY_HOME/bin:$PATH"
+# Install uv - ultra-fast Python package installer and resolver
+# uv is 10-100x faster than pip and more reliable than Poetry
+ENV UV_VERSION=0.8.17
+RUN curl -LsSf https://astral.sh/uv/${UV_VERSION}/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
 # Copy dependency files first (better layer caching)
-# Docker will cache this layer unless pyproject.toml or poetry.lock changes
-COPY pyproject.toml poetry.lock* ./
+# Docker will cache this layer unless pyproject.toml or uv.lock changes
+COPY pyproject.toml uv.lock ./
 
-# Install Python dependencies without dev dependencies or root package
+# Install Python dependencies using uv
+# --frozen: Use exact versions from uv.lock (no resolution)
 # --no-dev: Skip development dependencies (pytest, black, ruff, etc.)
-# --no-root: Don't install the project itself, only dependencies
-# --no-interaction: Non-interactive mode for CI/CD
-# --no-ansi: Disable colored output for cleaner logs
-RUN poetry install --no-dev --no-root --no-interaction --no-ansi
+# --no-editable: Install as regular packages, not editable
+RUN uv sync --frozen --no-dev --no-editable
 
 # ============================================================================
 # Stage 2: Production - Minimal runtime image
 # ============================================================================
-FROM python:3.11-slim as production
+FROM python:3.11-slim AS production
 
 # Add metadata labels following OCI image spec
 # Provides image provenance, version tracking, and documentation
@@ -82,6 +75,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Install runtime dependencies (smaller than build dependencies)
 # libpq-dev: Required for psycopg2 runtime (PostgreSQL client)
 # postgresql-client: Required for Alembic migrations
+# curl: Required for health checks
 # Note: gcc and build tools are NOT needed in production image
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \

@@ -78,7 +78,7 @@ class TelegramHandlers:
         message = update.message
 
         # Show typing indicator
-        await context.bot.send_chat_action(conversation_id=chat.id, action="typing")
+        await context.bot.send_chat_action(chat_id=chat.id, action="typing")
 
         try:
             response = await self.bot_client.send_message(
@@ -114,7 +114,7 @@ class TelegramHandlers:
             return
 
         # Show typing indicator
-        await context.bot.send_chat_action(conversation_id=chat.id, action="typing")
+        await context.bot.send_chat_action(chat_id=chat.id, action="typing")
 
         try:
             # Get the largest photo

@@ -221,23 +221,23 @@ class TestMessageEndpointV1:
             return_value=BotResponse(
                 success=True,
                 response="Hello! How can I help?",
-                conversation_id="chat1",
                 model="gpt-4",
+                total_message_count=2,
             )
         )
 
         response = client.post(
             "/v1/chat",
             headers={"Authorization": "Bearer valid_key"},
-            json={"user_id": "user1", "conversation_id": "chat1", "text": "Hello"},
+            json={"user_id": "user1", "text": "Hello"},
         )
 
         assert response.status_code == 200
         data = response.json()
         assert data["success"] is True
         assert data["response"] == "Hello! How can I help?"
-        assert data["conversation_id"] == "chat1"
         assert data["model"] == "gpt-4"
+        assert data["total_message_count"] == 2
 
     @patch("app.api.dependencies.APIKeyManager")
     @patch("app.api.dependencies.get_db_session")
@@ -372,6 +372,43 @@ class TestQuotaEnforcement:
         """Test that quota exceeded returns 429"""
         # TODO: Implement when quota checking is in dependencies
         pass
+
+
+class TestFixtureUsage:
+    """Test that all fixtures are properly configured"""
+
+    def test_mock_db_session_fixture(self, mock_db_session):
+        """Test mock_db_session fixture (line 33)"""
+        assert mock_db_session is not None
+
+    def test_mock_api_key_team_fixture(self, mock_api_key_team):
+        """Test mock_api_key_team fixture (lines 45-51)"""
+        assert mock_api_key_team.id == 1
+        assert mock_api_key_team.team_id == 100
+        assert mock_api_key_team.key_prefix == "sk_test_"
+        assert mock_api_key_team.is_active is True
+
+    def test_mock_super_admin_key_fixture(self, mock_super_admin_key):
+        """Test mock_super_admin_key fixture (line 64)"""
+        assert mock_super_admin_key == "test_super_admin_key_12345"
+
+    def test_mock_api_key_internal_fixture(self, mock_api_key_internal):
+        """Test mock_api_key_internal fixture (lines 88-94)"""
+        assert mock_api_key_internal.id == 2
+        assert mock_api_key_internal.team_id == 101
+        assert mock_api_key_internal.team.platform_name == "internal"
+
+    def test_mock_api_key_external_fixture(self, mock_api_key_external):
+        """Test mock_api_key_external fixture (lines 102-108)"""
+        assert mock_api_key_external.id == 3
+        assert mock_api_key_external.team_id == 102
+        assert mock_api_key_external.team.platform_name == "telegram"
+
+    def test_mock_api_key_admin_fixture(self, mock_api_key_admin):
+        """Test mock_api_key_admin fixture (lines 119-125)"""
+        assert mock_api_key_admin.id == 4
+        assert mock_api_key_admin.team_id == 103
+        assert mock_api_key_admin.key_prefix == "sk_admin_"
 
 
 if __name__ == "__main__":
