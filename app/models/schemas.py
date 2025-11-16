@@ -276,7 +276,7 @@ class HealthCheckResponse(BaseModel):
             "examples": [
                 {
                     "service": "Arash External API Service",
-                    "version": "1.1.0",
+                    "version": "1.0.0",
                     "status": "healthy",
                     "platforms": {
                         "telegram": {
@@ -298,7 +298,7 @@ class HealthCheckResponse(BaseModel):
     )
 
     service: str = Field(..., examples=["Arash External API Service"])
-    version: str = Field(..., examples=["1.1.0"])
+    version: str = Field(..., examples=["1.0.0"])
     status: str = Field(..., examples=["healthy", "degraded"])
     platforms: Dict[str, Dict[str, Any]]
     active_sessions: int = Field(..., examples=[25])

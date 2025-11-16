@@ -72,7 +72,32 @@ class AIServiceClient:
                     f"Attempt {attempt + 1}/{self.max_retries} for session {masked_session}"
                 )
 
+                # Debug logging: Log payload structure (but not full content for privacy)
+                logger.debug(
+                    f"Request payload structure: UserId={bool(payload.get('UserId'))}, "
+                    f"Pipeline={payload.get('Pipeline')}, History_count={len(payload.get('History', []))}, "
+                    f"Query_length={len(payload.get('Query', ''))}, Files_count={len(payload.get('Files', []))}"
+                )
+
                 response = await self.client.post(f"{self.base_url}/v2/chat", json=payload)
+
+                # Debug logging: Log response details before raising errors
+                logger.debug(
+                    f"Response status: {response.status_code}, "
+                    f"headers: {dict(response.headers)}, "
+                    f"body_length: {len(response.content)}"
+                )
+
+                # If error, log response body for debugging
+                if response.status_code >= 400:
+                    try:
+                        error_body = response.text[:500]  # First 500 chars
+                        logger.error(
+                            f"AI service error response (status {response.status_code}): {error_body}"
+                        )
+                    except Exception:
+                        pass
+
                 response.raise_for_status()
 
                 result = response.json()

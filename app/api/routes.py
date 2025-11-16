@@ -111,8 +111,29 @@ router = APIRouter()
                 }
             },
         },
+        400: {
+            "description": "Bad request - Invalid input data",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "empty_text": {
+                            "summary": "Empty message text",
+                            "value": {
+                                "detail": "Message text cannot be empty"
+                            }
+                        },
+                        "empty_user_id": {
+                            "summary": "Empty user ID",
+                            "value": {
+                                "detail": "User ID cannot be empty"
+                            }
+                        }
+                    }
+                }
+            },
+        },
         401: {
-            "description": "Authentication required",
+            "description": "Authentication required - No API key provided",
             "content": {
                 "application/json": {
                     "example": {
@@ -122,16 +143,102 @@ router = APIRouter()
             },
         },
         403: {
-            "description": "Invalid API key",
+            "description": "Forbidden - Invalid or inactive API key",
             "content": {
                 "application/json": {
-                    "example": {"detail": "Invalid API key. Please check your credentials."}
+                    "examples": {
+                        "invalid_key": {
+                            "summary": "Invalid API key",
+                            "value": {
+                                "detail": "Invalid API key. Please check your credentials."
+                            }
+                        },
+                        "inactive_key": {
+                            "summary": "Inactive API key",
+                            "value": {
+                                "detail": "API key is inactive or revoked"
+                            }
+                        },
+                        "expired_key": {
+                            "summary": "Expired API key",
+                            "value": {
+                                "detail": "API key has expired"
+                            }
+                        }
+                    }
+                }
+            },
+        },
+        422: {
+            "description": "Validation error - Request body doesn't match schema",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": [
+                            {
+                                "loc": ["body", "user_id"],
+                                "msg": "field required",
+                                "type": "value_error.missing"
+                            },
+                            {
+                                "loc": ["body", "text"],
+                                "msg": "field required",
+                                "type": "value_error.missing"
+                            }
+                        ]
+                    }
                 }
             },
         },
         500: {
             "description": "Internal server error",
-            "content": {"application/json": {"example": {"detail": "Error validating API key"}}},
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "api_key_validation_error": {
+                            "summary": "Error validating API key",
+                            "value": {
+                                "detail": "Error validating API key"
+                            }
+                        },
+                        "database_error": {
+                            "summary": "Database connection error",
+                            "value": {
+                                "detail": "Database error occurred"
+                            }
+                        },
+                        "general_error": {
+                            "summary": "Unexpected server error",
+                            "value": {
+                                "detail": "An unexpected error occurred"
+                            }
+                        }
+                    }
+                }
+            },
+        },
+        503: {
+            "description": "Service unavailable - AI service or database is down",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "ai_service_down": {
+                            "summary": "AI service unavailable",
+                            "value": {
+                                "success": False,
+                                "error": "service_unavailable",
+                                "response": "سرویس هوش مصنوعی در حال حاضر در دسترس نیست."
+                            }
+                        },
+                        "database_down": {
+                            "summary": "Database unavailable",
+                            "value": {
+                                "detail": "Database service is currently unavailable"
+                            }
+                        }
+                    }
+                }
+            },
         },
     },
 )
@@ -303,7 +410,7 @@ async def chat(
             },
         },
         401: {
-            "description": "Authentication required",
+            "description": "Authentication required - No API key provided",
             "content": {
                 "application/json": {
                     "example": {
@@ -313,10 +420,50 @@ async def chat(
             },
         },
         403: {
-            "description": "Invalid API key",
+            "description": "Forbidden - Invalid or inactive API key",
             "content": {
                 "application/json": {
-                    "example": {"detail": "Invalid API key. Please check your credentials."}
+                    "examples": {
+                        "invalid_key": {
+                            "summary": "Invalid API key",
+                            "value": {
+                                "detail": "Invalid API key. Please check your credentials."
+                            }
+                        },
+                        "inactive_key": {
+                            "summary": "Inactive API key",
+                            "value": {
+                                "detail": "API key is inactive or revoked"
+                            }
+                        }
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "api_key_validation_error": {
+                            "summary": "Error validating API key",
+                            "value": {
+                                "detail": "Error validating API key"
+                            }
+                        },
+                        "platform_error": {
+                            "summary": "Error retrieving platform configuration",
+                            "value": {
+                                "detail": "Failed to retrieve platform configuration"
+                            }
+                        },
+                        "general_error": {
+                            "summary": "Unexpected server error",
+                            "value": {
+                                "detail": "An unexpected error occurred"
+                            }
+                        }
+                    }
                 }
             },
         },

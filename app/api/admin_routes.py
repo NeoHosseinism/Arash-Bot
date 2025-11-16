@@ -289,7 +289,7 @@ class AdminDashboardResponse(BaseModel):
             "examples": [
                 {
                     "service": "Arash External API Service",
-                    "version": "1.1.0",
+                    "version": "1.0.0",
                     "status": "healthy",
                     "timestamp": "2025-01-15T14:30:00",
                     "platforms": {
@@ -353,14 +353,102 @@ class AdminDashboardResponse(BaseModel):
     )
 
     service: str = Field(..., examples=["Arash External API Service"])
-    version: str = Field(..., examples=["1.1.0"])
+    version: str = Field(..., examples=["1.0.0"])
     status: str = Field(..., examples=["healthy"])
     timestamp: datetime
     platforms: Dict[str, Dict[str, Any]]
     statistics: Dict[str, Any]
 
 
-@router.get("/", response_model=AdminDashboardResponse)
+@router.get(
+    "/",
+    response_model=AdminDashboardResponse,
+    responses={
+        200: {
+            "description": "Admin dashboard data retrieved successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "service": "Arash External API Service",
+                        "version": "1.0.0",
+                        "status": "healthy",
+                        "timestamp": "2025-01-15T14:30:00",
+                        "platforms": {
+                            "telegram": {
+                                "type": "public",
+                                "model": "Gemini 2.0 Flash",
+                                "rate_limit": 20,
+                                "commands": ["start", "help", "clear"]
+                            },
+                            "internal": {
+                                "type": "private",
+                                "default_model": "Gemini 2.0 Flash",
+                                "available_models": ["Gemini 2.0 Flash", "GPT-5 Chat"],
+                                "rate_limit": 60
+                            }
+                        },
+                        "statistics": {
+                            "total_sessions": 150,
+                            "active_sessions": 25
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Authentication required - No super admin API key provided",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "no_auth_header": {
+                            "summary": "Missing Authorization header",
+                            "value": {
+                                "detail": "Authentication required"
+                            }
+                        },
+                        "admin_keys_not_configured": {
+                            "summary": "Super admin keys not configured",
+                            "value": {
+                                "detail": "Super admin authentication not configured"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - Invalid super admin API key",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid super admin API key"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "database_error": {
+                            "summary": "Database connection error",
+                            "value": {
+                                "detail": "Failed to retrieve dashboard data"
+                            }
+                        },
+                        "general_error": {
+                            "summary": "Unexpected server error",
+                            "value": {
+                                "detail": "An unexpected error occurred"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def admin_dashboard(
     api_key=Depends(require_admin_access),
 ):
@@ -455,7 +543,7 @@ async def admin_dashboard(
 
     return AdminDashboardResponse(
         service="Arash External API Service",
-        version="1.1.0",
+        version="1.0.0",
         status="healthy",
         timestamp=datetime.now(),
         platforms={
@@ -513,6 +601,7 @@ async def admin_dashboard(
                 "application/json": {
                     "example": {
                         "id": 1,
+                        "display_name": "تیم هوش مصنوعی داخلی",
                         "platform_name": "Internal-BI",
                         "monthly_quota": 100000,
                         "daily_quota": 5000,
@@ -524,13 +613,106 @@ async def admin_dashboard(
                 }
             },
         },
+        400: {
+            "description": "Bad request - Invalid input or platform name already exists",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "platform_exists": {
+                            "summary": "Platform name already exists",
+                            "value": {
+                                "detail": "Team with platform name 'Internal-BI' already exists"
+                            }
+                        },
+                        "invalid_platform_name": {
+                            "summary": "Invalid platform name format",
+                            "value": {
+                                "detail": "Platform name must be ASCII characters without spaces"
+                            }
+                        },
+                        "invalid_quota": {
+                            "summary": "Invalid quota value",
+                            "value": {
+                                "detail": "Quota values must be positive integers"
+                            }
+                        }
+                    }
+                }
+            },
+        },
         401: {
-            "description": "Authentication required",
-            "content": {"application/json": {"example": {"detail": "Authentication required"}}},
+            "description": "Authentication required - No super admin API key provided",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "no_auth_header": {
+                            "summary": "Missing Authorization header",
+                            "value": {
+                                "detail": "Authentication required"
+                            }
+                        },
+                        "admin_keys_not_configured": {
+                            "summary": "Super admin keys not configured",
+                            "value": {
+                                "detail": "Super admin authentication not configured"
+                            }
+                        }
+                    }
+                }
+            },
         },
         403: {
-            "description": "Invalid super admin API key",
-            "content": {"application/json": {"example": {"detail": "Invalid super admin API key"}}},
+            "description": "Forbidden - Invalid super admin API key",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid super admin API key"
+                    }
+                }
+            },
+        },
+        422: {
+            "description": "Validation error - Request body doesn't match schema",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": [
+                            {
+                                "loc": ["body", "platform_name"],
+                                "msg": "field required",
+                                "type": "value_error.missing"
+                            }
+                        ]
+                    }
+                }
+            },
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "database_error": {
+                            "summary": "Database error during team creation",
+                            "value": {
+                                "detail": "Failed to create team due to database error"
+                            }
+                        },
+                        "api_key_generation_error": {
+                            "summary": "Error generating API key",
+                            "value": {
+                                "detail": "Team created but API key generation failed"
+                            }
+                        },
+                        "general_error": {
+                            "summary": "Unexpected server error",
+                            "value": {
+                                "detail": "An unexpected error occurred"
+                            }
+                        }
+                    }
+                }
+            },
         },
     },
 )
@@ -634,7 +816,131 @@ class TeamsListResponse(BaseModel):
     )
 
 
-@router.get("/teams")
+@router.get(
+    "/teams",
+    response_model=TeamsListResponse,
+    responses={
+        200: {
+            "description": "Teams list retrieved successfully",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "teams_list": {
+                            "summary": "List of teams with usage statistics",
+                            "value": {
+                                "teams": [
+                                    {
+                                        "id": 1,
+                                        "display_name": "Internal BI Team",
+                                        "platform_name": "Internal-BI",
+                                        "monthly_quota": 100000,
+                                        "daily_quota": 5000,
+                                        "is_active": True,
+                                        "api_key_prefix": "ark_1234",
+                                        "created_at": "2025-01-01T10:00:00",
+                                        "updated_at": "2025-01-15T14:30:00",
+                                        "usage": {
+                                            "requests": {"total": 15000, "successful": 14850}
+                                        }
+                                    }
+                                ],
+                                "total_report": None
+                            }
+                        },
+                        "teams_with_total": {
+                            "summary": "Teams list with total aggregated report",
+                            "value": {
+                                "teams": [
+                                    {
+                                        "id": 1,
+                                        "display_name": "Internal BI Team",
+                                        "platform_name": "Internal-BI",
+                                        "monthly_quota": 100000,
+                                        "is_active": True
+                                    }
+                                ],
+                                "total_report": {
+                                    "total_teams": 5,
+                                    "active_teams": 4,
+                                    "total_requests": 75000,
+                                    "total_cost": 75.50
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Authentication required - No super admin API key provided",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "no_auth_header": {
+                            "summary": "Missing Authorization header",
+                            "value": {
+                                "detail": "Authentication required"
+                            }
+                        },
+                        "admin_keys_not_configured": {
+                            "summary": "Super admin keys not configured",
+                            "value": {
+                                "detail": "Super admin authentication not configured"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - Invalid super admin API key",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid super admin API key"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not found - Team with specified ID does not exist",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Team not found"
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "database_error": {
+                            "summary": "Database connection error",
+                            "value": {
+                                "detail": "Failed to retrieve teams from database"
+                            }
+                        },
+                        "usage_stats_error": {
+                            "summary": "Error calculating usage statistics",
+                            "value": {
+                                "detail": "Failed to calculate usage statistics"
+                            }
+                        },
+                        "general_error": {
+                            "summary": "Unexpected server error",
+                            "value": {
+                                "detail": "An unexpected error occurred"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def get_teams(
     team_id: Optional[int] = None,
     active_only: bool = True,
@@ -743,7 +1049,145 @@ async def get_teams(
     )
 
 
-@router.patch("/teams/{team_id}", response_model=TeamResponse)
+@router.patch(
+    "/teams/{team_id}",
+    response_model=TeamResponse,
+    responses={
+        200: {
+            "description": "Team updated successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "id": 1,
+                        "display_name": "Internal BI Team Updated",
+                        "platform_name": "Internal-BI-v2",
+                        "monthly_quota": 150000,
+                        "daily_quota": 7000,
+                        "is_active": True,
+                        "api_key_prefix": "ark_1234",
+                        "api_key_last_used": "2025-01-15T14:30:00",
+                        "created_at": "2025-01-01T10:00:00",
+                        "updated_at": "2025-01-16T10:00:00",
+                        "usage": {
+                            "requests": {"total": 15000, "successful": 14850}
+                        }
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "Bad request - Invalid update data",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "platform_exists": {
+                            "summary": "Platform name already exists (when changing platform_name)",
+                            "value": {
+                                "detail": "Platform name 'Internal-BI-v2' is already in use by another team"
+                            }
+                        },
+                        "invalid_quota": {
+                            "summary": "Invalid quota value",
+                            "value": {
+                                "detail": "Quota values must be positive integers or null"
+                            }
+                        },
+                        "no_fields_provided": {
+                            "summary": "No fields to update",
+                            "value": {
+                                "detail": "At least one field must be provided for update"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        401: {
+            "description": "Authentication required - No super admin API key provided",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "no_auth_header": {
+                            "summary": "Missing Authorization header",
+                            "value": {
+                                "detail": "Authentication required"
+                            }
+                        },
+                        "admin_keys_not_configured": {
+                            "summary": "Super admin keys not configured",
+                            "value": {
+                                "detail": "Super admin authentication not configured"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        403: {
+            "description": "Forbidden - Invalid super admin API key",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Invalid super admin API key"
+                    }
+                }
+            }
+        },
+        404: {
+            "description": "Not found - Team with specified ID does not exist",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": "Team not found"
+                    }
+                }
+            }
+        },
+        422: {
+            "description": "Validation error - Request body doesn't match schema",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "detail": [
+                            {
+                                "loc": ["body", "monthly_quota"],
+                                "msg": "value is not a valid integer",
+                                "type": "type_error.integer"
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        500: {
+            "description": "Internal server error",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "database_error": {
+                            "summary": "Database error during update",
+                            "value": {
+                                "detail": "Failed to update team due to database error"
+                            }
+                        },
+                        "usage_stats_error": {
+                            "summary": "Error retrieving usage statistics",
+                            "value": {
+                                "detail": "Team updated but failed to retrieve usage statistics"
+                            }
+                        },
+                        "general_error": {
+                            "summary": "Unexpected server error",
+                            "value": {
+                                "detail": "An unexpected error occurred"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+)
 async def update_team(
     team_id: int,
     team_data: TeamUpdate,
@@ -756,7 +1200,9 @@ async def update_team(
     Returns updated team with usage statistics.
 
     Parameters:
+    - team_id: ID of the team to update (path parameter)
     - days: Number of days for usage statistics (default: 30)
+    - team_data: Fields to update (all optional)
     """
     db = get_db_session()
 
