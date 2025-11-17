@@ -5,9 +5,11 @@ This module ensures database schema is up-to-date using Alembic migrations.
 
 import logging
 import subprocess
+import time
 from pathlib import Path
 
 from sqlalchemy import inspect, text
+from sqlalchemy.exc import OperationalError
 
 from app.core.config import settings
 
@@ -99,65 +101,40 @@ def run_migrations() -> bool:
 def initialize_database() -> bool:
     """
     Initialize database with Alembic migrations.
-    This is the main entry point for database initialization at startup.
-
-    Process:
-    1. Check if database is accessible
-    2. Check if Alembic history exists
-    3. If no history, run initial migration
-    4. If history exists, check for pending migrations and run them
-    5. Verify schema is up-to-date
+    Automatically runs latest migrations on startup.
 
     Returns:
         True if database initialized successfully, False otherwise
     """
     try:
         logger.info("=" * 60)
-        logger.info(f"Database Initialization - Environment: {settings.ENVIRONMENT.upper()}")
+        logger.info("Database Initialization")
         logger.info("=" * 60)
 
-        # Get database connection (connection test handled internally)
+        # Wait for database
         from app.models.database import get_database
 
-        db = get_database()
+        for attempt in range(30):
+            try:
+                db = get_database()
+                with db.engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                logger.info(f"Database ready (attempt {attempt + 1})")
+                break
+            except OperationalError:
+                if attempt < 29:
+                    time.sleep(2)
+                else:
+                    logger.error("Database not ready after 30 attempts")
+                    return False
 
-        # Check if Alembic history exists
-        has_history = check_alembic_history()
+        # Run migrations (alembic upgrade head handles both initial and updates)
+        logger.info("Running migrations...")
+        if not run_migrations():
+            logger.error("Migrations failed")
+            return False
 
-        if not has_history:
-            logger.info("No Alembic history found, running initial migration")
-
-            # Run initial migration
-            if not run_migrations():
-                logger.error("Initial migration failed")
-                return False
-
-            logger.info("Initial migration completed")
-
-        else:
-            # Check current revision
-            current_rev = get_current_revision()
-            logger.info(f"Current migration revision: {current_rev or 'none'}")
-
-            # Run any pending migrations
-            logger.info("Checking for pending migrations")
-            if not run_migrations():
-                logger.warning("Migration check completed with warnings")
-                # Don't fail on warnings - database might already be up-to-date
-            else:
-                logger.info("Database schema is up-to-date")
-
-        # Verify tables exist
-        inspector = inspect(db.engine)
-        tables = inspector.get_table_names()
-        expected_tables = {"teams", "api_keys", "usage_logs", "alembic_version"}
-
-        missing_tables = expected_tables - set(tables)
-        if missing_tables:
-            logger.warning(f"Missing tables: {', '.join(missing_tables)}")
-        else:
-            logger.info(f"All required tables present: {', '.join(sorted(tables))}")
-
+        logger.info("Database initialized successfully")
         logger.info("=" * 60)
         return True
 

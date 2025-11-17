@@ -57,13 +57,9 @@ async def lifespan(app: FastAPI):
     logger.info(f"   User: {settings.DB_USER}")
 
     # Initialize database with Alembic migrations
-    try:
-        if not initialize_database():
-            logger.error("[ERROR] Database initialization failed - API key management may not work")
-        else:
-            logger.info("[OK] Database initialized successfully with Alembic migrations")
-    except Exception as e:
-        logger.error(f"[ERROR] Database initialization failed: {e}")
+    if not initialize_database():
+        logger.error("[CRITICAL] Database initialization failed")
+        raise RuntimeError("Database initialization failed")
 
     # Log platform configurations
     logger.info("Platform Configurations:")
