@@ -51,6 +51,8 @@ class TeamCreate(BaseModel):
     Field Distinction:
     - display_name: Human-friendly name (supports Persian/Farsi) for admin UI and chat
     - platform_name: System identifier for routing (ASCII, no spaces)
+    - platform_type: 'public' (Telegram, Discord) or 'private' (customer integrations)
+    - Platform config overrides: If NULL, uses defaults for platform_type
     - Auto-generates API key on creation
     """
 
@@ -60,18 +62,25 @@ class TeamCreate(BaseModel):
                 {
                     "display_name": "تیم هوش مصنوعی داخلی",
                     "platform_name": "Internal-BI",
+                    "platform_type": "private",
                     "monthly_quota": 100000,
                     "daily_quota": 5000,
                 },
                 {
                     "display_name": "پلتفرم بازاریابی",
                     "platform_name": "External-Marketing",
+                    "platform_type": "private",
                     "monthly_quota": 50000,
                     "daily_quota": 2000,
+                    "rate_limit": 40,
+                    "max_history": 20,
                 },
                 {
-                    "platform_name": "Data-Analytics",
+                    "platform_name": "HOSCO-Popak",
+                    "platform_type": "private",
                     "monthly_quota": 75000,
+                    "default_model": "openai/gpt-5-chat",
+                    "available_models": ["openai/gpt-5-chat", "google/gemini-2.0-flash-001"],
                 },
             ]
         }
@@ -87,11 +96,43 @@ class TeamCreate(BaseModel):
         description="System identifier for routing (ASCII, no spaces, e.g., 'Internal-BI', 'External-Marketing')",
         examples=["Internal-BI", "External-Marketing", "Data-Analytics"],
     )
+    platform_type: str = Field(
+        "private",
+        description="Platform type: 'public' (Telegram, Discord) or 'private' (customer integrations)",
+        examples=["private", "public"],
+    )
     monthly_quota: Optional[int] = Field(
         None, description="Monthly request quota (None = unlimited)", examples=[100000, None]
     )
     daily_quota: Optional[int] = Field(
         None, description="Daily request quota (None = unlimited)", examples=[5000, None]
+    )
+
+    # Platform configuration overrides (NULL = use defaults for platform_type)
+    rate_limit: Optional[int] = Field(
+        None,
+        description="Override default rate limit (requests/min). NULL = use platform_type default",
+        examples=[20, 60, None],
+    )
+    max_history: Optional[int] = Field(
+        None,
+        description="Override default max conversation history. NULL = use platform_type default",
+        examples=[10, 30, None],
+    )
+    default_model: Optional[str] = Field(
+        None,
+        description="Override default AI model. NULL = use platform_type default",
+        examples=["openai/gpt-5-chat", "google/gemini-2.0-flash-001", None],
+    )
+    available_models: Optional[List[str]] = Field(
+        None,
+        description="Override available models list. NULL = use platform_type default",
+        examples=[["openai/gpt-5-chat", "google/gemini-2.0-flash-001"], None],
+    )
+    allow_model_switch: Optional[bool] = Field(
+        None,
+        description="Override model switching permission. NULL = use platform_type default",
+        examples=[True, False, None],
     )
 
 
@@ -102,6 +143,8 @@ class TeamUpdate(BaseModel):
     Field Distinction:
     - display_name: Human-friendly name for admin UI and reports
     - platform_name: System identifier for routing and session isolation
+    - platform_type: 'public' or 'private'
+    - Platform config overrides: Set to NULL to reset to defaults
     """
 
     model_config = ConfigDict(
@@ -118,6 +161,13 @@ class TeamUpdate(BaseModel):
                 {
                     "display_name": "Marketing Platform",
                     "platform_name": "Marketing-Platform",
+                    "rate_limit": 80,
+                    "max_history": 25,
+                },
+                {
+                    "default_model": "openai/gpt-5-chat",
+                    "available_models": ["openai/gpt-5-chat", "anthropic/claude-4.1"],
+                    "allow_model_switch": True,
                 },
             ]
         }
@@ -125,9 +175,19 @@ class TeamUpdate(BaseModel):
 
     display_name: Optional[str] = Field(None, examples=["Internal BI Team"])
     platform_name: Optional[str] = Field(None, examples=["Internal-BI-Updated"])
+    platform_type: Optional[str] = Field(None, examples=["private", "public"])
     monthly_quota: Optional[int] = Field(None, examples=[150000])
     daily_quota: Optional[int] = Field(None, examples=[7000])
     is_active: Optional[bool] = Field(None, examples=[True, False])
+
+    # Platform configuration overrides
+    rate_limit: Optional[int] = Field(None, examples=[60, 80, None])
+    max_history: Optional[int] = Field(None, examples=[30, 25, None])
+    default_model: Optional[str] = Field(None, examples=["openai/gpt-5-chat", None])
+    available_models: Optional[List[str]] = Field(
+        None, examples=[["openai/gpt-5-chat", "anthropic/claude-4.1"], None]
+    )
+    allow_model_switch: Optional[bool] = Field(None, examples=[True, False, None])
 
 
 class TeamResponse(BaseModel):
@@ -139,6 +199,8 @@ class TeamResponse(BaseModel):
     Field Distinction:
     - display_name: Human-friendly name for display purposes
     - platform_name: System identifier for routing/operations
+    - platform_type: 'public' or 'private'
+    - Platform config: Shows overrides if set, NULL means using defaults
     - usage: Recent usage statistics (last 30 days by default)
     """
 
@@ -150,9 +212,15 @@ class TeamResponse(BaseModel):
                     "id": 1,
                     "display_name": "Internal BI Team",
                     "platform_name": "Internal-BI",
+                    "platform_type": "private",
                     "monthly_quota": 100000,
                     "daily_quota": 5000,
                     "is_active": True,
+                    "rate_limit": 80,
+                    "max_history": 25,
+                    "default_model": "openai/gpt-5-chat",
+                    "available_models": ["openai/gpt-5-chat", "google/gemini-2.0-flash-001"],
+                    "allow_model_switch": True,
                     "api_key_prefix": "ark_1234",
                     "api_key_last_used": "2025-01-15T14:30:00",
                     "created_at": "2025-01-01T10:00:00",
@@ -175,9 +243,20 @@ class TeamResponse(BaseModel):
     id: int = Field(..., examples=[1])
     display_name: str = Field(..., examples=["Internal BI Team"])
     platform_name: str = Field(..., examples=["Internal-BI"])
+    platform_type: str = Field(..., examples=["private", "public"])
     monthly_quota: Optional[int] = Field(None, examples=[100000])
     daily_quota: Optional[int] = Field(None, examples=[5000])
     is_active: bool = Field(..., examples=[True])
+
+    # Platform configuration (NULL = using defaults for platform_type)
+    rate_limit: Optional[int] = Field(None, examples=[60, 80, None])
+    max_history: Optional[int] = Field(None, examples=[30, 25, None])
+    default_model: Optional[str] = Field(None, examples=["openai/gpt-5-chat", None])
+    available_models: Optional[List[str]] = Field(
+        None, examples=[["openai/gpt-5-chat", "google/gemini-2.0-flash-001"], None]
+    )
+    allow_model_switch: Optional[bool] = Field(None, examples=[True, False, None])
+
     api_key_prefix: Optional[str] = Field(None, examples=["ark_1234"])
     api_key_last_used: Optional[datetime] = Field(None, examples=["2025-01-15T14:30:00"])
     created_at: datetime
@@ -202,9 +281,15 @@ class TeamCreateResponse(BaseModel):
                     "id": 1,
                     "display_name": "تیم هوش مصنوعی داخلی",
                     "platform_name": "Internal-BI",
+                    "platform_type": "private",
                     "monthly_quota": 100000,
                     "daily_quota": 5000,
                     "is_active": True,
+                    "rate_limit": 60,
+                    "max_history": 30,
+                    "default_model": None,
+                    "available_models": None,
+                    "allow_model_switch": None,
                     "created_at": "2025-01-15T10:00:00",
                     "api_key": "ark_1234567890abcdef1234567890abcdef12345678",
                     "warning": "Save this API key securely. It will not be shown again.",
@@ -216,9 +301,18 @@ class TeamCreateResponse(BaseModel):
     id: int = Field(..., examples=[1])
     display_name: str = Field(..., examples=["تیم هوش مصنوعی داخلی", "Internal BI Team"])
     platform_name: str = Field(..., examples=["Internal-BI"])
+    platform_type: str = Field(..., examples=["private", "public"])
     monthly_quota: Optional[int] = Field(None, examples=[100000])
     daily_quota: Optional[int] = Field(None, examples=[5000])
     is_active: bool = Field(..., examples=[True])
+
+    # Platform configuration
+    rate_limit: Optional[int] = Field(None, examples=[60, None])
+    max_history: Optional[int] = Field(None, examples=[30, None])
+    default_model: Optional[str] = Field(None, examples=["openai/gpt-5-chat", None])
+    available_models: Optional[List[str]] = Field(None, examples=[None])
+    allow_model_switch: Optional[bool] = Field(None, examples=[True, None])
+
     created_at: datetime
     api_key: str = Field(
         ...,
@@ -759,17 +853,29 @@ async def create_team(
         db=db,
         platform_name=team_data.platform_name,
         display_name=team_data.display_name,
+        platform_type=team_data.platform_type,
         monthly_quota=team_data.monthly_quota,
         daily_quota=team_data.daily_quota,
+        rate_limit=team_data.rate_limit,
+        max_history=team_data.max_history,
+        default_model=team_data.default_model,
+        available_models=team_data.available_models,
+        allow_model_switch=team_data.allow_model_switch,
     )
 
     return TeamCreateResponse(
         id=team.id,
         display_name=team.display_name,
         platform_name=team.platform_name,
+        platform_type=team.platform_type,
         monthly_quota=team.monthly_quota,
         daily_quota=team.daily_quota,
         is_active=team.is_active,
+        rate_limit=team.rate_limit,
+        max_history=team.max_history,
+        default_model=team.default_model,
+        available_models=team.available_models.split(",") if team.available_models else None,
+        allow_model_switch=team.allow_model_switch,
         created_at=team.created_at,
         api_key=api_key_string,
     )
@@ -1014,9 +1120,15 @@ async def get_teams(
                 id=team.id,
                 display_name=team.display_name,
                 platform_name=team.platform_name,
+                platform_type=team.platform_type,
                 monthly_quota=team.monthly_quota,
                 daily_quota=team.daily_quota,
                 is_active=team.is_active,
+                rate_limit=team.rate_limit,
+                max_history=team.max_history,
+                default_model=team.default_model,
+                available_models=team.available_models.split(",") if team.available_models else None,
+                allow_model_switch=team.allow_model_switch,
                 api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
                 api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
                 created_at=team.created_at,
@@ -1211,9 +1323,15 @@ async def update_team(
         team_id=team_id,
         display_name=team_data.display_name,
         platform_name=team_data.platform_name,
+        platform_type=team_data.platform_type,
         monthly_quota=team_data.monthly_quota,
         daily_quota=team_data.daily_quota,
         is_active=team_data.is_active,
+        rate_limit=team_data.rate_limit,
+        max_history=team_data.max_history,
+        default_model=team_data.default_model,
+        available_models=team_data.available_models,
+        allow_model_switch=team_data.allow_model_switch,
     )
 
     if not team:
@@ -1236,9 +1354,15 @@ async def update_team(
         id=team.id,
         display_name=team.display_name,
         platform_name=team.platform_name,
+        platform_type=team.platform_type,
         monthly_quota=team.monthly_quota,
         daily_quota=team.daily_quota,
         is_active=team.is_active,
+        rate_limit=team.rate_limit,
+        max_history=team.max_history,
+        default_model=team.default_model,
+        available_models=team.available_models.split(",") if team.available_models else None,
+        allow_model_switch=team.allow_model_switch,
         api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
         api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
         created_at=team.created_at,

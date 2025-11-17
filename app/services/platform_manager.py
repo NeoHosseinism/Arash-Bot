@@ -37,6 +37,20 @@ class PlatformConfig:
         self.api_key = api_key
         self.max_history = max_history
 
+    def copy(self) -> 'PlatformConfig':
+        """Create a copy of this config"""
+        return PlatformConfig(
+            type=self.type,
+            model=self.model,
+            available_models=self.available_models.copy(),
+            rate_limit=self.rate_limit,
+            commands=self.commands.copy(),
+            allow_model_switch=self.allow_model_switch,
+            requires_auth=self.requires_auth,
+            api_key=self.api_key,
+            max_history=self.max_history,
+        )
+
     def dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
         return {
@@ -52,57 +66,102 @@ class PlatformConfig:
 
 
 class PlatformManager:
-    """Manages platform-specific configurations and access control"""
+    """Manages platform-specific configurations with database-driven overrides"""
 
     def __init__(self):
+        # Default configurations for platform types
+        self.default_configs: Dict[str, PlatformConfig] = {}
+        # Keep backward compatibility configs
         self.configs: Dict[str, PlatformConfig] = {}
         self._load_configurations()
 
     def _load_configurations(self):
-        """Load platform configurations from settings"""
+        """Load default platform type configurations"""
 
-        # Telegram configuration (PUBLIC with limited models)
-        self.configs[Platform.TELEGRAM] = PlatformConfig(
+        # Public platform defaults (Telegram, Discord, etc.)
+        public_config = PlatformConfig(
             type=PlatformType.PUBLIC,
             model=settings.TELEGRAM_DEFAULT_MODEL,
             available_models=settings.telegram_models_list,
             rate_limit=settings.TELEGRAM_RATE_LIMIT,
             commands=settings.telegram_commands_list,
-            allow_model_switch=settings.TELEGRAM_ALLOW_MODEL_SWITCH,  # ✅ Configurable via ENV
+            allow_model_switch=settings.TELEGRAM_ALLOW_MODEL_SWITCH,
             requires_auth=False,
             max_history=settings.TELEGRAM_MAX_HISTORY,
         )
 
-        # Internal configuration (PRIVATE with all models)
-        self.configs[Platform.INTERNAL] = PlatformConfig(
+        # Private platform defaults (Customer integrations)
+        private_config = PlatformConfig(
             type=PlatformType.PRIVATE,
             model=settings.INTERNAL_DEFAULT_MODEL,
             available_models=settings.internal_models_list,
             rate_limit=settings.INTERNAL_RATE_LIMIT,
-            commands=["start", "help", "status", "clear", "model", "models", "settings"],
+            commands=["start", "help", "status", "clear", "model", "models"],  # NO /settings
             allow_model_switch=True,
             requires_auth=True,
             api_key=settings.INTERNAL_API_KEY,
             max_history=settings.INTERNAL_MAX_HISTORY,
         )
 
+        # Store by type
+        self.default_configs['public'] = public_config
+        self.default_configs['private'] = private_config
+
+        # Backward compatibility - keep old structure
+        self.configs[Platform.TELEGRAM] = public_config
+        self.configs[Platform.INTERNAL] = private_config
+
         logger.info("Platform configurations loaded successfully")
-        logger.info(
-            f"  - Telegram: {self.configs[Platform.TELEGRAM].model} + {len(self.configs[Platform.TELEGRAM].available_models)} models"
-        )
-        logger.info(f"  - Internal: {len(self.configs[Platform.INTERNAL].available_models)} models")
+        logger.info(f"  - Public: {public_config.model} + {len(public_config.available_models)} models")
+        logger.info(f"  - Private: {len(private_config.available_models)} models")
 
-    def get_config(self, platform: str) -> PlatformConfig:
-        """Get configuration for a platform"""
-        # Normalize platform name
-        platform = platform.lower()
+    def get_config(self, platform: str, team: Optional[Any] = None) -> PlatformConfig:
+        """
+        Get configuration for a platform with optional team-specific overrides.
 
-        # Return config if exists, otherwise default to telegram (public)
-        if platform in self.configs:
-            return self.configs[platform]
+        Args:
+            platform: Platform name (e.g., "telegram", "HOSCO-Popak")
+            team: Optional Team object with configuration overrides
 
-        logger.warning(f"Unknown platform: {platform}, defaulting to Telegram")
-        return self.configs[Platform.TELEGRAM]
+        Returns:
+            PlatformConfig with defaults and team-specific overrides applied
+        """
+        # If team provided, build custom config with overrides
+        if team:
+            # Start with default config for platform type
+            config = self.default_configs[team.platform_type].copy()
+
+            # Apply team-specific overrides
+            if team.rate_limit is not None:
+                config.rate_limit = team.rate_limit
+
+            if team.max_history is not None:
+                config.max_history = team.max_history
+
+            if team.default_model is not None:
+                config.model = team.default_model
+
+            if team.available_models is not None:
+                # Parse CSV string to list
+                try:
+                    config.available_models = [m.strip() for m in team.available_models.split(",") if m.strip()]
+                except (AttributeError, TypeError):
+                    # If not valid string, keep default
+                    pass
+
+            if team.allow_model_switch is not None:
+                config.allow_model_switch = team.allow_model_switch
+
+            return config
+
+        # Fallback: determine type by platform name (backward compatibility)
+        platform_lower = platform.lower()
+
+        if platform_lower in self.configs:
+            return self.configs[platform_lower]
+
+        # Unknown platforms default to private config
+        return self.default_configs['private']
 
     def is_private_platform(self, platform: str) -> bool:
         """Check if platform is private"""

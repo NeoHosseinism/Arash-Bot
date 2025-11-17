@@ -30,16 +30,23 @@ Base = declarative_base()
 
 class Team(Base):
     """
-    Team model for organizing users and tracking usage.
+    Team model representing a platform integration.
 
-    Each team represents a platform (e.g., "Internal-BI", "External-Telegram")
-    and has exactly ONE API key auto-generated on creation.
+    Platform Types:
+    - 'public': Public messaging services (Telegram, Discord, etc.)
+    - 'private': Customer-specific integrations (HOSCO-Popak, HOSCO-Avand, etc.)
+
+    Each team represents a platform and has exactly ONE API key auto-generated on creation.
 
     Field Distinction:
     - display_name: Human-friendly name for admin UI, reports, internal tools
-                    (e.g., "Internal BI Team", "Marketing Platform")
+                    (e.g., "پیامرسان سازمانی پوپک", "HOSCO Avand Portal")
     - platform_name: System identifier for routing, session isolation, API operations
-                     (e.g., "Internal-BI", "Marketing-Platform")
+                     (e.g., "HOSCO-Popak", "HOSCO-Avand")
+
+    Configuration Priority:
+    1. Team-specific overrides (rate_limit, max_history, etc.) - if set
+    2. Default config for platform_type - if overrides are NULL
     """
 
     __tablename__ = "teams"
@@ -51,10 +58,23 @@ class Team(Base):
     platform_name = Column(
         String(255), unique=True, nullable=False, index=True
     )  # System identifier for platform routing
+
+    # Platform type
+    platform_type = Column(String(50), nullable=False, default='private', index=True)
+
+    # Quotas
     monthly_quota = Column(Integer, nullable=True)  # Requests per month, None = unlimited
     daily_quota = Column(Integer, nullable=True)  # Requests per day, None = unlimited
-    is_active = Column(Boolean, default=True, nullable=False)
 
+    # Platform configuration overrides (NULL = use defaults)
+    rate_limit = Column(Integer, nullable=True)  # Override default rate limit (requests/min)
+    max_history = Column(Integer, nullable=True)  # Override default max conversation history
+    default_model = Column(String(255), nullable=True)  # Override default AI model
+    available_models = Column(Text, nullable=True)  # Override available models list (JSON)
+    allow_model_switch = Column(Boolean, nullable=True)  # Override model switch permission
+
+    # Status and timestamps
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

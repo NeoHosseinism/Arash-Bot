@@ -305,6 +305,12 @@ class APIKeyManager:
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
         display_name: Optional[str] = None,
+        platform_type: str = "private",
+        rate_limit: Optional[int] = None,
+        max_history: Optional[int] = None,
+        default_model: Optional[str] = None,
+        available_models: Optional[List[str]] = None,
+        allow_model_switch: Optional[bool] = None,
     ) -> Tuple[Team, str]:
         """
         Create a new team with auto-generated API key (one key per team).
@@ -318,18 +324,31 @@ class APIKeyManager:
             monthly_quota: Monthly request quota (None = unlimited)
             daily_quota: Daily request quota (None = unlimited)
             display_name: Human-friendly display name (defaults to platform_name if not provided)
+            platform_type: 'public' or 'private' (default: 'private')
+            rate_limit: Override default rate limit (None = use platform_type default)
+            max_history: Override max conversation history (None = use platform_type default)
+            default_model: Override default AI model (None = use platform_type default)
+            available_models: Override available models list (None = use platform_type default)
+            allow_model_switch: Override model switch permission (None = use platform_type default)
 
         Returns:
             Tuple of (team, api_key_string)
             - team: Created team object
             - api_key_string: Full API key (show only once to user)
         """
-        # Create team
+        # Create team with platform configuration
         team = Team(
             display_name=display_name or platform_name,  # Default to platform_name if not provided
             platform_name=platform_name,
+            platform_type=platform_type,
             monthly_quota=monthly_quota,
             daily_quota=daily_quota,
+            # Platform config overrides (NULL = use defaults)
+            rate_limit=rate_limit,
+            max_history=max_history,
+            default_model=default_model,
+            available_models=",".join(available_models) if available_models else None,  # Store as CSV
+            allow_model_switch=allow_model_switch,
         )
         db.add(team)
         db.flush()  # Flush to get team.id before creating key
@@ -352,7 +371,7 @@ class APIKeyManager:
         db.refresh(team)
 
         logger.info(
-            f"Created team '{platform_name}' (ID: {team.id}) with auto-generated API key (prefix: {key_prefix})"
+            f"Created team '{platform_name}' (ID: {team.id}, type: {platform_type}) with auto-generated API key (prefix: {key_prefix})"
         )
 
         return team, api_key_string
@@ -394,9 +413,15 @@ class APIKeyManager:
         team_id: int,
         display_name: Optional[str] = None,
         platform_name: Optional[str] = None,
+        platform_type: Optional[str] = None,
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
         is_active: Optional[bool] = None,
+        rate_limit: Optional[int] = None,
+        max_history: Optional[int] = None,
+        default_model: Optional[str] = None,
+        available_models: Optional[List[str]] = None,
+        allow_model_switch: Optional[bool] = None,
     ) -> Optional[Team]:
         """
         Update team settings.
@@ -404,15 +429,23 @@ class APIKeyManager:
         Supports independent updates to display_name and platform_name:
         - display_name: Human-friendly name for admin UI
         - platform_name: System identifier for routing
+        - platform_type: 'public' or 'private'
+        - Platform config overrides: Set to None to keep existing, or provide new values
 
         Args:
             db: Database session
             team_id: Team ID
             display_name: New human-friendly display name
             platform_name: New platform identifier
+            platform_type: New platform type ('public' or 'private')
             monthly_quota: New monthly quota
             daily_quota: New daily quota
             is_active: Active status
+            rate_limit: Override rate limit (None = keep existing)
+            max_history: Override max history (None = keep existing)
+            default_model: Override default model (None = keep existing)
+            available_models: Override available models (None = keep existing)
+            allow_model_switch: Override model switch permission (None = keep existing)
 
         Returns:
             Updated team if found, None otherwise
@@ -426,6 +459,8 @@ class APIKeyManager:
             team.display_name = display_name
         if platform_name is not None:
             team.platform_name = platform_name
+        if platform_type is not None:
+            team.platform_type = platform_type
         if monthly_quota is not None:
             team.monthly_quota = monthly_quota
         if daily_quota is not None:
@@ -433,12 +468,24 @@ class APIKeyManager:
         if is_active is not None:
             team.is_active = is_active
 
+        # Platform configuration overrides
+        if rate_limit is not None:
+            team.rate_limit = rate_limit
+        if max_history is not None:
+            team.max_history = max_history
+        if default_model is not None:
+            team.default_model = default_model
+        if available_models is not None:
+            team.available_models = ",".join(available_models) if available_models else None
+        if allow_model_switch is not None:
+            team.allow_model_switch = allow_model_switch
+
         team.updated_at = datetime.utcnow()
         db.commit()
         db.refresh(team)
 
         logger.info(
-            f"Updated team: {team.display_name} / {team.platform_name} (ID: {team.id})"
+            f"Updated team: {team.display_name} / {team.platform_name} (ID: {team.id}, type: {team.platform_type})"
         )
         return team
 
