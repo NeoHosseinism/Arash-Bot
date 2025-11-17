@@ -94,14 +94,15 @@ class PlatformManager:
 
     def get_config(self, platform: str) -> PlatformConfig:
         """Get configuration for a platform"""
+        # Normalize platform name
         platform = platform.lower()
 
-        # Public platforms (telegram, discord, etc.)
-        if platform == "telegram":
-            return self.configs["telegram"]
+        # Return config if exists, otherwise default to telegram (public)
+        if platform in self.configs:
+            return self.configs[platform]
 
-        # All private platforms use internal config
-        return self.configs["internal"]
+        logger.warning(f"Unknown platform: {platform}, defaulting to Telegram")
+        return self.configs[Platform.TELEGRAM]
 
     def is_private_platform(self, platform: str) -> bool:
         """Check if platform is private"""
