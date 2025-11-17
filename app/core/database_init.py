@@ -72,7 +72,8 @@ def run_migrations() -> bool:
         result = subprocess.run(
             ["python", "-m", "alembic", "upgrade", "head"],
             cwd=project_root,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
             timeout=60,
         )
@@ -81,7 +82,8 @@ def run_migrations() -> bool:
             logger.info("Migrations completed successfully")
             if result.stdout:
                 for line in result.stdout.strip().split("\n"):
-                    logger.info(f"Migration: {line}")
+                    if line.strip():
+                        logger.info(f"Migration: {line}")
             return True
         else:
             logger.error(f"Migration failed: {result.stderr}")
