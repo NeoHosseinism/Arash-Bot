@@ -68,9 +68,9 @@ def run_migrations() -> bool:
 
         logger.info("Running Alembic migrations")
 
-        # Run alembic upgrade head
+        # Run alembic upgrade head (use python -m for container compatibility)
         result = subprocess.run(
-            ["alembic", "upgrade", "head"],
+            ["python", "-m", "alembic", "upgrade", "head"],
             cwd=project_root,
             capture_output=True,
             text=True,
@@ -91,7 +91,7 @@ def run_migrations() -> bool:
         logger.error("Migration timeout after 60 seconds")
         return False
     except FileNotFoundError:
-        logger.error("Alembic command not found")
+        logger.error("Python/Alembic command not found")
         return False
     except Exception as e:
         logger.error(f"Migration error: {e}")
