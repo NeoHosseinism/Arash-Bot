@@ -64,18 +64,18 @@ class SessionManager:
         key = self.get_session_key(platform, user_id, team_id)
 
         if key not in self.sessions:
-            # Load team if available (for config overrides)
-            team = None
-            if team_id:
+            # Load channel if available (for config overrides)
+            channel = None
+            if team_id:  # param name kept for backward compat
                 db = get_db_session()
                 try:
-                    from app.models.database import Team
-                    team = db.query(Team).filter(Team.id == team_id).first()
+                    from app.models.database import Channel
+                    channel = db.query(Channel).filter(Channel.id == team_id).first()
                 except Exception as e:
-                    logger.error(f"Error loading team {team_id}: {e}")
+                    logger.error(f"Error loading channel {team_id}: {e}")
 
-            # Get config with team-specific overrides
-            config = platform_manager.get_config(platform, team=team)
+            # Get config with channel-specific overrides
+            config = platform_manager.get_config(platform, team=channel)  # param name kept for backward compat
 
             # Load message history from database
             db = get_db_session()

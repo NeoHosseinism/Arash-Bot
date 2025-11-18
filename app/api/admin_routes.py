@@ -1,21 +1,21 @@
 """
-Admin API routes for team and API key management
+Admin API routes for channel and API key management
 
 TWO-PATH AUTHENTICATION:
 These endpoints are ONLY accessible to SUPER ADMINS (internal team).
 Authentication via SUPER_ADMIN_API_KEYS environment variable (NOT database).
 
 ADMIN ENDPOINTS (SUPER ADMINS ONLY):
-- Team management (create, list, update, delete teams)
-- API key management (create, list, revoke API keys for any team)
-- Usage statistics (view ALL teams' usage)
+- Channel management (create, list, update, delete channels)
+- API key management (create, list, revoke API keys for any channel)
+- Usage statistics (view ALL channels' usage)
 - Platform information (Telegram + Internal platform config)
 - System administration (clear sessions, webhook config, etc.)
 
 SECURITY:
 - All endpoints protected by require_admin_access dependency
 - Exposes platform details including Telegram (admin-only information)
-- External teams (TEAM level) have NO ACCESS to these endpoints
+- External channels (CHANNEL level) have NO ACCESS to these endpoints
 """
 
 import logging
@@ -36,7 +36,7 @@ from app.services.usage_tracker import UsageTracker
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin", tags=["Team Management & Administration"])
+router = APIRouter(prefix="/admin", tags=["Channel Management & Administration"])
 
 
 # ===========================
@@ -44,14 +44,14 @@ router = APIRouter(prefix="/admin", tags=["Team Management & Administration"])
 # ===========================
 
 
-class TeamCreate(BaseModel):
+class ChannelCreate(BaseModel):
     """
-    Request model for creating a team.
+    Request model for creating a channel.
 
     Field Distinction:
-    - display_name: Human-friendly name (supports Persian/Farsi) for admin UI and chat
-    - platform_name: System identifier for routing (ASCII, no spaces)
-    - platform_type: 'public' (Telegram, Discord) or 'private' (customer integrations)
+    - title: Human-friendly name (supports Persian/Farsi) for admin UI and chat
+    - channel_id: System identifier for routing (ASCII, no spaces)
+    - access_type: 'public' (Telegram, Discord) or 'private' (customer integrations)
     - Platform config overrides: If NULL, uses defaults for platform_type
     - Auto-generates API key on creation
     """
@@ -60,24 +60,24 @@ class TeamCreate(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "display_name": "تیم هوش مصنوعی داخلی",
-                    "platform_name": "Internal-BI",
-                    "platform_type": "private",
+                    "title": "تیم هوش مصنوعی داخلی",
+                    "channel_id": "Internal-BI",
+                    "access_type": "private",
                     "monthly_quota": 100000,
                     "daily_quota": 5000,
                 },
                 {
-                    "display_name": "پلتفرم بازاریابی",
-                    "platform_name": "External-Marketing",
-                    "platform_type": "private",
+                    "title": "پلتفرم بازاریابی",
+                    "channel_id": "External-Marketing",
+                    "access_type": "private",
                     "monthly_quota": 50000,
                     "daily_quota": 2000,
                     "rate_limit": 40,
                     "max_history": 20,
                 },
                 {
-                    "platform_name": "HOSCO-Popak",
-                    "platform_type": "private",
+                    "channel_id": "HOSCO-Popak",
+                    "access_type": "private",
                     "monthly_quota": 75000,
                     "default_model": "openai/gpt-5-chat",
                     "available_models": ["openai/gpt-5-chat", "google/gemini-2.0-flash-001"],
@@ -86,17 +86,17 @@ class TeamCreate(BaseModel):
         }
     )
 
-    display_name: Optional[str] = Field(
+    title: Optional[str] = Field(
         None,
         description="Human-friendly display name (supports Persian/Farsi). Defaults to platform_name if not provided.",
         examples=["تیم هوش مصنوعی داخلی", "Internal BI Team", "پلتفرم بازاریابی"],
     )
-    platform_name: str = Field(
+    channel_id: str = Field(
         ...,
         description="System identifier for routing (ASCII, no spaces, e.g., 'Internal-BI', 'External-Marketing')",
         examples=["Internal-BI", "External-Marketing", "Data-Analytics"],
     )
-    platform_type: str = Field(
+    access_type: str = Field(
         "private",
         description="Platform type: 'public' (Telegram, Discord) or 'private' (customer integrations)",
         examples=["private", "public"],
@@ -136,14 +136,14 @@ class TeamCreate(BaseModel):
     )
 
 
-class TeamUpdate(BaseModel):
+class ChannelUpdate(BaseModel):
     """
-    Request model for updating a team.
+    Request model for updating a channel.
 
     Field Distinction:
-    - display_name: Human-friendly name for admin UI and reports
-    - platform_name: System identifier for routing and session isolation
-    - platform_type: 'public' or 'private'
+    - title: Human-friendly name for admin UI and reports
+    - channel_id: System identifier for routing and session isolation
+    - access_type: 'public' or 'private'
     - Platform config overrides: Set to NULL to reset to defaults
     """
 
@@ -151,16 +151,16 @@ class TeamUpdate(BaseModel):
         json_schema_extra={
             "examples": [
                 {
-                    "display_name": "Internal BI Team",
-                    "platform_name": "Internal-BI-Updated",
+                    "title": "Internal BI Team",
+                    "channel_id": "Internal-BI-Updated",
                     "monthly_quota": 150000,
                     "daily_quota": 7000,
                     "is_active": True,
                 },
                 {"is_active": False},
                 {
-                    "display_name": "Marketing Platform",
-                    "platform_name": "Marketing-Platform",
+                    "title": "Marketing Platform",
+                    "channel_id": "Marketing-Platform",
                     "rate_limit": 80,
                     "max_history": 25,
                 },
@@ -173,9 +173,9 @@ class TeamUpdate(BaseModel):
         }
     )
 
-    display_name: Optional[str] = Field(None, examples=["Internal BI Team"])
-    platform_name: Optional[str] = Field(None, examples=["Internal-BI-Updated"])
-    platform_type: Optional[str] = Field(None, examples=["private", "public"])
+    title: Optional[str] = Field(None, examples=["Internal BI Team"])
+    channel_id: Optional[str] = Field(None, examples=["Internal-BI-Updated"])
+    access_type: Optional[str] = Field(None, examples=["private", "public"])
     monthly_quota: Optional[int] = Field(None, examples=[150000])
     daily_quota: Optional[int] = Field(None, examples=[7000])
     is_active: Optional[bool] = Field(None, examples=[True, False])
@@ -190,16 +190,16 @@ class TeamUpdate(BaseModel):
     allow_model_switch: Optional[bool] = Field(None, examples=[True, False, None])
 
 
-class TeamResponse(BaseModel):
+class ChannelResponse(BaseModel):
     """
-    Response model for team with usage statistics.
+    Response model for channel with usage statistics.
 
     Includes API key prefix and usage data (one key per team).
 
     Field Distinction:
-    - display_name: Human-friendly name for display purposes
-    - platform_name: System identifier for routing/operations
-    - platform_type: 'public' or 'private'
+    - title: Human-friendly name for display purposes
+    - channel_id: System identifier for routing/operations
+    - access_type: 'public' or 'private'
     - Platform config: Shows overrides if set, NULL means using defaults
     - usage: Recent usage statistics (last 30 days by default)
     """
@@ -210,9 +210,9 @@ class TeamResponse(BaseModel):
             "examples": [
                 {
                     "id": 1,
-                    "display_name": "Internal BI Team",
-                    "platform_name": "Internal-BI",
-                    "platform_type": "private",
+                    "title": "Internal BI Team",
+                    "channel_id": "Internal-BI",
+                    "access_type": "private",
                     "monthly_quota": 100000,
                     "daily_quota": 5000,
                     "is_active": True,
@@ -241,9 +241,9 @@ class TeamResponse(BaseModel):
     )
 
     id: int = Field(..., examples=[1])
-    display_name: str = Field(..., examples=["Internal BI Team"])
-    platform_name: str = Field(..., examples=["Internal-BI"])
-    platform_type: str = Field(..., examples=["private", "public"])
+    title: str = Field(..., examples=["Internal BI Team"])
+    channel_id: str = Field(..., examples=["Internal-BI"])
+    access_type: str = Field(..., examples=["private", "public"])
     monthly_quota: Optional[int] = Field(None, examples=[100000])
     daily_quota: Optional[int] = Field(None, examples=[5000])
     is_active: bool = Field(..., examples=[True])
@@ -263,13 +263,13 @@ class TeamResponse(BaseModel):
     updated_at: datetime
     usage: Optional[Dict[str, Any]] = Field(
         None,
-        description="Usage statistics for the team (last 30 days by default)",
+        description="Usage statistics for the channel (last 30 days by default)",
     )
 
 
-class TeamCreateResponse(BaseModel):
+class ChannelCreateResponse(BaseModel):
     """
-    Response model when creating a team (includes the generated API key).
+    Response model when creating a channel (includes the generated API key).
 
     The API key is shown ONLY ONCE during creation.
     """
@@ -279,9 +279,9 @@ class TeamCreateResponse(BaseModel):
             "examples": [
                 {
                     "id": 1,
-                    "display_name": "تیم هوش مصنوعی داخلی",
-                    "platform_name": "Internal-BI",
-                    "platform_type": "private",
+                    "title": "تیم هوش مصنوعی داخلی",
+                    "channel_id": "Internal-BI",
+                    "access_type": "private",
                     "monthly_quota": 100000,
                     "daily_quota": 5000,
                     "is_active": True,
@@ -299,9 +299,9 @@ class TeamCreateResponse(BaseModel):
     )
 
     id: int = Field(..., examples=[1])
-    display_name: str = Field(..., examples=["تیم هوش مصنوعی داخلی", "Internal BI Team"])
-    platform_name: str = Field(..., examples=["Internal-BI"])
-    platform_type: str = Field(..., examples=["private", "public"])
+    title: str = Field(..., examples=["تیم هوش مصنوعی داخلی", "Internal BI Team"])
+    channel_id: str = Field(..., examples=["Internal-BI"])
+    access_type: str = Field(..., examples=["private", "public"])
     monthly_quota: Optional[int] = Field(None, examples=[100000])
     daily_quota: Optional[int] = Field(None, examples=[5000])
     is_active: bool = Field(..., examples=[True])
@@ -325,7 +325,7 @@ class TeamCreateResponse(BaseModel):
 class UsageStatsResponse(BaseModel):
     """Response model for usage statistics (team-based only, no api_key_id)
 
-    Note: team_name contains the team's display_name (supports Persian/Farsi)
+    Note: team_name contains the channel's display_name (supports Persian/Farsi)
     """
 
     model_config = ConfigDict(
@@ -353,10 +353,10 @@ class UsageStatsResponse(BaseModel):
         }
     )
 
-    team_id: Optional[int] = Field(None, examples=[1])
+    channel_id: Optional[int] = Field(None, examples=[1])
     team_name: Optional[str] = Field(
         None,
-        description="Team display name (supports Persian/Farsi)",
+        description="Channel display name (supports Persian/Farsi)",
         examples=["تیم هوش مصنوعی داخلی", "Internal BI Team"],
     )
     period: dict
@@ -562,9 +562,9 @@ async def admin_dashboard(
     telegram_config = platform_manager.get_config("telegram")
     internal_config = platform_manager.get_config("internal")
 
-    # Get team name mapping for statistics
-    teams = APIKeyManager.list_all_teams(db)
-    team_name_map = {team.id: team.display_name for team in teams}
+    # Get channel name mapping for statistics
+    channels = APIKeyManager.list_all_channels(db)
+    team_name_map = {channel.id: channel.title for channel in teams}
 
     # Calculate statistics
     total_sessions = len(session_manager.sessions)
@@ -614,7 +614,7 @@ async def admin_dashboard(
             team_id = session.team_id
             if team_id not in team_stats:
                 team_stats[team_id]["team_id"] = team_id
-                team_stats[team_id]["team_name"] = team_name_map.get(team_id, f"Team {team_id}")
+                team_stats[team_id]["team_name"] = team_name_map.get(team_id, f"Channel {team_id}")
 
             team_stats[team_id]["sessions"] += 1
             team_stats[team_id]["messages"] += session.total_message_count
@@ -681,22 +681,22 @@ async def admin_dashboard(
 
 
 # ===========================
-# Team Management Endpoints
+# Channel Management Endpoints
 # ===========================
 
 
 @router.post(
-    "/teams",
-    response_model=TeamCreateResponse,
+    "/channels",
+    response_model=ChannelCreateResponse,
     responses={
         200: {
-            "description": "Team created successfully",
+            "description": "Channel created successfully",
             "content": {
                 "application/json": {
                     "example": {
                         "id": 1,
-                        "display_name": "تیم هوش مصنوعی داخلی",
-                        "platform_name": "Internal-BI",
+                        "title": "تیم هوش مصنوعی داخلی",
+                        "channel_id": "Internal-BI",
                         "monthly_quota": 100000,
                         "daily_quota": 5000,
                         "is_active": True,
@@ -715,7 +715,7 @@ async def admin_dashboard(
                         "platform_exists": {
                             "summary": "Platform name already exists",
                             "value": {
-                                "detail": "Team with platform name 'Internal-BI' already exists"
+                                "detail": "Channel with platform name 'Internal-BI' already exists"
                             }
                         },
                         "invalid_platform_name": {
@@ -787,15 +787,15 @@ async def admin_dashboard(
                 "application/json": {
                     "examples": {
                         "database_error": {
-                            "summary": "Database error during team creation",
+                            "summary": "Database error during channel creation",
                             "value": {
-                                "detail": "Failed to create team due to database error"
+                                "detail": "Failed to create channel due to database error"
                             }
                         },
                         "api_key_generation_error": {
                             "summary": "Error generating API key",
                             "value": {
-                                "detail": "Team created but API key generation failed"
+                                "detail": "Channel created but API key generation failed"
                             }
                         },
                         "general_error": {
@@ -810,19 +810,19 @@ async def admin_dashboard(
         },
     },
 )
-async def create_team(
-    team_data: TeamCreate,
+async def create_channel(
+    channel_data: ChannelCreate,
     api_key=Depends(require_admin_access),
 ):
     """
-    Create a new team with auto-generated API key (Admin only).
+    Create a new channel with auto-generated API key (Admin only).
 
     ⚠️ **IMPORTANT**: The API key is shown ONLY ONCE in the response. Save it securely!
 
     ## Request Example
     ```json
     {
-      "platform_name": "Internal-BI",
+      "channel_id": "Internal-BI",
       "monthly_quota": 100000,
       "daily_quota": 5000
     }
@@ -841,48 +841,48 @@ async def create_team(
     db = get_db_session()
 
     # Check if platform_name already exists
-    existing_team = APIKeyManager.get_team_by_platform_name(db, team_data.platform_name)
-    if existing_team:
+    existing_channel = APIKeyManager.get_channel_by_channel_id(db, channel_data.platform_name)
+    if existing_channel:
         raise HTTPException(
             status_code=400,
-            detail=f"Team with platform name '{team_data.platform_name}' already exists",
+            detail=f"Channel with platform name '{channel_data.platform_name}' already exists",
         )
 
-    # Create team with auto-generated API key
-    team, api_key_string = APIKeyManager.create_team_with_key(
+    # Create channel with auto-generated API key
+    channel, api_key_string = APIKeyManager.create_channel_with_key(
         db=db,
-        platform_name=team_data.platform_name,
-        display_name=team_data.display_name,
-        platform_type=team_data.platform_type,
-        monthly_quota=team_data.monthly_quota,
-        daily_quota=team_data.daily_quota,
-        rate_limit=team_data.rate_limit,
-        max_history=team_data.max_history,
-        default_model=team_data.default_model,
-        available_models=team_data.available_models,
-        allow_model_switch=team_data.allow_model_switch,
+        channel_id=channel_data.channel_id,
+        title=channel_data.title,
+        access_type=channel_data.access_type,
+        monthly_quota=channel_data.monthly_quota,
+        daily_quota=channel_data.daily_quota,
+        rate_limit=channel_data.rate_limit,
+        max_history=channel_data.max_history,
+        default_model=channel_data.default_model,
+        available_models=channel_data.available_models,
+        allow_model_switch=channel_data.allow_model_switch,
     )
 
-    return TeamCreateResponse(
-        id=team.id,
-        display_name=team.display_name,
-        platform_name=team.platform_name,
-        platform_type=team.platform_type,
-        monthly_quota=team.monthly_quota,
-        daily_quota=team.daily_quota,
-        is_active=team.is_active,
-        rate_limit=team.rate_limit,
-        max_history=team.max_history,
-        default_model=team.default_model,
-        available_models=team.available_models.split(",") if team.available_models else None,
-        allow_model_switch=team.allow_model_switch,
-        created_at=team.created_at,
+    return ChannelCreateResponse(
+        id=channel.id,
+        display_name=channel.title,
+        platform_name=channel.channel_id,
+        platform_type=channel.access_type,
+        monthly_quota=channel.monthly_quota,
+        daily_quota=channel.daily_quota,
+        is_active=channel.is_active,
+        rate_limit=channel.rate_limit,
+        max_history=channel.max_history,
+        default_model=channel.default_model,
+        available_models=channel.available_models.split(",") if channel.available_models else None,
+        allow_model_switch=channel.allow_model_switch,
+        created_at=channel.created_at,
         api_key=api_key_string,
     )
 
 
-class TeamsListResponse(BaseModel):
-    """Response model for teams listing with optional total report"""
+class ChannelsListResponse(BaseModel):
+    """Response model for channels listing with optional total report"""
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -891,8 +891,8 @@ class TeamsListResponse(BaseModel):
                     "teams": [
                         {
                             "id": 1,
-                            "display_name": "Internal BI Team",
-                            "platform_name": "Internal-BI",
+                            "title": "Internal BI Team",
+                            "channel_id": "Internal-BI",
                             "monthly_quota": 100000,
                             "daily_quota": 5000,
                             "is_active": True,
@@ -915,7 +915,7 @@ class TeamsListResponse(BaseModel):
         }
     )
 
-    teams: List[TeamResponse]
+    teams: List[ChannelResponse]
     total_report: Optional[Dict[str, Any]] = Field(
         None,
         description="Total aggregated report across all teams (included when totally=true)",
@@ -923,8 +923,8 @@ class TeamsListResponse(BaseModel):
 
 
 @router.get(
-    "/teams",
-    response_model=TeamsListResponse,
+    "/channels",
+    response_model=ChannelsListResponse,
     responses={
         200: {
             "description": "Teams list retrieved successfully",
@@ -937,8 +937,8 @@ class TeamsListResponse(BaseModel):
                                 "teams": [
                                     {
                                         "id": 1,
-                                        "display_name": "Internal BI Team",
-                                        "platform_name": "Internal-BI",
+                                        "title": "Internal BI Team",
+                                        "channel_id": "Internal-BI",
                                         "monthly_quota": 100000,
                                         "daily_quota": 5000,
                                         "is_active": True,
@@ -959,8 +959,8 @@ class TeamsListResponse(BaseModel):
                                 "teams": [
                                     {
                                         "id": 1,
-                                        "display_name": "Internal BI Team",
-                                        "platform_name": "Internal-BI",
+                                        "title": "Internal BI Team",
+                                        "channel_id": "Internal-BI",
                                         "monthly_quota": 100000,
                                         "is_active": True
                                     }
@@ -1009,11 +1009,11 @@ class TeamsListResponse(BaseModel):
             }
         },
         404: {
-            "description": "Not found - Team with specified ID does not exist",
+            "description": "Not found - Channel with specified ID does not exist",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "Team not found"
+                        "detail": "Channel not found"
                     }
                 }
             }
@@ -1047,8 +1047,8 @@ class TeamsListResponse(BaseModel):
         }
     }
 )
-async def get_teams(
-    team_id: Optional[int] = None,
+async def get_channels(
+    channel_id: Optional[int] = None,
     active_only: bool = True,
     days: int = 30,
     totally: bool = False,
@@ -1058,7 +1058,7 @@ async def get_teams(
     Get teams with usage statistics (Admin only)
 
     Parameters:
-    - team_id: Optional team ID to get specific team (returns single item list)
+    - channel_id: Optional channel ID to get specific channel (returns single item list)
     - active_only: Filter active teams only (default: True)
     - days: Number of days for usage statistics (default: 30)
     - totally: Include total aggregated report across all teams (default: False)
@@ -1069,20 +1069,20 @@ async def get_teams(
 
     Examples:
     - GET /admin/teams - List all active teams with usage
-    - GET /admin/teams?team_id=1 - Get specific team with usage
+    - GET /admin/teams?team_id=1 - Get specific channel with usage
     - GET /admin/teams?totally=true - List all teams with total report
     - GET /admin/teams?active_only=false&days=7 - All teams with 7-day usage
     """
     db = get_db_session()
 
     # Get teams based on filter
-    if team_id:
-        team = APIKeyManager.get_team_by_id(db, team_id)
+    if channel_id:
+        channel = APIKeyManager.get_channel_by_id(db, team_id)
         if not team:
-            raise HTTPException(status_code=404, detail="Team not found")
+            raise HTTPException(status_code=404, detail="Channel not found")
         teams = [team]
     else:
-        teams = APIKeyManager.list_all_teams(db, active_only=active_only)
+        channels = APIKeyManager.list_all_channels(db, active_only=active_only)
 
     # Calculate start date for usage statistics
     start_date = datetime.utcnow() - timedelta(days=days)
@@ -1094,14 +1094,14 @@ async def get_teams(
     total_failed = 0
     total_cost = 0.0
 
-    for team in teams:
-        # Get the team's API key (one per team)
-        api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
+    for channel in channels:
+        # Get the channel's API key (one per team)
+        api_key_obj = db.query(APIKey).filter(APIKey.channel_id == channel.id).first()
 
-        # Get usage statistics for the team
+        # Get usage statistics for the channel
         try:
-            usage_stats = UsageTracker.get_team_usage_stats(db, team.id, start_date)
-            # Remove team_id and team_name from usage stats (already in TeamResponse)
+            usage_stats = UsageTracker.get_team_usage_stats(db, channel.id, start_date)
+            # Remove team_id and team_name from usage stats (already in ChannelResponse)
             usage_stats.pop("team_id", None)
             usage_stats.pop("team_name", None)
 
@@ -1112,27 +1112,27 @@ async def get_teams(
                 total_failed += usage_stats.get("requests", {}).get("failed", 0)
                 total_cost += usage_stats.get("cost", {}).get("total", 0.0)
         except Exception as e:
-            logger.warning(f"Failed to get usage stats for team {team.id}: {e}")
+            logger.warning(f"Failed to get usage stats for channel {channel.id}: {e}")
             usage_stats = None
 
         responses.append(
-            TeamResponse(
-                id=team.id,
-                display_name=team.display_name,
-                platform_name=team.platform_name,
-                platform_type=team.platform_type,
-                monthly_quota=team.monthly_quota,
-                daily_quota=team.daily_quota,
-                is_active=team.is_active,
-                rate_limit=team.rate_limit,
-                max_history=team.max_history,
-                default_model=team.default_model,
-                available_models=team.available_models.split(",") if team.available_models else None,
-                allow_model_switch=team.allow_model_switch,
+            ChannelResponse(
+                id=channel.id,
+                display_name=channel.title,
+                platform_name=channel.channel_id,
+                platform_type=channel.access_type,
+                monthly_quota=channel.monthly_quota,
+                daily_quota=channel.daily_quota,
+                is_active=channel.is_active,
+                rate_limit=channel.rate_limit,
+                max_history=channel.max_history,
+                default_model=channel.default_model,
+                available_models=channel.available_models.split(",") if channel.available_models else None,
+                allow_model_switch=channel.allow_model_switch,
                 api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
                 api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
-                created_at=team.created_at,
-                updated_at=team.updated_at,
+                created_at=channel.created_at,
+                updated_at=channel.updated_at,
                 usage=usage_stats,
             )
         )
@@ -1155,24 +1155,24 @@ async def get_teams(
             },
         }
 
-    return TeamsListResponse(
+    return ChannelsListResponse(
         teams=responses,
         total_report=total_report,
     )
 
 
 @router.patch(
-    "/teams/{team_id}",
-    response_model=TeamResponse,
+    "/channels/{channel_id}",
+    response_model=ChannelResponse,
     responses={
         200: {
-            "description": "Team updated successfully",
+            "description": "Channel updated successfully",
             "content": {
                 "application/json": {
                     "example": {
                         "id": 1,
-                        "display_name": "Internal BI Team Updated",
-                        "platform_name": "Internal-BI-v2",
+                        "title": "Internal BI Channel Updated",
+                        "channel_id": "Internal-BI-v2",
                         "monthly_quota": 150000,
                         "daily_quota": 7000,
                         "is_active": True,
@@ -1246,11 +1246,11 @@ async def get_teams(
             }
         },
         404: {
-            "description": "Not found - Team with specified ID does not exist",
+            "description": "Not found - Channel with specified ID does not exist",
             "content": {
                 "application/json": {
                     "example": {
-                        "detail": "Team not found"
+                        "detail": "Channel not found"
                     }
                 }
             }
@@ -1279,13 +1279,13 @@ async def get_teams(
                         "database_error": {
                             "summary": "Database error during update",
                             "value": {
-                                "detail": "Failed to update team due to database error"
+                                "detail": "Failed to update channel due to database error"
                             }
                         },
                         "usage_stats_error": {
                             "summary": "Error retrieving usage statistics",
                             "value": {
-                                "detail": "Team updated but failed to retrieve usage statistics"
+                                "detail": "Channel updated but failed to retrieve usage statistics"
                             }
                         },
                         "general_error": {
@@ -1300,72 +1300,72 @@ async def get_teams(
         }
     }
 )
-async def update_team(
-    team_id: int,
-    team_data: TeamUpdate,
+async def update_channel(
+    channel_id: int,
+    channel_data: ChannelUpdate,
     days: int = 30,
     api_key=Depends(require_admin_access),
 ):
     """
-    Update team settings (Admin only)
+    Update channel settings (Admin only)
 
-    Returns updated team with usage statistics.
+    Returns updated channel with usage statistics.
 
     Parameters:
-    - team_id: ID of the team to update (path parameter)
+    - channel_id: ID of the channel to update (path parameter)
     - days: Number of days for usage statistics (default: 30)
-    - team_data: Fields to update (all optional)
+    - channel_data: Fields to update (all optional)
     """
     db = get_db_session()
 
-    team = APIKeyManager.update_team(
+    channel = APIKeyManager.update_channel(
         db=db,
         team_id=team_id,
-        display_name=team_data.display_name,
-        platform_name=team_data.platform_name,
-        platform_type=team_data.platform_type,
-        monthly_quota=team_data.monthly_quota,
-        daily_quota=team_data.daily_quota,
-        is_active=team_data.is_active,
-        rate_limit=team_data.rate_limit,
-        max_history=team_data.max_history,
-        default_model=team_data.default_model,
-        available_models=team_data.available_models,
-        allow_model_switch=team_data.allow_model_switch,
+        title=channel_data.title,
+        channel_id=channel_data.channel_id,
+        access_type=channel_data.access_type,
+        monthly_quota=channel_data.monthly_quota,
+        daily_quota=channel_data.daily_quota,
+        is_active=channel_data.is_active,
+        rate_limit=channel_data.rate_limit,
+        max_history=channel_data.max_history,
+        default_model=channel_data.default_model,
+        available_models=channel_data.available_models,
+        allow_model_switch=channel_data.allow_model_switch,
     )
 
     if not team:
-        raise HTTPException(status_code=404, detail="Team not found")
+        raise HTTPException(status_code=404, detail="Channel not found")
 
-    # Get the team's API key
-    api_key_obj = db.query(APIKey).filter(APIKey.team_id == team.id).first()
+    # Get the channel's API key
+    api_key_obj = db.query(APIKey).filter(APIKey.channel_id == channel.id).first()
 
     # Get usage statistics
     start_date = datetime.utcnow() - timedelta(days=days)
     try:
-        usage_stats = UsageTracker.get_team_usage_stats(db, team.id, start_date)
+        usage_stats = UsageTracker.get_team_usage_stats(db, channel.id, start_date)
         usage_stats.pop("team_id", None)
         usage_stats.pop("team_name", None)
     except Exception as e:
-        logger.warning(f"Failed to get usage stats for team {team.id}: {e}")
+        logger.warning(f"Failed to get usage stats for channel {channel.id}: {e}")
         usage_stats = None
 
-    return TeamResponse(
-        id=team.id,
-        display_name=team.display_name,
-        platform_name=team.platform_name,
-        platform_type=team.platform_type,
-        monthly_quota=team.monthly_quota,
-        daily_quota=team.daily_quota,
-        is_active=team.is_active,
-        rate_limit=team.rate_limit,
-        max_history=team.max_history,
-        default_model=team.default_model,
-        available_models=team.available_models.split(",") if team.available_models else None,
-        allow_model_switch=team.allow_model_switch,
+    return ChannelResponse(
+        id=channel.id,
+        display_name=channel.title,
+        platform_name=channel.channel_id,
+        platform_type=channel.access_type,
+        monthly_quota=channel.monthly_quota,
+        daily_quota=channel.daily_quota,
+        is_active=channel.is_active,
+        rate_limit=channel.rate_limit,
+        max_history=channel.max_history,
+        default_model=channel.default_model,
+        available_models=channel.available_models.split(",") if channel.available_models else None,
+        allow_model_switch=channel.allow_model_switch,
         api_key_prefix=api_key_obj.key_prefix if api_key_obj else None,
         api_key_last_used=api_key_obj.last_used_at if api_key_obj else None,
-        created_at=team.created_at,
-        updated_at=team.updated_at,
+        created_at=channel.created_at,
+        updated_at=channel.updated_at,
         usage=usage_stats,
     )

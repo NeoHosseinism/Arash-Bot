@@ -10,7 +10,7 @@ TWO-PATH AUTHENTICATION SYSTEM:
    - Purpose: Internal team managing the service infrastructure
    - Completely separate from client database
 
-2. TEAM API KEYS (Application Level):
+2. CHANNEL API KEYS (Application Level):
    - Authentication: Database-backed API keys
    - Stored in api_keys table
    - Can access: ONLY /v1/chat endpoint
@@ -18,10 +18,10 @@ TWO-PATH AUTHENTICATION SYSTEM:
    - No admin access whatsoever
 
 SECURITY:
-- Complete separation: Admin auth (env vars) vs Team auth (database)
-- External teams cannot access admin endpoints (no way to get super admin keys)
-- External teams don't know about super admins or access levels
-- Team isolation via session tagging
+- Complete separation: Admin auth (env vars) vs Channel auth (database)
+- External channels cannot access admin endpoints (no way to get super admin keys)
+- External channels don't know about super admins or access levels
+- Channel isolation via session tagging
 """
 
 import logging
@@ -60,9 +60,9 @@ def require_admin_access(
     - Returns: The validated super admin API key string
 
     ENDPOINTS PROTECTED:
-    - Team management (create, list, update, delete teams)
+    - Channel management (create, list, update, delete channels)
     - API key management (create, list, revoke API keys for clients)
-    - Usage statistics (view ALL teams' usage)
+    - Usage statistics (view ALL channels' usage)
     - Platform information (Telegram + Internal config)
     - System administration (clear sessions, etc.)
 
@@ -106,27 +106,27 @@ def require_team_access(
     AUTHENTICATION:
     - Checks Authorization header against database (api_keys table)
     - Validates key hash, expiration, active status
-    - Returns APIKey object with team_id for isolation
+    - Returns APIKey object with channel_id for isolation
 
     USAGE:
     - Used by: /v1/chat endpoint
     - Authentication: Database lookup (application level)
-    - Returns: Validated APIKey object (includes team_id for session isolation)
+    - Returns: Validated APIKey object (includes channel_id for session isolation)
 
     SECURITY & TRANSPARENCY:
-    - External teams think they're using a simple chatbot API
+    - External channels think they're using a simple chatbot API
     - No exposure of super admins or admin endpoints
-    - Complete team isolation via session tagging (transparent to clients)
+    - Complete channel isolation via session tagging (transparent to clients)
     - No way to access admin functionality
 
-    WHAT EXTERNAL TEAMS SEE:
+    WHAT EXTERNAL CHANNELS SEE:
     - Input: Message content
     - Output: Bot response
     - Simple API, no complexity
 
     WHAT THEY DON'T SEE:
     - Super admin authentication
-    - Other teams or their usage
+    - Other channels or their usage
     - Session management internals
     - Admin endpoints existence
     - Platform configuration
@@ -136,9 +136,9 @@ def require_team_access(
     - 403: Invalid API key (doesn't exist, inactive, or expired)
 
     SECURITY:
-    - Database API keys are ONLY for external teams
+    - Database API keys are ONLY for external channels
     - Cannot access /v1/admin/* endpoints (requires super admin key)
-    - Team isolation enforced via team_id in sessions
+    - Channel isolation enforced via channel_id in sessions
     """
     if not authorization:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -151,14 +151,14 @@ def require_team_access(
             raise HTTPException(status_code=403, detail="Invalid API key")
 
         logger.debug(
-            f"Team access granted to API key: {api_key.key_prefix} (Team: {api_key.team.display_name})"
+            f"Channel access granted to API key: {api_key.key_prefix} (Channel: {api_key.channel.title})"
         )
         return api_key
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error validating team API key: {e}")
+        logger.error(f"Error validating channel API key: {e}")
         raise HTTPException(status_code=500, detail="Error validating API key") from e
 
 
@@ -174,24 +174,24 @@ def require_chat_access(
        - Returns "telegram" string marker
        - Used ONLY for the integrated Telegram bot service
 
-    2. TEAM MODE (External teams):
+    2. TEAM MODE (External channels):
        - API key validated against database
        - Returns APIKey object
-       - Used for authenticated external teams
+       - Used for authenticated external channels
 
     SECURITY:
     - NO unauthenticated access allowed
     - Telegram bot must use TELEGRAM_SERVICE_KEY
-    - External teams must use their team API keys
-    - Super admins can distinguish Telegram traffic from external team traffic in logs
+    - External channels must use their channel API keys
+    - Super admins can distinguish Telegram traffic from external channel traffic in logs
 
     USAGE:
     - Used by: /v1/chat and /v1/commands endpoints
-    - Returns: "telegram" (Telegram bot) OR APIKey object (external teams)
+    - Returns: "telegram" (Telegram bot) OR APIKey object (external channels)
 
     ERROR RESPONSES:
     - 401: No authorization header provided
-    - 403: Invalid API key (neither Telegram service key nor team key)
+    - 403: Invalid API key (neither Telegram service key nor channel key)
 
     WHY THIS CHANGE:
     - Previous optional authentication allowed unauthenticated access
@@ -224,7 +224,7 @@ def require_chat_access(
             )
 
         logger.info(
-            f"[TEAM] API access granted to: {api_key.key_prefix} (Team: {api_key.team.platform_name})"
+            f"[TEAM] API access granted to: {api_key.key_prefix} (Channel: {api_key.channel.channel_id})"
         )
         return api_key
 

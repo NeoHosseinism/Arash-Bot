@@ -28,49 +28,49 @@ logger = logging.getLogger(__name__)
 Base = declarative_base()
 
 
-class Team(Base):
+class Channel(Base):
     """
-    Team model representing a platform integration.
+    Channel model representing an integration point for the service.
 
-    Platform Types:
+    Access Types:
     - 'public': Public messaging services (Telegram, Discord, etc.)
-    - 'private': Customer-specific integrations (HOSCO-Popak, HOSCO-Avand, etc.)
+    - 'private': Internal/company-specific integrations (Popak, Avand, BI, etc.)
 
-    Each team represents a platform and has exactly ONE API key auto-generated on creation.
+    Each channel represents an integration endpoint and has exactly ONE API key auto-generated on creation.
 
     Field Distinction:
-    - display_name: Human-friendly name for admin UI, reports, internal tools
-                    (e.g., "پیامرسان سازمانی پوپک", "HOSCO Avand Portal")
-    - platform_name: System identifier for routing, session isolation, API operations
-                     (e.g., "HOSCO-Popak", "HOSCO-Avand")
+    - title: Human-friendly display name for admin UI, reports, internal tools
+             (e.g., "پیامرسان سازمانی پوپک", "ربات تلگرام")
+    - channel_id: System identifier for routing, session isolation, API operations
+                  (e.g., "popak", "avand", "telegram", "bi")
 
     Configuration Priority:
-    1. Team-specific overrides (rate_limit, max_history, etc.) - if set
-    2. Default config for platform_type - if overrides are NULL
+    1. Channel-specific overrides (rate_limit, max_history, etc.) - if set
+    2. Default config for access_type - if overrides are NULL
     """
 
-    __tablename__ = "teams"
+    __tablename__ = "channels"
 
     id = Column(Integer, primary_key=True, index=True)
-    display_name = Column(
+    title = Column(
         String(255), unique=True, nullable=False, index=True
     )  # Human-friendly display name
-    platform_name = Column(
+    channel_id = Column(
         String(255), unique=True, nullable=False, index=True
-    )  # System identifier for platform routing
+    )  # System identifier for channel routing
 
-    # Platform type
-    platform_type = Column(String(50), nullable=False, default='private', index=True)
+    # Access type
+    access_type = Column(String(50), nullable=False, default='private', index=True)
 
     # Quotas
     monthly_quota = Column(Integer, nullable=True)  # Requests per month, None = unlimited
     daily_quota = Column(Integer, nullable=True)  # Requests per day, None = unlimited
 
-    # Platform configuration overrides (NULL = use defaults)
+    # Channel configuration overrides (NULL = use defaults)
     rate_limit = Column(Integer, nullable=True)  # Override default rate limit (requests/min)
     max_history = Column(Integer, nullable=True)  # Override default max conversation history
     default_model = Column(String(255), nullable=True)  # Override default AI model
-    available_models = Column(Text, nullable=True)  # Override available models list (JSON)
+    available_models = Column(Text, nullable=True)  # Override available models list (CSV)
     allow_model_switch = Column(Boolean, nullable=True)  # Override model switch permission
 
     # Status and timestamps
@@ -79,19 +79,23 @@ class Team(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     # Relationships (one-to-one with APIKey due to unique constraint)
-    api_keys = relationship("APIKey", back_populates="team", cascade="all, delete-orphan")
-    usage_logs = relationship("UsageLog", back_populates="team", cascade="all, delete-orphan")
+    api_keys = relationship("APIKey", back_populates="channel", cascade="all, delete-orphan")
+    usage_logs = relationship("UsageLog", back_populates="channel", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Team(id={self.id}, platform_name='{self.platform_name}')>"
+        return f"<Channel(id={self.id}, channel_id='{self.channel_id}')>"
+
+
+# Backward compatibility alias
+Team = Channel
 
 
 class APIKey(Base):
     """
-    API Key model for external teams (clients) only
+    API Key model for channels (integration endpoints)
 
     NOTE: Super admin authentication is handled via environment variables (SUPER_ADMIN_API_KEYS).
-    This table ONLY stores API keys for external teams using the chat service.
+    This table ONLY stores API keys for channels using the chat service.
     All keys in this table have equal access (chat service only, NO admin access).
     """
 
@@ -101,11 +105,11 @@ class APIKey(Base):
     key_hash = Column(String(64), unique=True, nullable=False, index=True)  # SHA256 hash
     key_prefix = Column(String(16), nullable=False)  # First 8 chars for identification
     name = Column(String(255), nullable=False)  # Friendly name for the key
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    channel_id = Column(Integer, ForeignKey("channels.id"), nullable=False, index=True)
 
     # Quota management
-    monthly_quota = Column(Integer, nullable=True)  # Overrides team quota if set
-    daily_quota = Column(Integer, nullable=True)  # Overrides team quota if set
+    monthly_quota = Column(Integer, nullable=True)  # Overrides channel quota if set
+    daily_quota = Column(Integer, nullable=True)  # Overrides channel quota if set
 
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
@@ -120,11 +124,11 @@ class APIKey(Base):
     expires_at = Column(DateTime, nullable=True)  # None = never expires
 
     # Relationships
-    team = relationship("Team", back_populates="api_keys")
+    channel = relationship("Channel", back_populates="api_keys")
     usage_logs = relationship("UsageLog", back_populates="api_key", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<APIKey(id={self.id}, prefix='{self.key_prefix}', team_id={self.team_id})>"
+        return f"<APIKey(id={self.id}, prefix='{self.key_prefix}', channel_id={self.channel_id})>"
 
     @property
     def is_expired(self) -> bool:
@@ -141,7 +145,7 @@ class UsageLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=False, index=True)
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=False, index=True)
+    channel_id = Column(Integer, ForeignKey("channels.id"), nullable=False, index=True)
 
     # Request details
     session_id = Column(String(64), nullable=False, index=True)
@@ -163,7 +167,7 @@ class UsageLog(Base):
 
     # Relationships
     api_key = relationship("APIKey", back_populates="usage_logs")
-    team = relationship("Team", back_populates="usage_logs")
+    channel = relationship("Channel", back_populates="usage_logs")
 
     def __repr__(self):
         return f"<UsageLog(id={self.id}, api_key_id={self.api_key_id}, model='{self.model_used}')>"
@@ -337,7 +341,7 @@ class Message(Base):
     """
     Message model for storing conversation history.
 
-    Stores all messages (user and assistant) for each user on each platform/team.
+    Stores all messages (user and assistant) for each user on each channel.
     Messages are never deleted - /clear command only marks them as "cleared"
     so they're excluded from AI context but kept for analytics.
     """
@@ -347,9 +351,9 @@ class Message(Base):
     id = Column(Integer, primary_key=True, index=True)
 
     # Isolation fields
-    team_id = Column(Integer, ForeignKey("teams.id"), nullable=True, index=True)  # None for Telegram
-    api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=True, index=True)  # None for Telegram
-    platform = Column(String(50), nullable=False, index=True)  # "telegram", "Internal-BI", etc.
+    channel_id = Column(Integer, ForeignKey("channels.id"), nullable=True, index=True)  # None for public channels (Telegram)
+    api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=True, index=True)  # None for public channels (Telegram)
+    platform = Column(String(50), nullable=False, index=True)  # "telegram", "popak", "avand", etc.
     user_id = Column(String(255), nullable=False, index=True)  # User identifier from client
 
     # Message content
@@ -363,7 +367,7 @@ class Message(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
     # Relationships
-    team = relationship("Team", foreign_keys=[team_id])
+    channel = relationship("Channel", foreign_keys=[channel_id])
     api_key = relationship("APIKey", foreign_keys=[api_key_id])
 
     def __repr__(self):

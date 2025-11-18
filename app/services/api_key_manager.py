@@ -1,6 +1,6 @@
 """
 API Key Management Service
-Handles creation, validation, and management of API keys for team-based access control.
+Handles creation, validation, and management of API keys for channel-based access control.
 """
 
 import hashlib
@@ -11,13 +11,13 @@ from typing import List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
-from app.models.database import APIKey, Team, UsageLog
+from app.models.database import APIKey, Channel, UsageLog
 
 logger = logging.getLogger(__name__)
 
 
 class APIKeyManager:
-    """Manages API keys for team-based access control"""
+    """Manages API keys for channel-based access control"""
 
     @staticmethod
     def generate_api_key() -> Tuple[str, str, str]:
@@ -55,43 +55,9 @@ class APIKeyManager:
         return hashlib.sha256(api_key.encode()).hexdigest()
 
     @staticmethod
-    def create_team(
-        db: Session,
-        name: str,
-        monthly_quota: Optional[int] = None,
-        daily_quota: Optional[int] = None,
-        display_name: Optional[str] = None,
-    ) -> Team:
-        """
-        Create a new team (legacy method - prefer create_team_with_key).
-
-        Args:
-            db: Database session
-            name: Platform identifier (system name for routing/session isolation)
-            monthly_quota: Monthly request quota (None = unlimited)
-            daily_quota: Daily request quota (None = unlimited)
-            display_name: Human-friendly display name (defaults to name if not provided)
-
-        Returns:
-            Created team
-        """
-        team = Team(
-            display_name=display_name or name,  # Default display_name to name if not provided
-            platform_name=name,  # Use name parameter as platform_name for backward compatibility
-            monthly_quota=monthly_quota,
-            daily_quota=daily_quota,
-        )
-        db.add(team)
-        db.commit()
-        db.refresh(team)
-
-        logger.info(f"Created team: {team.display_name} (Platform: {name}, ID: {team.id})")
-        return team
-
-    @staticmethod
     def create_api_key(
         db: Session,
-        team_id: int,
+        channel_id: int,
         name: str,
         created_by: Optional[str] = None,
         description: Optional[str] = None,
@@ -100,19 +66,19 @@ class APIKeyManager:
         expires_in_days: Optional[int] = None,
     ) -> Tuple[str, APIKey]:
         """
-        Create a new API key for an external team (client).
+        Create a new API key for a channel.
 
-        NOTE: This creates API keys for external teams only (chat service access).
+        NOTE: This creates API keys for channels only (chat service access).
         Super admin authentication is handled separately via SUPER_ADMIN_API_KEYS environment variable.
 
         Args:
             db: Database session
-            team_id: Team ID
+            channel_id: Channel ID
             name: Friendly name for the key
             created_by: User who created the key
             description: Description of the key
-            monthly_quota: Monthly quota override (None = use team quota)
-            daily_quota: Daily quota override (None = use team quota)
+            monthly_quota: Monthly quota override (None = use channel quota)
+            daily_quota: Daily quota override (None = use channel quota)
             expires_in_days: Days until expiration (None = never expires)
 
         Returns:
@@ -133,7 +99,7 @@ class APIKeyManager:
             key_hash=key_hash,
             key_prefix=key_prefix,
             name=name,
-            team_id=team_id,
+            channel_id=channel_id,
             monthly_quota=monthly_quota,
             daily_quota=daily_quota,
             created_by=created_by,
@@ -144,7 +110,7 @@ class APIKeyManager:
         db.commit()
         db.refresh(api_key)
 
-        logger.info(f"Created API key: {name} (prefix: {key_prefix}) for team ID {team_id}")
+        logger.info(f"Created API key: {name} (prefix: {key_prefix}) for channel ID {channel_id}")
 
         return api_key_string, api_key
 
@@ -179,10 +145,10 @@ class APIKeyManager:
             logger.warning(f"Expired API key attempted (prefix: {db_key.key_prefix})")
             return None
 
-        # Check if team is active
-        if not db_key.team.is_active:
+        # Check if channel is active
+        if not db_key.channel.is_active:
             logger.warning(
-                f"API key from inactive team attempted (prefix: {db_key.key_prefix}, team: {db_key.team.display_name})"
+                f"API key from inactive channel attempted (prefix: {db_key.key_prefix}, channel: {db_key.channel.title})"
             )
             return None
 
@@ -190,7 +156,7 @@ class APIKeyManager:
         db_key.last_used_at = datetime.utcnow()
         db.commit()
 
-        logger.debug(f"API key validated (prefix: {db_key.key_prefix}, team: {db_key.team.display_name})")
+        logger.debug(f"API key validated (prefix: {db_key.key_prefix}, channel: {db_key.channel.title})")
         return db_key
 
     @staticmethod
@@ -241,179 +207,160 @@ class APIKeyManager:
         return True
 
     @staticmethod
-    def list_team_api_keys(db: Session, team_id: int) -> List[APIKey]:
+    def list_channel_api_keys(db: Session, channel_id: int) -> List[APIKey]:
         """
-        List all API keys for a team.
+        List all API keys for a channel.
 
         Args:
             db: Database session
-            team_id: Team ID
+            channel_id: Channel ID
 
         Returns:
             List of API keys
         """
-        return db.query(APIKey).filter(APIKey.team_id == team_id).all()
+        return db.query(APIKey).filter(APIKey.channel_id == channel_id).all()
 
     @staticmethod
-    def get_team_by_name(db: Session, name: str) -> Optional[Team]:
+    def get_channel_by_id(db: Session, channel_id: int) -> Optional[Channel]:
         """
-        Get team by display_name (legacy method for backward compatibility).
-
-        For new code, use get_team_by_platform_name() or get_team_by_display_name().
+        Get channel by ID.
 
         Args:
             db: Database session
-            name: Team display name
+            channel_id: Channel ID
 
         Returns:
-            Team object if found, None otherwise
+            Channel object if found, None otherwise
         """
-        return db.query(Team).filter(Team.display_name == name).first()
+        return db.query(Channel).filter(Channel.id == channel_id).first()
 
     @staticmethod
-    def get_team_by_display_name(db: Session, display_name: str) -> Optional[Team]:
+    def get_channel_by_channel_id(db: Session, channel_id_str: str) -> Optional[Channel]:
         """
-        Get team by human-friendly display name.
+        Get channel by channel_id (technical identifier).
 
         Args:
             db: Database session
-            display_name: Team display name
+            channel_id_str: Channel identifier (e.g., "telegram", "popak", "avand")
 
         Returns:
-            Team object if found, None otherwise
+            Channel object if found, None otherwise
         """
-        return db.query(Team).filter(Team.display_name == display_name).first()
+        return db.query(Channel).filter(Channel.channel_id == channel_id_str).first()
 
     @staticmethod
-    def get_team_by_platform_name(db: Session, platform_name: str) -> Optional[Team]:
+    def get_channel_by_title(db: Session, title: str) -> Optional[Channel]:
         """
-        Get team by platform name.
+        Get channel by human-friendly title.
 
         Args:
             db: Database session
-            platform_name: Platform name (e.g., "Internal-BI", "External-Telegram")
+            title: Channel title
 
         Returns:
-            Team object if found, None otherwise
+            Channel object if found, None otherwise
         """
-        return db.query(Team).filter(Team.platform_name == platform_name).first()
+        return db.query(Channel).filter(Channel.title == title).first()
 
     @staticmethod
-    def create_team_with_key(
+    def create_channel_with_key(
         db: Session,
-        platform_name: str,
+        channel_id: str,
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
-        display_name: Optional[str] = None,
-        platform_type: str = "private",
+        title: Optional[str] = None,
+        access_type: str = "private",
         rate_limit: Optional[int] = None,
         max_history: Optional[int] = None,
         default_model: Optional[str] = None,
         available_models: Optional[List[str]] = None,
         allow_model_switch: Optional[bool] = None,
-    ) -> Tuple[Team, str]:
+    ) -> Tuple[Channel, str]:
         """
-        Create a new team with auto-generated API key (one key per team).
-
-        This is the new simplified method that creates a team and immediately
-        generates its single API key.
+        Create a new channel with auto-generated API key (one key per channel).
 
         Args:
             db: Database session
-            platform_name: System identifier for routing (e.g., "Internal-BI", "External-Telegram")
+            channel_id: System identifier for routing (e.g., "telegram", "popak", "avand")
             monthly_quota: Monthly request quota (None = unlimited)
             daily_quota: Daily request quota (None = unlimited)
-            display_name: Human-friendly display name (defaults to platform_name if not provided)
-            platform_type: 'public' or 'private' (default: 'private')
-            rate_limit: Override default rate limit (None = use platform_type default)
-            max_history: Override max conversation history (None = use platform_type default)
-            default_model: Override default AI model (None = use platform_type default)
-            available_models: Override available models list (None = use platform_type default)
-            allow_model_switch: Override model switch permission (None = use platform_type default)
+            title: Human-friendly display name (defaults to channel_id if not provided)
+            access_type: 'public' or 'private' (default: 'private')
+            rate_limit: Override default rate limit (None = use access_type default)
+            max_history: Override max conversation history (None = use access_type default)
+            default_model: Override default AI model (None = use access_type default)
+            available_models: Override available models list (None = use access_type default)
+            allow_model_switch: Override model switch permission (None = use access_type default)
 
         Returns:
-            Tuple of (team, api_key_string)
-            - team: Created team object
+            Tuple of (channel, api_key_string)
+            - channel: Created channel object
             - api_key_string: Full API key (show only once to user)
         """
-        # Create team with platform configuration
-        team = Team(
-            display_name=display_name or platform_name,  # Default to platform_name if not provided
-            platform_name=platform_name,
-            platform_type=platform_type,
+        # Create channel with configuration
+        channel = Channel(
+            title=title or channel_id,  # Default to channel_id if not provided
+            channel_id=channel_id,
+            access_type=access_type,
             monthly_quota=monthly_quota,
             daily_quota=daily_quota,
-            # Platform config overrides (NULL = use defaults)
+            # Channel config overrides (NULL = use defaults)
             rate_limit=rate_limit,
             max_history=max_history,
             default_model=default_model,
             available_models=",".join(available_models) if available_models else None,  # Store as CSV
             allow_model_switch=allow_model_switch,
         )
-        db.add(team)
-        db.flush()  # Flush to get team.id before creating key
+        db.add(channel)
+        db.flush()  # Flush to get channel.id before creating key
 
-        # Auto-generate API key for this team
+        # Auto-generate API key for this channel
         api_key_string, key_hash, key_prefix = APIKeyManager.generate_api_key()
 
         api_key = APIKey(
             key_hash=key_hash,
             key_prefix=key_prefix,
-            name=f"API Key for {platform_name}",  # Auto-generated name
-            team_id=team.id,
-            monthly_quota=None,  # Use team quotas
-            daily_quota=None,  # Use team quotas
+            name=f"API Key for {channel_id}",  # Auto-generated name
+            channel_id=channel.id,
+            monthly_quota=None,  # Use channel quotas
+            daily_quota=None,  # Use channel quotas
             created_by="system",  # Auto-created by system
-            description=f"Auto-generated key for {platform_name}",
+            description=f"Auto-generated key for {channel_id}",
         )
         db.add(api_key)
         db.commit()
-        db.refresh(team)
+        db.refresh(channel)
 
         logger.info(
-            f"Created team '{platform_name}' (ID: {team.id}, type: {platform_type}) with auto-generated API key (prefix: {key_prefix})"
+            f"Created channel '{channel_id}' (ID: {channel.id}, type: {access_type}) with auto-generated API key (prefix: {key_prefix})"
         )
 
-        return team, api_key_string
+        return channel, api_key_string
 
     @staticmethod
-    def get_team_by_id(db: Session, team_id: int) -> Optional[Team]:
+    def list_all_channels(db: Session, active_only: bool = True) -> List[Channel]:
         """
-        Get team by ID.
+        List all channels.
 
         Args:
             db: Database session
-            team_id: Team ID
+            active_only: Only return active channels
 
         Returns:
-            Team object if found, None otherwise
+            List of channels
         """
-        return db.query(Team).filter(Team.id == team_id).first()
-
-    @staticmethod
-    def list_all_teams(db: Session, active_only: bool = True) -> List[Team]:
-        """
-        List all teams.
-
-        Args:
-            db: Database session
-            active_only: Only return active teams
-
-        Returns:
-            List of teams
-        """
-        query = db.query(Team)
+        query = db.query(Channel)
         if active_only:
-            query = query.filter(Team.is_active)
+            query = query.filter(Channel.is_active)
         return query.all()
 
     @staticmethod
-    def update_team(
+    def update_channel(
         db: Session,
-        team_id: int,
-        display_name: Optional[str] = None,
-        platform_name: Optional[str] = None,
-        platform_type: Optional[str] = None,
+        channel_id: int,
+        title: Optional[str] = None,
+        channel_id_str: Optional[str] = None,
+        access_type: Optional[str] = None,
         monthly_quota: Optional[int] = None,
         daily_quota: Optional[int] = None,
         is_active: Optional[bool] = None,
@@ -422,22 +369,16 @@ class APIKeyManager:
         default_model: Optional[str] = None,
         available_models: Optional[List[str]] = None,
         allow_model_switch: Optional[bool] = None,
-    ) -> Optional[Team]:
+    ) -> Optional[Channel]:
         """
-        Update team settings.
-
-        Supports independent updates to display_name and platform_name:
-        - display_name: Human-friendly name for admin UI
-        - platform_name: System identifier for routing
-        - platform_type: 'public' or 'private'
-        - Platform config overrides: Set to None to keep existing, or provide new values
+        Update channel settings.
 
         Args:
             db: Database session
-            team_id: Team ID
-            display_name: New human-friendly display name
-            platform_name: New platform identifier
-            platform_type: New platform type ('public' or 'private')
+            channel_id: Channel ID (integer primary key)
+            title: New human-friendly display name
+            channel_id_str: New channel identifier
+            access_type: New access type ('public' or 'private')
             monthly_quota: New monthly quota
             daily_quota: New daily quota
             is_active: Active status
@@ -448,94 +389,94 @@ class APIKeyManager:
             allow_model_switch: Override model switch permission (None = keep existing)
 
         Returns:
-            Updated team if found, None otherwise
+            Updated channel if found, None otherwise
         """
-        team = db.query(Team).filter(Team.id == team_id).first()
+        channel = db.query(Channel).filter(Channel.id == channel_id).first()
 
-        if not team:
+        if not channel:
             return None
 
-        if display_name is not None:
-            team.display_name = display_name
-        if platform_name is not None:
-            team.platform_name = platform_name
-        if platform_type is not None:
-            team.platform_type = platform_type
+        if title is not None:
+            channel.title = title
+        if channel_id_str is not None:
+            channel.channel_id = channel_id_str
+        if access_type is not None:
+            channel.access_type = access_type
         if monthly_quota is not None:
-            team.monthly_quota = monthly_quota
+            channel.monthly_quota = monthly_quota
         if daily_quota is not None:
-            team.daily_quota = daily_quota
+            channel.daily_quota = daily_quota
         if is_active is not None:
-            team.is_active = is_active
+            channel.is_active = is_active
 
-        # Platform configuration overrides
+        # Channel configuration overrides
         if rate_limit is not None:
-            team.rate_limit = rate_limit
+            channel.rate_limit = rate_limit
         if max_history is not None:
-            team.max_history = max_history
+            channel.max_history = max_history
         if default_model is not None:
-            team.default_model = default_model
+            channel.default_model = default_model
         if available_models is not None:
-            team.available_models = ",".join(available_models) if available_models else None
+            channel.available_models = ",".join(available_models) if available_models else None
         if allow_model_switch is not None:
-            team.allow_model_switch = allow_model_switch
+            channel.allow_model_switch = allow_model_switch
 
-        team.updated_at = datetime.utcnow()
+        channel.updated_at = datetime.utcnow()
         db.commit()
-        db.refresh(team)
+        db.refresh(channel)
 
         logger.info(
-            f"Updated team: {team.display_name} / {team.platform_name} (ID: {team.id}, type: {team.platform_type})"
+            f"Updated channel: {channel.title} / {channel.channel_id} (ID: {channel.id}, type: {channel.access_type})"
         )
-        return team
+        return channel
 
     @staticmethod
-    def delete_team(db: Session, team_id: int, force: bool = False) -> bool:
+    def delete_channel(db: Session, channel_id: int, force: bool = False) -> bool:
         """
-        Delete a team. By default, only deletes if no active API keys exist.
+        Delete a channel. By default, only deletes if no active API keys exist.
 
         Args:
             db: Database session
-            team_id: Team ID to delete
-            force: If True, delete team and all associated API keys and usage logs
+            channel_id: Channel ID to delete
+            force: If True, delete channel and all associated API keys and usage logs
 
         Returns:
             True if deleted, False if not found or has active keys
         """
-        team = db.query(Team).filter(Team.id == team_id).first()
+        channel = db.query(Channel).filter(Channel.id == channel_id).first()
 
-        if not team:
-            logger.warning(f"Team not found for deletion: ID {team_id}")
+        if not channel:
+            logger.warning(f"Channel not found for deletion: ID {channel_id}")
             return False
 
         # Check for active API keys
-        active_keys = db.query(APIKey).filter(APIKey.team_id == team_id, APIKey.is_active).count()
+        active_keys = db.query(APIKey).filter(APIKey.channel_id == channel_id, APIKey.is_active).count()
 
         if active_keys > 0 and not force:
             logger.warning(
-                f"Cannot delete team {team.display_name}: has {active_keys} active API keys. Use force=True to delete anyway."
+                f"Cannot delete channel {channel.title}: has {active_keys} active API keys. Use force=True to delete anyway."
             )
             raise ValueError(
-                f"Team has {active_keys} active API keys. Revoke them first or use --force flag."
+                f"Channel has {active_keys} active API keys. Revoke them first or use --force flag."
             )
 
-        team_name = team.display_name
+        channel_name = channel.title
 
         # If force, delete all associated API keys and usage logs
         if force:
             # Delete usage logs first (foreign key dependency)
-            deleted_logs = db.query(UsageLog).filter(UsageLog.team_id == team_id).delete()
+            deleted_logs = db.query(UsageLog).filter(UsageLog.channel_id == channel_id).delete()
 
             # Delete API keys
-            deleted_keys = db.query(APIKey).filter(APIKey.team_id == team_id).delete()
+            deleted_keys = db.query(APIKey).filter(APIKey.channel_id == channel_id).delete()
 
             logger.info(
-                f"Force deleting team {team_name}: removed {deleted_keys} keys and {deleted_logs} usage logs"
+                f"Force deleting channel {channel_name}: removed {deleted_keys} keys and {deleted_logs} usage logs"
             )
 
-        # Delete the team
-        db.delete(team)
+        # Delete the channel
+        db.delete(channel)
         db.commit()
 
-        logger.info(f"Deleted team: {team_name} (ID: {team_id})")
+        logger.info(f"Deleted channel: {channel_name} (ID: {channel_id})")
         return True

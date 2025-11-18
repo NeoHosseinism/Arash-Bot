@@ -117,21 +117,21 @@ class PlatformManager:
 
     def get_config(self, platform: str, team: Optional[Any] = None) -> PlatformConfig:
         """
-        Get configuration for a platform with optional team-specific overrides.
+        Get configuration for a platform with optional channel-specific overrides.
 
         Args:
-            platform: Platform name (e.g., "telegram", "HOSCO-Popak")
-            team: Optional Team object with configuration overrides
+            platform: Platform name (e.g., "telegram", "popak", "avand")
+            team: Optional Channel object with configuration overrides (param kept for backward compat)
 
         Returns:
-            PlatformConfig with defaults and team-specific overrides applied
+            PlatformConfig with defaults and channel-specific overrides applied
         """
-        # If team provided, build custom config with overrides
-        if team:
-            # Start with default config for platform type
-            config = self.default_configs[team.platform_type].copy()
+        # If channel provided, build custom config with overrides
+        if team:  # Keep param name 'team' for backward compat
+            # Start with default config for access type
+            config = self.default_configs[team.access_type].copy()
 
-            # Apply team-specific overrides
+            # Apply channel-specific overrides
             if team.rate_limit is not None:
                 config.rate_limit = team.rate_limit
 

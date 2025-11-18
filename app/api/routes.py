@@ -252,23 +252,23 @@ async def chat(
     ## Security Update (CRITICAL)
     **Authentication is now MANDATORY for all requests.**
     - Telegram bot: Must use TELEGRAM_SERVICE_KEY
-    - External teams: Must use their team API keys
+    - External channels: Must use their channel API keys
     - Unauthenticated requests: REJECTED with 401
 
     ## Authentication Modes
 
     ### 1. TELEGRAM MODE (Telegram bot service):
     - Telegram bot uses TELEGRAM_SERVICE_KEY in Authorization header
-    - Platform="telegram", no team_id
+    - Platform="telegram", no channel_id
     - Session keys: telegram:conversation_id
 
-    ### 2. TEAM MODE (External authenticated teams):
-    - External teams use their team API keys
-    - Platform auto-detected from team.platform_name
-    - Session keys: platform_name:team_id:conversation_id (team isolation enforced)
+    ### 2. TEAM MODE (External authenticated channels):
+    - External channels use their channel API keys
+    - Platform auto-detected from channel.channel_id
+    - Session keys: channel_id:channel_id:conversation_id (channel isolation enforced)
 
     ## Single Conversation Per User
-    - Each user has ONE conversation per platform/team
+    - Each user has ONE conversation per platform/channel
     - No conversation_id needed - sessions are based on user_id
     - /clear command excludes previous messages from AI context but keeps in database
 
@@ -313,9 +313,9 @@ async def chat(
 
         logger.info(f"[TELEGRAM] bot_request user_id={message.user_id}")
     else:
-        # TEAM MODE: Authenticated external team
-        platform_name = auth.team.platform_name
-        team_id = auth.team_id
+        # TEAM MODE: Authenticated external channel
+        platform_name = auth.channel.channel_id
+        team_id = auth.channel_id
         api_key_id = auth.id
         api_key_prefix = auth.key_prefix
 
@@ -478,7 +478,7 @@ async def get_commands(
     ## Security Update (CRITICAL)
     **Authentication is now MANDATORY for all requests.**
     - Telegram bot: Must use TELEGRAM_SERVICE_KEY
-    - External teams: Must use their team API keys
+    - External channels: Must use their channel API keys
     - Unauthenticated requests: REJECTED with 401
 
     ## Authentication Modes
@@ -488,8 +488,8 @@ async def get_commands(
     - Returns Telegram platform commands
 
     ### 2. TEAM MODE:
-    - External teams use their team API keys
-    - Returns commands for authenticated team's platform
+    - External channels use their channel API keys
+    - Returns commands for authenticated channel's platform
 
     ## Response Format
     ```json
@@ -517,9 +517,9 @@ async def get_commands(
         platform_name = "telegram"
         logger.info("[TELEGRAM] commands_request platform=telegram")
     else:
-        # TEAM MODE: Authenticated external team
-        platform_name = auth.team.platform_name
-        logger.info(f"[TEAM] commands_request platform={platform_name} team_id={auth.team_id}")
+        # TEAM MODE: Authenticated external channel
+        platform_name = auth.channel.channel_id
+        logger.info(f"[TEAM] commands_request platform={platform_name} team_id={auth.channel_id}")
 
     # Get allowed commands for this platform
     allowed_commands = platform_manager.get_allowed_commands(platform_name)

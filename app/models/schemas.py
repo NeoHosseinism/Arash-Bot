@@ -51,7 +51,7 @@ class IncomingMessage(BaseModel):
     - Each user has ONE conversation per platform/team (no conversation_id needed)
     - Messages are persisted in database
     - /clear command excludes previous messages from AI context (but keeps in DB)
-    - Platform auto-detected from API key's team.platform_name
+    - Platform auto-detected from API key's channel.channel_id
     """
 
     model_config = ConfigDict(
@@ -188,7 +188,7 @@ class SessionStatusResponse(BaseModel):
                 {
                     "user_id": "user_12345",
                     "platform": "Internal-BI",
-                    "platform_type": "private",
+                    "access_type": "private",
                     "current_model": "Gemini 2.0 Flash",
                     "total_message_count": 24,
                     "history_length": 10,
@@ -203,7 +203,7 @@ class SessionStatusResponse(BaseModel):
 
     user_id: str = Field(..., examples=["user_12345", "telegram_987654"])
     platform: str = Field(..., examples=["telegram", "Internal-BI"])
-    platform_type: str = Field(..., examples=["public", "private"])
+    access_type: str = Field(..., examples=["public", "private"])
     current_model: str = Field(..., examples=["Gemini 2.0 Flash", "DeepSeek Chat V3"])
     total_message_count: int = Field(
         ..., examples=[24], description="Total messages ever (persists through /clear). Commands are NOT counted - only chat messages and AI responses."

@@ -94,14 +94,14 @@ class UsageTracker:
                 "allowed": bool,
                 "current_usage": int,
                 "quota_limit": int or None,
-                "quota_source": "api_key" or "team" or "unlimited",
+                "quota_source": "api_key" or "channel" or "unlimited",
                 "reset_time": datetime or None
             }
         """
         # Determine which quota to use
         if period == "daily":
             quota_limit = (
-                api_key.daily_quota if api_key.daily_quota is not None else api_key.team.daily_quota
+                api_key.daily_quota if api_key.daily_quota is not None else api_key.channel.daily_quota
             )
             period_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
             reset_time = period_start + timedelta(days=1)
@@ -109,7 +109,7 @@ class UsageTracker:
             quota_limit = (
                 api_key.monthly_quota
                 if api_key.monthly_quota is not None
-                else api_key.team.monthly_quota
+                else api_key.channel.monthly_quota
             )
             now = datetime.utcnow()
             period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -148,14 +148,14 @@ class UsageTracker:
                 (period == "daily" and api_key.daily_quota is not None)
                 or (period == "monthly" and api_key.monthly_quota is not None)
             )
-            else "team"
+            else "channel"
         )
 
         allowed = current_usage < quota_limit
 
         if not allowed:
             logger.warning(
-                f"Quota exceeded for API key {api_key.key_prefix} (team: {api_key.team.display_name}): "
+                f"Quota exceeded for API key {api_key.key_prefix} (channel: {api_key.channel.title}): "
                 f"{current_usage}/{quota_limit} {period} requests"
             )
 
